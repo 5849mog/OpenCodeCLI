@@ -1,0 +1,50 @@
+:81 {
+	@transform_port_query {
+		query XTransformPort=*
+	}
+
+	handle @transform_port_query {
+		reverse_proxy localhost:{query.XTransformPort} {
+			header_up Host {host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# ── CORS proxy for fetch_url (optional) ──
+	# Route:  /cors-proxy/https://example.com/page
+	# Usage:  Configure "Custom CORS proxy URL" in Settings as http://localhost:81/cors-proxy/
+	#
+	# SECURITY WARNING: This proxy forwards arbitrary URLs. In production it could
+	# be abused to access internal services. Only use on trusted networks.
+	@cors_proxy {
+		path /cors-proxy/*
+	}
+	handle @cors_proxy {
+		uri strip_prefix /cors-proxy
+		reverse_proxy {path} {
+			header_up User-Agent "Mozilla/5.0 (compatible; OpenCodeWeb/1.0)"
+		}
+	}
+
+	@cors_preflight {
+		method OPTIONS
+		path /cors-proxy/*
+	}
+	handle @cors_preflight {
+		header Access-Control-Allow-Origin *
+		header Access-Control-Allow-Methods "GET, POST, OPTIONS"
+		header Access-Control-Allow-Headers *
+		respond 204
+	}
+
+	handle {
+		reverse_proxy localhost:3000 {
+			header_up Host {host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Real-IP {remote_host}
+		}
+	}
+}

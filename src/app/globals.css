@@ -1,0 +1,201 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-fraunces);
+  --font-mono: var(--font-jetbrains-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Claude-inspired warm palette */
+:root {
+  --radius: 0.75rem;
+  /* Warm whites & creams */
+  --background: #FAF9F7;
+  --foreground: #2D2B27;
+  --card: #FFFFFF;
+  --card-foreground: #2D2B27;
+  --popover: #FFFFFF;
+  --popover-foreground: #2D2B27;
+  /* Claude orange */
+  --primary: #D97757;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F5F3EE;
+  --secondary-foreground: #2D2B27;
+  --muted: #F0EDE5;
+  --muted-foreground: #8B8884;
+  --accent: #F5F3EE;
+  --accent-foreground: #2D2B27;
+  --destructive: #E54D2E;
+  --border: #E5E2D9;
+  --input: #E5E2D9;
+  --ring: #D97757;
+  /* Claude orange for charts */
+  --chart-1: #D97757;
+  --chart-2: #E8A87C;
+  --chart-3: #C4A484;
+  --chart-4: #8B7355;
+  --chart-5: #6B5D54;
+  --sidebar: #F5F3EE;
+  --sidebar-foreground: #2D2B27;
+  --sidebar-primary: #D97757;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F0EDE5;
+  --sidebar-accent-foreground: #2D2B27;
+  --sidebar-border: #E5E2D9;
+  --sidebar-ring: #D97757;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ----- Prism syntax highlighting — Claude warm theme ----- */
+code[class*="language-"],
+pre[class*="language-"],
+.token {
+  font-family: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo,
+    Monaco, "Courier New", monospace;
+}
+
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #A8A29E;
+  font-style: italic;
+}
+
+.token.punctuation {
+  color: #78716C;
+}
+
+.token.property,
+.token.tag,
+.token.boolean,
+.token.number,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #D97757;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #6B8E6B;
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #C4A484;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.keyword {
+  color: #B87B5A;
+}
+
+.token.function,
+.token.class-name {
+  color: #8B7355;
+}
+
+.token.regex,
+.token.important,
+.token.variable {
+  color: #D97757;
+}
+
+.token.important,
+.token.bold {
+  font-weight: bold;
+}
+
+.token.italic {
+  font-style: italic;
+}
+
+/* ----- Scrollbars — Claude style ----- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #D6D3CE;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A8A29E;
+}
+
+/* Indeterminate progress bar animation */
+@keyframes slide-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+/* Claude-style fade in animation */
+@keyframes claude-fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.claude-fade-in {
+  animation: claude-fade-in 0.2s ease-out;
+}
