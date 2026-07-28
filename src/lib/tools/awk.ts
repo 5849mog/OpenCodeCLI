@@ -56,12 +56,12 @@ export function sprintfAwk(fmt: string, args: string[]): string {
   let ai = 0;
   for (let i = 0; i < fmt.length; i++) {
     if (fmt[i] === "%" && i + 1 < fmt.length) {
-      const spec = fmt[i + 1];
       i++;
-      // Skip width/precision spec (very basic)
+      // Skip width/precision digits (e.g. %.4 → just the .4 part)
       let j = i;
       while (j < fmt.length && /[0-9.]/.test(fmt[j])) j++;
-      if (j > i) { i = j - 1; continue; }
+      const spec = j < fmt.length ? fmt[j] : ""; // the format specifier after width/precision
+      if (spec) i = j; // skip past width/precision to the specifier
       switch (spec) {
         case "s": result += String(args[ai++] ?? ""); break;
         case "d": case "i": result += String(parseInt(args[ai++] ?? "0", 10) || 0); break;

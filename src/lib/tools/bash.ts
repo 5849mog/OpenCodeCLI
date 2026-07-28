@@ -1463,7 +1463,11 @@ function runOneShellCommandFromTokens(tokens: string[], stdin?: string): {
       const script = scriptArgs[0];
       const file = scriptArgs[1];
       const { content } = resolveInput(file);
-      if (content === null) return { ok: false, output: "awk: no input" };
+      // If no input but script has BEGIN block, pass empty string (BEGIN doesn't need input)
+      if (content === null) {
+        if (script.includes("BEGIN")) return { ok: true, output: runAwk(script, "", fieldSep) };
+        return { ok: false, output: "awk: no input" };
+      }
 
       return { ok: true, output: runAwk(script, content, fieldSep) };
     }
@@ -1497,8 +1501,10 @@ function runOneShellCommandFromTokens(tokens: string[], stdin?: string): {
     case "expr": {
       let calcExpr: string;
       let calcScale = 0;
-      if (program === "bc" && !rest.length && stdin) {
-        calcExpr = stdin.trim();
+      if (program === "bc" && stdin) {
+        // bc with piped stdin: filter out flags like -l so we read from stdin
+        const args = rest.filter(t => !t.startsWith("-"));
+        calcExpr = args.join(" ").trim() || stdin.trim();
       } else {
         calcExpr = rest.join(" ").trim();
       }
