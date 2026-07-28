@@ -23,7 +23,12 @@ jobs:
       - uses: oven-sh/setup-bun@v1
 
       - name: Install dependencies
-        run: bun install
+        run: |
+          for i in 1 2 3; do
+            bun install && break
+            echo "bun install failed (attempt $i), retrying in 5s..."
+            sleep 5
+          done
 
       - name: Set repo name
         run: |
