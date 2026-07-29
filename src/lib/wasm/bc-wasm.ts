@@ -56,8 +56,8 @@ async function init(): Promise<boolean> {
       if (!wasmResp.ok) throw new Error(`bc.wasm HTTP ${wasmResp.status}`);
       wasmBinary = await wasmResp.arrayBuffer();
 
-      // 3. 暖机测试
-      const test = await createInstance('1+1');
+      // 3. 暖机测试（同时验证 -l 模式）
+      const test = await createInstance('1+1', { useMathLib: true });
       if (!test.ok) throw new Error(`warm-up failed: ${test.output}`);
 
       wasmReady = true;
@@ -74,12 +74,16 @@ async function init(): Promise<boolean> {
 
 // ─── 创建实例 ─────────────────────────────────────────────────────
 
+interface InstanceOptions {
+  useMathLib?: boolean;
+}
+
 interface InstanceResult {
   ok: boolean;
   output: string;
 }
 
-async function createInstance(expr: string): Promise<InstanceResult> {
+async function createInstance(expr: string, opts?: InstanceOptions): Promise<InstanceResult> {
   const stdout: string[] = [];
   const stderr: string[] = [];
 
@@ -97,7 +101,8 @@ async function createInstance(expr: string): Promise<InstanceResult> {
   })) as Record<string, unknown>;
 
   const callMain = inst.callMain as (args: string[]) => void;
-  callMain(['-q']);
+  const bcArgs = opts?.useMathLib ? ['-q', '-l'] : ['-q'];
+  callMain(bcArgs);
 
   const errOutput = stderr.join('\n').trim();
   if (errOutput) return { ok: false, output: errOutput };
@@ -174,7 +179,7 @@ export async function evaluate(expr: string, opts?: BcOptions): Promise<BcResult
 
   if (wasmReady && bcFactory && wasmBinary) {
     try {
-      const result = await createInstance(expression);
+      const result = await createInstance(expression, { useMathLib: opts?.useMathLib });
       if (result.ok && result.output !== '(no output)') return result;
       if (!result.ok) return result;
     } catch (err) {
