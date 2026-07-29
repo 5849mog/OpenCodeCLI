@@ -8,7 +8,7 @@
  * 降级: wasm 不可用时自动回退到 JS 实现。
  */
 
-let wasmModule: WebAssembly.Module | null = null;
+let wasmBinary: ArrayBuffer | null = null;
 let bcFactory: ((opts: Record<string, unknown>) => Promise<Record<string, unknown>>) | null = null;
 let wasmReady = false;
 let initPromise: Promise<boolean> | null = null;
@@ -44,18 +44,17 @@ async function init(): Promise<boolean> {
 
   initPromise = (async () => {
     try {
-      // 1. 预编译 wasm Module（缓存 WebAssembly.Module）
-      const wasmResp = await fetch(wasmUrl('bc.wasm'));
-      if (!wasmResp.ok) throw new Error(`bc.wasm HTTP ${wasmResp.status}`);
-      wasmModule = await WebAssembly.compileStreaming(wasmResp);
-
-      // 2. 用 <script> 标签加载 emscripten 粘合剂
-      //    emscripten 输出经典脚本 (MODULARIZE + EXPORT_ES6=0)，
-      //    UMD 回退到 window.BCModule = factory
+      // 1. 加载 <script> 标签（emscripten 粘合剂）
+      //    UMD 回退到 window.BCModule
       await loadScript(wasmUrl('bc.js'));
       const factory = (window as any).BCModule;
-      if (typeof factory !== 'function') throw new Error('BCModule factory not found on window');
+      if (typeof factory !== 'function') throw new Error('BCModule not found');
       bcFactory = factory;
+
+      // 2. 获取 wasm 二进制（预缓存，避免每次 fetch）
+      const wasmResp = await fetch(wasmUrl('bc.wasm'));
+      if (!wasmResp.ok) throw new Error(`bc.wasm HTTP ${wasmResp.status}`);
+      wasmBinary = await wasmResp.arrayBuffer();
 
       // 3. 暖机测试
       const test = await createInstance('1+1');
@@ -91,15 +90,10 @@ async function createInstance(expr: string): Promise<InstanceResult> {
     print: (t: unknown) => stdout.push(String(t)),
     printErr: (t: unknown) => stderr.push(String(t)),
     stdin: () => (inputPos < inputBuf.length ? inputBuf[inputPos++] : null),
-    instantiateWasm: (
-      imports: WebAssembly.Imports,
-      callback: (instance: WebAssembly.Instance) => void,
-    ) => {
-      WebAssembly.instantiate(wasmModule!, imports).then(
-        ({ instance }) => callback(instance),
-      );
-      return {};
-    },
+    // 提供 wasm 二进制 + locateFile，让 emscripten 内部处理实例化
+    // （避免我们自己实现 instantiateWasm 时漏传 module 参数导致崩溃）
+    wasmBinary: wasmBinary,
+    locateFile: (path: string) => wasmUrl(path),
   })) as Record<string, unknown>;
 
   const callMain = inst.callMain as (args: string[]) => void;
@@ -178,7 +172,7 @@ export async function evaluate(expr: string, opts?: BcOptions): Promise<BcResult
 
   const expression = opts?.stdin ?? expr;
 
-  if (wasmReady && bcFactory && wasmModule) {
+  if (wasmReady && bcFactory && wasmBinary) {
     try {
       const result = await createInstance(expression);
       if (result.ok && result.output !== '(no output)') return result;
