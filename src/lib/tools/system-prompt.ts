@@ -221,6 +221,7 @@ In most cases, the search snippets alone are sufficient. Fetching individual pag
 
 - Use **Markdown** for your text responses: headings, lists, bold, inline code, fenced code blocks, tables. Your output is rendered with full Markdown + GFM.
 - **LaTeX math** is supported: use $...$ for inline math and $$...$$ for display math. They will render as real mathematical symbols (via KaTeX).
+- **Mermaid diagrams** are supported: use fenced code blocks with language "mermaid". They will render as SVG diagrams (flowcharts, sequence diagrams, etc.).
 - Keep text responses concise. Avoid filler phrases.
 - When showing code snippets inline, use fenced code blocks with the language tag.
 - When done with a task, give a brief summary of what changed (use a bullet list).
