@@ -1,6 +1,7 @@
 import { vfs, grepSync } from "../vfs";
 import type { ToolResult } from "./types";
 import { runAwk, splitAwkActions } from "./awk";
+import * as bcWasm from "../wasm/bc-wasm";
 
 /** Split a command string on &&, ||, and ; while respecting quotes and \;
  *  e.g. `echo abc | sed 's/a/X/; s/b/Y/'` → one segment (the ; is inside quotes)
@@ -91,7 +92,7 @@ async function toolBash(args: Record<string, unknown>): Promise<ToolResult> {
       case ";":    shouldRun = true; break;
     }
     if (!shouldRun) continue;
-    const out = runPipeline(seg.cmd);
+    const out = await runPipeline(seg.cmd);
     if (out.mutated) mutated = true;
     if (out.output) outputs.push(out.output);
     lastOk = out.ok;
@@ -108,11 +109,11 @@ async function toolBash(args: Record<string, unknown>): Promise<ToolResult> {
   };
 }
 
-function runPipeline(cmdLine: string): {
+async function runPipeline(cmdLine: string): Promise<{
   ok: boolean;
   output: string;
   mutated?: boolean;
-} {
+}> {
   const tokens = tokenizeWithOperators(cmdLine);
   if (tokens.length === 0) return { ok: false, output: "Empty command" };
 
@@ -161,7 +162,7 @@ function runPipeline(cmdLine: string): {
       if (f === null) return { ok: false, output: `<: ${stage.inputRedirect}: not found` };
       stageStdin = f;
     }
-    const result = runOneShellCommandFromTokens(stage.cmdTokens, stageStdin);
+    const result = await runOneShellCommandFromTokens(stage.cmdTokens, stageStdin);
     if (result.mutated) mutated = true;
     if (!result.ok) {
       return { ok: false, output: result.output, mutated };
@@ -236,11 +237,11 @@ function tokenizeWithOperators(cmd: string): string[] {
   return tokens;
 }
 
-function runOneShellCommand(cmd: string, stdin?: string): {
+async function runOneShellCommand(cmd: string, stdin?: string): Promise<{
   ok: boolean;
   output: string;
   mutated?: boolean;
-} {
+}> {
   return runOneShellCommandFromTokens(tokenize(cmd), stdin);
 }
 
@@ -277,11 +278,11 @@ function splitLines(s: string): string[] {
   return l;
 }
 
-function runOneShellCommandFromTokens(tokens: string[], stdin?: string): {
+async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): Promise<{
   ok: boolean;
   output: string;
   mutated?: boolean;
-} {
+}> {
   if (tokens.length === 0) return { ok: false, output: "Empty command" };
 
   const expandedTokens: string[] = [tokens[0]];
@@ -609,7 +610,7 @@ function runOneShellCommandFromTokens(tokens: string[], stdin?: string): {
         for (const f of files) {
           const fullPath = "./" + f.path;
           const cmdTokens = execCmd.map((t) => (t === "{}" ? fullPath : t));
-          const r = runOneShellCommandFromTokens(cmdTokens);
+          const r = await runOneShellCommandFromTokens(cmdTokens);
           if (r.output) results.push(r.output);
         }
         return { ok: true, output: results.join("\n") || "(command completed with no output)" };
@@ -1499,52 +1500,42 @@ function runOneShellCommandFromTokens(tokens: string[], stdin?: string): {
     }
     case "bc":
     case "expr": {
-      let calcExpr: string;
-      let calcScale = 0;
-      if (program === "bc" && stdin) {
-        // bc with piped stdin: filter out flags like -l so we read from stdin
-        const args = rest.filter(t => !t.startsWith("-"));
-        calcExpr = args.join(" ").trim() || stdin.trim();
-      } else {
-        calcExpr = rest.join(" ").trim();
-      }
-      if (!calcExpr) return { ok: false, output: `${program}: missing expression` };
-
       if (program === "bc") {
-        // Extract scale=N
-        const sm = calcExpr.match(/\bscale\s*=\s*(\d+)\b/);
-        if (sm) { calcScale = parseInt(sm[1], 10); calcExpr = calcExpr.replace(/\bscale\s*=\s*\d+\s*[;,]\s*/g, ""); }
+        // --- Native bc via WebAssembly (with JS fallback) ---
+        // Extract flags (-l for math lib) from tokens
+        const flags = rest.filter(t => t.startsWith("-"));
+        // Rest is the expression; if piped stdin, use that instead
+        const args = rest.filter(t => !t.startsWith("-"));
+        const calcExpr = (stdin ? args.join(" ") || stdin.trim() : args.join(" ")).trim();
 
-        // Convert bc syntax → JavaScript equivalents:
-        //   ^ (exponentiation) → **
-        //   sqrt(x) → Math.sqrt(x)
-        //   s(x), c(x), a(x), l(x), e(x) → Math.sin, Math.cos, etc.
-        //   pi → Math.PI
-        //   length(x) → number of integer digits
-        //   ibase/obase → stripped (not supported)
-        calcExpr = calcExpr
-          .replace(/\^/g, "**")
-          .replace(/\bsqrt\s*\(/g, "Math.sqrt(")
-          .replace(/(?<!\w)s\s*\(/g, "Math.sin(")
-          .replace(/(?<!\w)c\s*\(/g, "Math.cos(")
-          .replace(/(?<!\w)a\s*\(/g, "Math.atan(")
-          .replace(/(?<!\w)l\s*\(/g, "Math.log(")
-          .replace(/(?<!\w)e\s*\(/g, "Math.exp(")
-          .replace(/\bpi\b/gi, "Math.PI")
-          .replace(/\b(length|ibase|obase)\s*[=\(\s]/gi, "");
+        if (!calcExpr) return { ok: false, output: "bc: no expression provided" };
+
+        // Try WebAssembly bc, fallback to legacy JS evaluator
+        try {
+          const result = await bcWasm.evaluate(calcExpr, {
+            stdin: stdin ?? undefined,
+            useMathLib: flags.includes("-l"),
+          });
+          return result;
+        } catch (_e) {
+          // Wasm evaluation threw — this shouldn't happen since bcWasm has
+          // its own internal fallback, but just in case:
+          return { ok: false, output: "bc: evaluation failed" };
+        }
       }
 
-      // Sanitize: allow numbers, operators, parens, decimals, Math.xxx
-      const sanitized = calcExpr.replace(/[^0-9+\-*/().%\sa-zA-Z.]/g, "");
-      if (!sanitized.trim()) return { ok: false, output: `${program}: missing expression` };
+      // --- expr command: simple integer expression evaluator (kept as-is) ---
+      const calcExpr = rest.join(" ").trim();
+      if (!calcExpr) return { ok: false, output: "expr: missing expression" };
+
+      // Sanitize: allow only numbers, operators, parens, whitespace
+      const sanitized = calcExpr.replace(/[^0-9+\-*/%()\s]/g, "");
+      if (!sanitized.trim()) return { ok: false, output: "expr: missing expression" };
       try {
         const result = Function(`"use strict"; return (${sanitized})`)();
-        if (program === "bc" && calcScale > 0) {
-          return { ok: true, output: (result as number).toFixed(calcScale) };
-        }
         return { ok: true, output: String(result) };
       } catch {
-        return { ok: false, output: `${program}: expression evaluation failed` };
+        return { ok: false, output: "expr: expression evaluation failed" };
       }
     }
     case "xargs": {
@@ -1574,13 +1565,13 @@ function runOneShellCommandFromTokens(tokens: string[], stdin?: string): {
       if (replaceStr) {
         for (const item of items) {
           const args = xargsCmdTokens.map((t) => t.replace(replaceStr, item));
-          const r = runOneShellCommandFromTokens(args);
+          const r = await runOneShellCommandFromTokens(args);
           if (r.output) results.push(r.output);
         }
       } else {
         for (let bi = 0; bi < items.length; bi += maxArgs) {
           const batch = items.slice(bi, bi + maxArgs);
-          const r = runOneShellCommandFromTokens([...xargsCmdTokens, ...batch]);
+          const r = await runOneShellCommandFromTokens([...xargsCmdTokens, ...batch]);
           if (r.output) results.push(r.output);
         }
       }
