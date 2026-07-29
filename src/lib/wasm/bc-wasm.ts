@@ -1,16 +1,11 @@
 /**
- * bc-wasm.ts — WebAssembly bc 引擎 (主线层直连)
+ * bc-wasm.ts — WebAssembly bc 引擎（主线层直连）
  *
- * 直接在主线程加载 emscripten 编译的 bc.wasm，通过动态 import() 加载
- * emscripten 工厂。每次求值创建一个新的 wasm 实例（编译已缓存，仅实例化）。
+ * 用 <script> 标签加载 emscripten 的输出（经典脚本），
+ * 工厂函数注册到 window.BCModule，全程不经过打包器模块解析。
  *
- * 无 Worker，无 importScripts，避免 GitHub Pages 子目录部署的路径问题。
- *
- * API:
- *   - evaluate(expr, opts?) — 执行 bc 表达式
- *   - isAvailable()         — 检查 wasm 是否就绪
- *
- * 降级: wasm 不可用时自动回退到 JS 实现（基本运算）。
+ * 每次求值创建一个新的 wasm 实例（wasm Module 预编译缓存，仅实例化）。
+ * 降级: wasm 不可用时自动回退到 JS 实现。
  */
 
 let wasmModule: WebAssembly.Module | null = null;
@@ -20,10 +15,6 @@ let initPromise: Promise<boolean> | null = null;
 
 // ─── 路径解析 ────────────────────────────────────────────────────
 
-/**
- * 动态解析 wasm 文件的 URL，兼容 GitHub Pages 子目录部署。
- * 例如 https://5849mog.github.io/OpenCodeCLI/ 下返回 /OpenCodeCLI/wasm/xxx。
- */
 function wasmUrl(file: string): string {
   const { hostname, pathname } = window.location;
   if (hostname.includes('github.io')) {
@@ -31,6 +22,18 @@ function wasmUrl(file: string): string {
     if (seg.length > 0 && seg[0] !== '_next') return `/${seg[0]}/wasm/${file}`;
   }
   return `/wasm/${file}`;
+}
+
+// ─── <script> 加载器（绕过打包器） ───────────────────────────────
+
+function loadScript(url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`loadScript failed: ${url}`));
+    document.head.appendChild(s);
+  });
 }
 
 // ─── 初始化 ───────────────────────────────────────────────────────
@@ -41,24 +44,20 @@ async function init(): Promise<boolean> {
 
   initPromise = (async () => {
     try {
-      // 1. 预编译 wasm Module（缓存 WebAssembly.Module，重复实例化很快）
+      // 1. 预编译 wasm Module（缓存 WebAssembly.Module）
       const wasmResp = await fetch(wasmUrl('bc.wasm'));
       if (!wasmResp.ok) throw new Error(`bc.wasm HTTP ${wasmResp.status}`);
       wasmModule = await WebAssembly.compileStreaming(wasmResp);
 
-      // 2. 动态加载 emscripten 工厂（绕过 Turbopack 构建时解析）
-      const jsResp = await fetch(wasmUrl('bc.mjs'));
-      if (!jsResp.ok) throw new Error(`bc.mjs HTTP ${jsResp.status}`);
-      const jsCode = await jsResp.text();
-      const blobUrl = URL.createObjectURL(new Blob([jsCode], { type: 'text/javascript' }));
-      try {
-        const mod = await import(blobUrl);
-        bcFactory = mod.default as (opts: Record<string, unknown>) => Promise<Record<string, unknown>>;
-      } finally {
-        URL.revokeObjectURL(blobUrl);
-      }
+      // 2. 用 <script> 标签加载 emscripten 粘合剂
+      //    emscripten 输出经典脚本 (MODULARIZE + EXPORT_ES6=0)，
+      //    UMD 回退到 window.BCModule = factory
+      await loadScript(wasmUrl('bc.js'));
+      const factory = (window as any).BCModule;
+      if (typeof factory !== 'function') throw new Error('BCModule factory not found on window');
+      bcFactory = factory;
 
-      // 3. 暖机测试：创建一个实例然后丢弃（确保工厂能工作）
+      // 3. 暖机测试
       const test = await createInstance('1+1');
       if (!test.ok) throw new Error(`warm-up failed: ${test.output}`);
 
@@ -103,7 +102,6 @@ async function createInstance(expr: string): Promise<InstanceResult> {
     },
   })) as Record<string, unknown>;
 
-  // callMain 触发 bc 的 main()，处理 stdin → stdout
   const callMain = inst.callMain as (args: string[]) => void;
   callMain(['-q']);
 
@@ -128,14 +126,12 @@ function jsFallback(expr: string, stdin?: string): InstanceResult {
 
   if (!calcExpr) return { ok: false, output: 'bc: missing expression' };
 
-  // Extract scale=N
   const sm = calcExpr.match(/\bscale\s*=\s*(\d+)\b/);
   if (sm) {
     calcScale = parseInt(sm[1], 10);
     calcExpr = calcExpr.replace(/\bscale\s*=\s*\d+\s*[;,]\s*/g, '');
   }
 
-  // Convert bc syntax → JavaScript equivalents
   calcExpr = calcExpr
     .replace(/\^/g, '**')
     .replace(/\bsqrt\s*\(/g, 'Math.sqrt(')
@@ -147,7 +143,6 @@ function jsFallback(expr: string, stdin?: string): InstanceResult {
     .replace(/\bpi\b/gi, 'Math.PI')
     .replace(/\b(length|ibase|obase)\s*[=\(\s]/gi, '');
 
-  // Sanitize
   const sanitized = calcExpr.replace(/[^0-9+\-*/().%\sa-zA-Z.]/g, '');
   if (!sanitized.trim()) return { ok: false, output: 'bc: missing expression' };
 
@@ -174,19 +169,7 @@ export interface BcResult {
   output: string;
 }
 
-/**
- * 执行 bc 表达式。
- *
- * @param expr  表达式
- * @param opts  可选参数（stdin, useMathLib）
- *
- * 示例:
- *   evaluate('2+2')                     → { ok: true, output: '4' }
- *   evaluate('ibase=16; FF')           → { ok: true, output: '255' }
- *   evaluate('', { stdin: '2+2' })     → { ok: true, output: '4' }
- */
 export async function evaluate(expr: string, opts?: BcOptions): Promise<BcResult> {
-  // wasm 未就绪 → 尝试初始化
   if (!wasmReady && !initPromise) {
     await init();
   } else if (!wasmReady && initPromise) {
@@ -195,11 +178,9 @@ export async function evaluate(expr: string, opts?: BcOptions): Promise<BcResult
 
   const expression = opts?.stdin ?? expr;
 
-  // wasm 就绪 → 用它
   if (wasmReady && bcFactory && wasmModule) {
     try {
       const result = await createInstance(expression);
-      // 如果 wasm 返回空输出，降级
       if (result.ok && result.output !== '(no output)') return result;
       if (!result.ok) return result;
     } catch (err) {
@@ -207,13 +188,9 @@ export async function evaluate(expr: string, opts?: BcOptions): Promise<BcResult
     }
   }
 
-  // 降级到 JS 实现
   return jsFallback(expression, opts?.stdin);
 }
 
-/**
- * 检查 wasm bc 是否可用。
- */
 export async function isAvailable(): Promise<boolean> {
   if (wasmReady) return true;
   return init();
