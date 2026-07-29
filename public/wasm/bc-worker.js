@@ -106,5 +106,11 @@ self.onmessage = async (e) => {
   }
 };
 
-// Auto-init
-init();
+// Auto-init and signal readiness to main thread
+init().then(() => {
+  self.postMessage({ type: 'ready' });
+}).catch((err) => {
+  console.error('bc-worker fatal init error:', err);
+  // Send ready anyway so main thread doesn't hang — evaluate() will use fallback
+  self.postMessage({ type: 'ready' });
+});
