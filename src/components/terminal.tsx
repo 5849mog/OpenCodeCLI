@@ -1630,8 +1630,7 @@ let mermaidId = 0;
 function MermaidBlock({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const done = useRef(false);
-  const isComplete = code.trim().length > 10 && code.includes('
-');
+  const isComplete = code.trim().length > 10 && code.includes('\n');
   useEffect(() => {
     if (done.current || !ref.current || !isComplete) return;
     done.current = true;
