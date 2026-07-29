@@ -58,3 +58,9 @@ server.log
 /public/wasm/bc.js
 /tools/bc-wasm/source/
 /tools/bc-wasm/build/
+
+# mawk-wasm build artifacts
+/public/wasm/mawk.wasm
+/public/wasm/mawk.js
+/tools/mawk-wasm/source/
+/tools/mawk-wasm/build/
