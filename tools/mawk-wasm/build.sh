@@ -21,10 +21,11 @@ OUT_DIR="$PROJECT_ROOT/public/wasm"
 # --- Config ---
 # mawk source URLs (tried in order until one works)
 MAWK_URLS=(
-  "https://invisible-mirror.net/archives/mawk/mawk-1.3.4-20240930.tar.gz"
-  "https://invisible-mirror.net/archives/mawk/mawk-1.3.4-20240930.tgz"
-  "https://github.com/ThomasDickey/nawk-snapshots/archive/master.tar.gz"
-  "https://github.com/ThomasDickey/nawk-snapshots/archive/main.tar.gz"
+  "https://github.com/ThomasDickey/mawk-20121129/archive/master.tar.gz"
+  "https://github.com/ThomasDickey/mawk-20121129/archive/main.tar.gz"
+  "https://invisible-mirror.net/archives/mawk/mawk-1.3.4-20100507.tgz"
+  "https://invisible-mirror.net/archives/mawk/mawk-1.3.4-20100419.tgz"
+  "https://invisible-mirror.net/archives/mawk/mawk-1.3.3-20090820.tgz"
 )
 
 # --- Preflight ---
