@@ -32,6 +32,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import mermaid from "mermaid";
+
+mermaid.initialize({ startOnLoad: false, theme: "default" });
 import type { Components } from "react-markdown";
 import Prism from "prismjs";
 import "prismjs/components/prism-clike";
@@ -1623,6 +1626,24 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;");
 }
 
+let mermaidId = 0;
+function MermaidBlock({ code }: { code: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    (async () => {
+      if (!ref.current) return;
+      const id = ++mermaidId;
+      try {
+        const { svg } = await mermaid.render('mermaid-' + id, code);
+        ref.current.innerHTML = svg;
+      } catch (e) {
+        ref.current.innerHTML = '<pre class="text-red-500 text-xs">Mermaid error: ' + e + '</pre>';
+      }
+    })();
+  }, [code]);
+  return <div ref={ref} className="my-2 flex justify-center" />;
+}
+
 const markdownComponents: Components = {
   h1: ({ children }) => (
     <h1 className="mt-3 mb-2 text-lg font-bold text-[#1A1815]">{children}</h1>
@@ -1733,6 +1754,10 @@ const markdownComponents: Components = {
       const match = /language-(\w+)/.exec(childProps.className || "");
       if (match) lang = match[1];
       codeText = String(childProps.children ?? "").replace(/\n$/, "");
+    }
+    // Mermaid flowchart — render with mermaid.js
+    if (lang === "mermaid") {
+      return <MermaidBlock code={codeText} />;
     }
     return (
       <div className="my-2 overflow-hidden rounded-md border border-[#E5E2D9] bg-[#FFFFFF]">
