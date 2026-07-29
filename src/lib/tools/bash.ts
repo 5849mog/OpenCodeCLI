@@ -2,7 +2,6 @@ import { vfs, grepSync } from "../vfs";
 import type { ToolResult } from "./types";
 import { runAwk, splitAwkActions } from "./awk";
 import * as bcWasm from "../wasm/bc-wasm";
-import * as awkWasm from "../wasm/awk-wasm";
 
 /** Split a command string on &&, ||, and ; while respecting quotes and \;
  *  e.g. `echo abc | sed 's/a/X/; s/b/Y/'` → one segment (the ; is inside quotes)
@@ -1449,7 +1448,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       }
     }
     case "awk": {
-      let fieldSep: string = "";
+      let fieldSep: RegExp | string = /\s+/;
       const fIdx = rest.indexOf("-F");
       if (fIdx >= 0 && rest[fIdx + 1]) fieldSep = rest[fIdx + 1];
 
@@ -1465,21 +1464,13 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       const script = scriptArgs[0];
       const file = scriptArgs[1];
       const { content } = resolveInput(file);
-
-      // If no input but script has BEGIN block, pass empty string
+      // If no input but script has BEGIN block, pass empty string (BEGIN doesn't need input)
       if (content === null) {
-        if (script.includes("BEGIN")) return { ok: true, output: runAwk(script, "", fieldSep || /\s+/) };
+        if (script.includes("BEGIN")) return { ok: true, output: runAwk(script, "", fieldSep) };
         return { ok: false, output: "awk: no input" };
       }
 
-      // Try WebAssembly mawk (管道模式)
-      if (content) {
-        const result = await awkWasm.evaluate(script, content, { fieldSep: fieldSep || undefined });
-        if (result.ok) return result;
-      }
-
-      // 降级到 JS
-      return { ok: true, output: runAwk(script, content, fieldSep || /\s+/) };
+      return { ok: true, output: runAwk(script, content, fieldSep) };
     }
     case "paste": {
       const sIdx = rest.indexOf("-s");
