@@ -11,10 +11,22 @@
  *
  * Message protocol:
  *   { id: number, expr: string } → { id, ok: boolean, output: string }
+ *
+ * Path resolution:
+ *   Uses self.location.href to derive the wasm directory dynamically,
+ *   so it works in both dev (localhost) and GitHub Pages subdirectory deployment.
  */
 
+// --- Resolve wasm file paths dynamically ---
+// self.location.href in a Worker = the worker script's own URL
+// e.g. https://5849mog.github.io/OpenCodeCLI/wasm/bc-worker.js
+// Derive the directory to find bc.js and bc.wasm in the same folder
+const WASM_DIR = self.location.href.substring(
+  0, self.location.href.lastIndexOf('/') + 1
+);
+
 // Emscripten-generated module loader (MODULARIZE=1, classic script)
-importScripts('/wasm/bc.js');
+importScripts(WASM_DIR + 'bc.js');
 
 let wasmModule = null;
 let ready = false;
@@ -23,7 +35,7 @@ let ready = false;
 async function init() {
   if (ready) return;
   try {
-    const response = await fetch('/wasm/bc.wasm');
+    const response = await fetch(WASM_DIR + 'bc.wasm');
     wasmModule = await WebAssembly.compileStreaming(response);
     ready = true;
   } catch (err) {

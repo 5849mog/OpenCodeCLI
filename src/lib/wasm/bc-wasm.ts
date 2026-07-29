@@ -15,6 +15,25 @@
 
 // Worker 实例（单例，惰性创建）
 let worker: Worker | null = null;
+
+/**
+ * 动态解析 wasm 文件的 URL。
+ * GitHub Pages 部署在 username.github.io/repo-name/ 子目录下，
+ * 直接用 /wasm/ 会从根目录加载，找不到文件。
+ * 此函数检测 GitHub Pages 并自动加上 repo name 前缀。
+ */
+function getWasmUrl(filename: string): string {
+  // GitHub Pages 的子目录部署
+  if (window.location.hostname.includes('github.io')) {
+    const segments = window.location.pathname.split('/').filter(Boolean);
+    // 第一个路径段通常是 repo name（除非是根域名部署）
+    if (segments.length > 0 && segments[0] !== '_next') {
+      return '/' + segments[0] + '/wasm/' + filename;
+    }
+  }
+  // 根目录部署（localhost / 自定义域名）
+  return '/wasm/' + filename;
+}
 let workerReady = false;
 let workerInitPromise: Promise<boolean> | null = null;
 let nextCallId = 0;
@@ -91,7 +110,9 @@ export async function initBC(): Promise<boolean> {
 
   workerInitPromise = (async () => {
     try {
-      worker = new Worker('/wasm/bc-worker.js');
+      // Resolve Worker URL dynamically for subdirectory deployments (GitHub Pages)
+      const workerUrl = getWasmUrl('bc-worker.js');
+      worker = new Worker(workerUrl);
 
       // 监听 Worker 消息
       worker.onmessage = (e: MessageEvent) => {
