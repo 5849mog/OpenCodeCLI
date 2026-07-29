@@ -19,8 +19,8 @@ SOURCE_DIR="$SCRIPT_DIR/source"
 OUT_DIR="$PROJECT_ROOT/public/wasm"
 
 # --- Config ---
-MAWK_REPO="https://github.com/ThomasDickey/nawk-snapshots.git"
-MAWK_TAG="v1.3.4-20240930"
+# Official mawk source from invisible-island.net (maintained by Thomas Dickey)
+MAWK_URL="https://invisible-mirror.net/archives/mawk/mawk-1.3.4-20240930.tgz"
 
 # --- Preflight ---
 command -v emcc >/dev/null 2>&1 || {
@@ -41,11 +41,9 @@ else
   rm -rf "$SOURCE_DIR"
   mkdir -p "$SOURCE_DIR"
 
-  # Download tarball from GitHub (avoids git auth issues in CI)
-  TARBALL_URL="${MAWK_REPO%.git}/tarball/${MAWK_TAG}"
-  curl -fsSL "$TARBALL_URL" | tar xz --strip-components=1 -C "$SOURCE_DIR" 2>/dev/null || \
-    curl -fsSL "${MAWK_REPO%.git}/tarball/master" | tar xz --strip-components=1 -C "$SOURCE_DIR" 2>/dev/null || \
-    curl -fsSL "${MAWK_REPO%.git}/tarball/main" | tar xz --strip-components=1 -C "$SOURCE_DIR"
+  # Download source from invisible-mirror.net (official mawk distribution)
+  echo "  Downloading $MAWK_URL ..."
+  curl -fsSL "$MAWK_URL" | tar xz --strip-components=1 -C "$SOURCE_DIR"
 
   cd "$SOURCE_DIR"
   if [ ! -f "mawk.c" ]; then
