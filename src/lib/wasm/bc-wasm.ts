@@ -1,48 +1,114 @@
 /**
- * bc-wasm.ts — WebAssembly bc 引擎中间层
+ * bc-wasm.ts — WebAssembly bc 引擎 (主线层直连)
  *
- * 通过 Web Worker 调用真正的 bc (gavinhoward/bc 编译为 wasm)，
- * 支持完整的 POSIX bc 语法：变量、函数、条件、循环、进制转换等。
+ * 直接在主线程加载 emscripten 编译的 bc.wasm，通过动态 import() 加载
+ * emscripten 工厂。每次求值创建一个新的 wasm 实例（编译已缓存，仅实例化）。
+ *
+ * 无 Worker，无 importScripts，避免 GitHub Pages 子目录部署的路径问题。
  *
  * API:
- *   - initBC()         — 初始化 Worker 和 wasm 模块（惰性调用，无需手动）
- *   - evaluate(expr)   — 执行 bc 表达式，返回 { ok, output }
- *   - evaluateSync(expr) — （实验性）同步版本，作为 fallback
+ *   - evaluate(expr, opts?) — 执行 bc 表达式
+ *   - isAvailable()         — 检查 wasm 是否就绪
  *
- * 降级策略：
- *   如果 Worker 初始化失败，自动降级到内置 JS 实现。
+ * 降级: wasm 不可用时自动回退到 JS 实现（基本运算）。
  */
 
-// Worker 实例（单例，惰性创建）
-let worker: Worker | null = null;
+let wasmModule: WebAssembly.Module | null = null;
+let bcFactory: ((opts: Record<string, unknown>) => Promise<Record<string, unknown>>) | null = null;
+let wasmReady = false;
+let initPromise: Promise<boolean> | null = null;
+
+// ─── 路径解析 ────────────────────────────────────────────────────
 
 /**
- * 动态解析 wasm 文件的 URL。
- * GitHub Pages 部署在 username.github.io/repo-name/ 子目录下，
- * 直接用 /wasm/ 会从根目录加载，找不到文件。
- * 此函数检测 GitHub Pages 并自动加上 repo name 前缀。
+ * 动态解析 wasm 文件的 URL，兼容 GitHub Pages 子目录部署。
+ * 例如 https://5849mog.github.io/OpenCodeCLI/ 下返回 /OpenCodeCLI/wasm/xxx。
  */
-function getWasmUrl(filename: string): string {
-  // GitHub Pages 的子目录部署
-  if (window.location.hostname.includes('github.io')) {
-    const segments = window.location.pathname.split('/').filter(Boolean);
-    // 第一个路径段通常是 repo name（除非是根域名部署）
-    if (segments.length > 0 && segments[0] !== '_next') {
-      return '/' + segments[0] + '/wasm/' + filename;
-    }
+function wasmUrl(file: string): string {
+  const { hostname, pathname } = window.location;
+  if (hostname.includes('github.io')) {
+    const seg = pathname.split('/').filter(Boolean);
+    if (seg.length > 0 && seg[0] !== '_next') return `/${seg[0]}/wasm/${file}`;
   }
-  // 根目录部署（localhost / 自定义域名）
-  return '/wasm/' + filename;
+  return `/wasm/${file}`;
 }
-let workerReady = false;
-let workerInitPromise: Promise<boolean> | null = null;
-let nextCallId = 0;
 
-// 待处理的调用（callId → resolve）
-const pendingCalls = new Map<number, (result: BcResult) => void>();
+// ─── 初始化 ───────────────────────────────────────────────────────
 
-// 降级用 JS 实现（Worker 不可用时的保底）
-function jsFallbackEvaluate(expr: string, stdin?: string): BcResult {
+async function init(): Promise<boolean> {
+  if (wasmReady) return true;
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    try {
+      // 1. 预编译 wasm Module（缓存 WebAssembly.Module，重复实例化很快）
+      const wasmResp = await fetch(wasmUrl('bc.wasm'));
+      if (!wasmResp.ok) throw new Error(`bc.wasm HTTP ${wasmResp.status}`);
+      wasmModule = await WebAssembly.compileStreaming(wasmResp);
+
+      // 2. 动态加载 emscripten 工厂（ES 模块）
+      const mod = await import(/* @vite-ignore */ wasmUrl('bc.mjs'));
+      bcFactory = mod.default as (opts: Record<string, unknown>) => Promise<Record<string, unknown>>;
+
+      // 3. 暖机测试：创建一个实例然后丢弃（确保工厂能工作）
+      const test = await createInstance('1+1');
+      if (!test.ok) throw new Error(`warm-up failed: ${test.output}`);
+
+      wasmReady = true;
+      return true;
+    } catch (err) {
+      console.warn('[bc-wasm] init failed, using JS fallback:', err);
+      wasmReady = false;
+      return false;
+    }
+  })();
+
+  return initPromise;
+}
+
+// ─── 创建实例 ─────────────────────────────────────────────────────
+
+interface InstanceResult {
+  ok: boolean;
+  output: string;
+}
+
+async function createInstance(expr: string): Promise<InstanceResult> {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  const inputBuf = new TextEncoder().encode(expr + '\n');
+  let inputPos = 0;
+
+  const inst = (await bcFactory!({
+    print: (t: unknown) => stdout.push(String(t)),
+    printErr: (t: unknown) => stderr.push(String(t)),
+    stdin: () => (inputPos < inputBuf.length ? inputBuf[inputPos++] : null),
+    instantiateWasm: (
+      imports: WebAssembly.Imports,
+      callback: (instance: WebAssembly.Instance) => void,
+    ) => {
+      WebAssembly.instantiate(wasmModule!, imports).then(
+        ({ instance }) => callback(instance),
+      );
+      return {};
+    },
+  })) as Record<string, unknown>;
+
+  // callMain 触发 bc 的 main()，处理 stdin → stdout
+  const callMain = inst.callMain as (args: string[]) => void;
+  callMain(['-q']);
+
+  const errOutput = stderr.join('\n').trim();
+  if (errOutput) return { ok: false, output: errOutput };
+
+  const outOutput = stdout.join('\n').trim();
+  return { ok: true, output: outOutput || '(no output)' };
+}
+
+// ─── 降级 JS 实现 ────────────────────────────────────────────────
+
+function jsFallback(expr: string, stdin?: string): InstanceResult {
   let calcExpr: string;
   let calcScale = 0;
 
@@ -88,10 +154,10 @@ function jsFallbackEvaluate(expr: string, stdin?: string): BcResult {
   }
 }
 
+// ─── 公开 API ─────────────────────────────────────────────────────
+
 export interface BcOptions {
-  /** 是否使用 -l 数学库（默认 false，由 AI 通过参数控制） */
   useMathLib?: boolean;
-  /** stdin 管道输入（适用于 echo "..." | bc 场景） */
   stdin?: string;
 }
 
@@ -101,147 +167,46 @@ export interface BcResult {
 }
 
 /**
- * 初始化 Web Worker 和 wasm 模块。
- * 惰性调用——在任何 evaluate() 首次调用时自动触发。
- */
-export async function initBC(): Promise<boolean> {
-  if (workerReady) return true;
-  if (workerInitPromise) return workerInitPromise;
-
-  workerInitPromise = (async () => {
-    try {
-      // Resolve Worker URL dynamically for subdirectory deployments (GitHub Pages)
-      const workerUrl = getWasmUrl('bc-worker.js');
-      worker = new Worker(workerUrl);
-
-      // 监听 Worker 消息
-      worker.onmessage = (e: MessageEvent) => {
-        const { id, ok, output, type } = e.data;
-
-        // "ready" 信号
-        if (type === 'ready') {
-          workerReady = true;
-          return;
-        }
-
-        // 处理 evaluate 结果
-        const resolve = pendingCalls.get(id);
-        if (resolve) {
-          pendingCalls.delete(id);
-          resolve({ ok, output });
-        }
-      };
-
-      worker.onerror = (err: ErrorEvent) => {
-        console.warn('bc-worker error:', err.message);
-        workerReady = false;
-      };
-
-      // 等待 Worker 就绪（或超时）
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          // 即使超时也继续——Worker 可能还在初始化
-          console.warn('bc-worker init timeout, proceeding without wasm');
-          resolve();
-        }, 10000);
-
-        const checkReady = (e: MessageEvent) => {
-          if (e.data.type === 'ready') {
-            clearTimeout(timeout);
-            workerReady = true;
-            worker!.removeEventListener('message', checkReady);
-            resolve();
-          }
-        };
-        worker!.addEventListener('message', checkReady);
-      });
-
-      return true;
-    } catch (err) {
-      console.warn('bc-worker init failed, using JS fallback:', err);
-      workerReady = false;
-      return false;
-    }
-  })();
-
-  return workerInitPromise;
-}
-
-/**
  * 执行 bc 表达式。
  *
- * @param expr 要计算的表达式
- * @param options 可选参数（useMathLib, stdin）
- * @returns { ok, output }
+ * @param expr  表达式
+ * @param opts  可选参数（stdin, useMathLib）
  *
- * 示例：
- *   evaluate('2+2')                    → { ok: true, output: '4' }
- *   evaluate('ibase=16; FF')          → { ok: true, output: '255' }
- *   evaluate('', { stdin: '2+2' })    → { ok: true, output: '4' }
+ * 示例:
+ *   evaluate('2+2')                     → { ok: true, output: '4' }
+ *   evaluate('ibase=16; FF')           → { ok: true, output: '255' }
+ *   evaluate('', { stdin: '2+2' })     → { ok: true, output: '4' }
  */
-export async function evaluate(
-  expr: string,
-  options?: BcOptions,
-): Promise<BcResult> {
-  // 尝试 wasm Worker
-  if (!workerReady) {
-    const ok = await initBC();
-    if (!ok) {
-      // Wasm 不可用，降级到 JS 实现
-      return jsFallbackEvaluate(expr, options?.stdin);
+export async function evaluate(expr: string, opts?: BcOptions): Promise<BcResult> {
+  // wasm 未就绪 → 尝试初始化
+  if (!wasmReady && !initPromise) {
+    await init();
+  } else if (!wasmReady && initPromise) {
+    await initPromise;
+  }
+
+  const expression = opts?.stdin ?? expr;
+
+  // wasm 就绪 → 用它
+  if (wasmReady && bcFactory && wasmModule) {
+    try {
+      const result = await createInstance(expression);
+      // 如果 wasm 返回空输出，降级
+      if (result.ok && result.output !== '(no output)') return result;
+      if (!result.ok) return result;
+    } catch (err) {
+      console.warn('[bc-wasm] evaluate error, falling back:', err);
     }
   }
 
-  // 如果 Worker 不可用（初始化失败）
-  if (!worker || !workerReady) {
-    return jsFallbackEvaluate(expr, options?.stdin);
-  }
-
-  return new Promise<BcResult>((resolve) => {
-    const callId = nextCallId++;
-    pendingCalls.set(callId, resolve);
-
-    worker!.postMessage({
-      id: callId,
-      expr: options?.stdin ?? expr,
-      command: 'eval',
-    });
-
-    // 安全超时（15 秒）
-    setTimeout(() => {
-      if (pendingCalls.has(callId)) {
-        pendingCalls.delete(callId);
-        resolve({ ok: false, output: 'bc: evaluation timed out' });
-      }
-    }, 15000);
-  });
+  // 降级到 JS 实现
+  return jsFallback(expression, opts?.stdin);
 }
 
 /**
- * 检查 bc wasm 是否可用。
+ * 检查 wasm bc 是否可用。
  */
 export async function isAvailable(): Promise<boolean> {
-  if (workerReady) return true;
-  return initBC();
-}
-
-/**
- * 销毁 Worker 实例（释放资源）。
- */
-export function destroy(): void {
-  if (worker) {
-    worker.terminate();
-    worker = null;
-  }
-  workerReady = false;
-  workerInitPromise = null;
-  pendingCalls.clear();
-}
-
-/**
- * 同步降级求值（用于无法使用 async 的上下文）。
- * 注意：只支持基础运算，不支持完整 bc 语法。
- */
-export function evaluateSync(expr: string): BcResult {
-  return jsFallbackEvaluate(expr);
+  if (wasmReady) return true;
+  return init();
 }

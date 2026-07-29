@@ -89,20 +89,19 @@ emcc $BC_OBJECTS \
   -s WASM=1 \
   -s MODULARIZE=1 \
   -s EXPORT_NAME="BCModule" \
-  -s EXPORT_ES6=0 \
+  -s EXPORT_ES6=1 \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s FORCE_FILESYSTEM=1 \
   -s INVOKE_RUN=0 \
   -s EXIT_RUNTIME=1 \
-  -s ENVIRONMENT="web,worker" \
+  -s ENVIRONMENT="web" \
   -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
   -s "EXPORTED_RUNTIME_METHODS=['FS','callMain']" \
-  -o "$OUT_DIR/bc.js"
+  -o "$OUT_DIR/bc.mjs"
 
 echo ""
 echo "=== Build complete ==="
 echo "  bc.wasm  → $OUT_DIR/bc.wasm"
-echo "  bc.js    → $OUT_DIR/bc.js"
-echo "  bc-worker.js → $OUT_DIR/bc-worker.js"
+echo "  bc.mjs   → $OUT_DIR/bc.mjs"
 echo ""
 echo "Wasm size: $(du -h "$OUT_DIR/bc.wasm" | cut -f1)"
