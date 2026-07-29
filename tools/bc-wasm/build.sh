@@ -56,11 +56,14 @@ cd "$SOURCE_DIR"
 mkdir -p "$BUILD_DIR"
 
 # gavinhoward/bc uses a custom configure.sh
-# Disable readline/history/editline for browser use — we only need non-interactive pipe mode
+# Readline is OFF by default (use --enable-readline to turn on).
+# For browser wasm we only need non-interactive pipe mode, so we skip it.
+# --disable-history removes interactive history (not needed for pipes).
+# --disable-nls saves wasm size by removing native language support.
 emconfigure ./configure.sh \
-  --disable-readline \
   --disable-history \
-  --enable-static \
+  --disable-nls \
+  --disable-man-pages \
   --prefix="$BUILD_DIR/installed"
 
 # --- Compile static library ---
@@ -99,6 +102,7 @@ emcc $BC_OBJECTS \
 echo ""
 echo "=== Build complete ==="
 echo "  bc.wasm  → $OUT_DIR/bc.wasm"
-echo "  bc.mjs   → $OUT_DIR/bc.mjs"
+echo "  bc.js    → $OUT_DIR/bc.js"
+echo "  bc-worker.js → $OUT_DIR/bc-worker.js"
 echo ""
 echo "Wasm size: $(du -h "$OUT_DIR/bc.wasm" | cut -f1)"
