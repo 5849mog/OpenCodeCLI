@@ -19,8 +19,13 @@ SOURCE_DIR="$SCRIPT_DIR/source"
 OUT_DIR="$PROJECT_ROOT/public/wasm"
 
 # --- Config ---
-# Official mawk source from invisible-island.net (maintained by Thomas Dickey)
-MAWK_URL="https://invisible-mirror.net/archives/mawk/mawk-1.3.4-20240930.tgz"
+# mawk source URLs (tried in order until one works)
+MAWK_URLS=(
+  "https://invisible-mirror.net/archives/mawk/mawk-1.3.4-20240930.tar.gz"
+  "https://invisible-mirror.net/archives/mawk/mawk-1.3.4-20240930.tgz"
+  "https://github.com/ThomasDickey/nawk-snapshots/archive/master.tar.gz"
+  "https://github.com/ThomasDickey/nawk-snapshots/archive/main.tar.gz"
+)
 
 # --- Preflight ---
 command -v emcc >/dev/null 2>&1 || {
@@ -41,9 +46,22 @@ else
   rm -rf "$SOURCE_DIR"
   mkdir -p "$SOURCE_DIR"
 
-  # Download source from invisible-mirror.net (official mawk distribution)
-  echo "  Downloading $MAWK_URL ..."
-  curl -fsSL "$MAWK_URL" | tar xz --strip-components=1 -C "$SOURCE_DIR"
+  # Download source (try multiple URLs, use temp file for atomic check)
+  DOWNLOADED=false
+  TMPFILE=$(mktemp)
+  for url in "${MAWK_URLS[@]}"; do
+    echo "  Trying $url ..."
+    if curl -fsSL "$url" -o "$TMPFILE" && tar xzf "$TMPFILE" --strip-components=1 -C "$SOURCE_DIR" 2>/dev/null; then
+      DOWNLOADED=true
+      echo "  ✓ Success"
+      break
+    fi
+  done
+  rm -f "$TMPFILE"
+  if [ "$DOWNLOADED" = false ]; then
+    echo "ERROR: Failed to download mawk source from all URLs"
+    exit 1
+  fi
 
   cd "$SOURCE_DIR"
   if [ ! -f "mawk.c" ]; then
