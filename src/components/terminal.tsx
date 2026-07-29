@@ -15,6 +15,7 @@ import { memo, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, us
 import { motion } from "framer-motion";
 import {
   ArrowUp,
+  Copy,
   Download,
   Loader2,
   Square,
@@ -29,6 +30,8 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import type { Components } from "react-markdown";
 import Prism from "prismjs";
 import "prismjs/components/prism-clike";
@@ -1088,24 +1091,28 @@ function EventRow({
 
 function UserRow({ text }: { text: string }) {
   return (
-    <div className="flex gap-2">
+    <div className="group flex gap-2">
       <span className="shrink-0 pt-0.5 text-[#D97757]">&gt;</span>
       <div className="flex-1 whitespace-pre-wrap break-words text-[#1A1815]">
         {text}
       </div>
+      <button
+        onClick={() => navigator.clipboard?.writeText(text)}
+        className="shrink-0 self-start pt-0.5 opacity-0 transition-opacity group-hover:opacity-100 text-[#A8A29E] hover:text-[#3D3B37]"
+        title="Copy message"
+      >
+        <Copy size={14} />
+      </button>
     </div>
   );
 }
 
 function AssistantRow({ text, streaming }: { text: string; streaming: boolean }) {
-  // Always render Markdown (real-time), but defer the parse so streaming
-  // tokens don't block the input. useDeferredValue lets React batch updates
-  // and drop intermediate renders if the main thread is busy.
   const deferredText = useDeferredValue(text);
   const isStale = deferredText !== text;
   if (!text) return null;
   return (
-    <div className="flex gap-2">
+    <div className="group flex gap-2">
       <span className="shrink-0 pt-0.5 text-[#8B7355]">⟫</span>
       <div className="flex-1 min-w-0 break-words text-[#2D2B27]" style={{ opacity: isStale ? 0.95 : 1 }}>
         <MarkdownRenderer text={streaming ? deferredText : text} />
@@ -1113,6 +1120,13 @@ function AssistantRow({ text, streaming }: { text: string; streaming: boolean })
           <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-emerald-400 align-middle" />
         )}
       </div>
+      <button
+        onClick={() => navigator.clipboard?.writeText(text)}
+        className="shrink-0 self-start pt-0.5 opacity-0 transition-opacity group-hover:opacity-100 text-[#A8A29E] hover:text-[#3D3B37]"
+        title="Copy message"
+      >
+        <Copy size={14} />
+      </button>
     </div>
   );
 }
@@ -1749,7 +1763,11 @@ const MarkdownRenderer = memo(function MarkdownRenderer({
 }) {
   return (
     <div className="prose-invert max-w-none break-words text-[13px]">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={markdownComponents}
+      >
         {text}
       </ReactMarkdown>
     </div>
