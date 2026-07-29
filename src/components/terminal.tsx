@@ -1629,11 +1629,12 @@ function escapeHtml(s: string): string {
 let mermaidId = 0;
 function MermaidBlock({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  // 只渲染一次，并且代码必须看起来完整（不是流式中途片段）
-  const shouldSkip = !code.trim() || code.trim().length < 20 || !code.includes('
+  const done = useRef(false);
+  const isComplete = code.trim().length > 10 && code.includes('
 ');
   useEffect(() => {
-    if (shouldSkip || !ref.current) return;
+    if (done.current || !ref.current || !isComplete) return;
+    done.current = true;
     const id = ++mermaidId;
     (async () => {
       try {
@@ -1643,10 +1644,9 @@ function MermaidBlock({ code }: { code: string }) {
         if (ref.current) ref.current.innerHTML = '';
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  if (shouldSkip) {
-    return <pre class="text-xs text-[#8B8884] italic">[diagram]</pre>;
+  }, [code, isComplete]);
+  if (!isComplete) {
+    return <pre className="text-xs text-[#8B8884] italic">[diagram]</pre>;
   }
   return <div ref={ref} className="my-2 flex justify-center" />;
 }
