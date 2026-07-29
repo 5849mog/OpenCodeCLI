@@ -32,16 +32,26 @@ echo "=== mawk-wasm build ==="
 echo "Emscripten: $(emcc --version | head -1)"
 echo "Output:     $OUT_DIR"
 
-# --- Clone / update source ---
-if [ -d "$SOURCE_DIR/.git" ]; then
-  echo "[1/3] Updating mawk source..."
+# --- Download source ---
+if [ -d "$SOURCE_DIR" ] && [ -f "$SOURCE_DIR/mawk.c" ]; then
+  echo "[1/3] Source already present, skipping download..."
   cd "$SOURCE_DIR"
-  git fetch --tags
-  git checkout "$MAWK_TAG" 2>/dev/null || echo "  Tag $MAWK_TAG not found, using HEAD"
 else
-  echo "[1/3] Cloning mawk source..."
-  GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "$MAWK_TAG" "$MAWK_REPO" "$SOURCE_DIR" 2>/dev/null || \
-    GIT_TERMINAL_PROMPT=0 git clone --depth 1 "$MAWK_REPO" "$SOURCE_DIR"
+  echo "[1/3] Downloading mawk source..."
+  rm -rf "$SOURCE_DIR"
+  mkdir -p "$SOURCE_DIR"
+
+  # Download tarball from GitHub (avoids git auth issues in CI)
+  TARBALL_URL="${MAWK_REPO%.git}/tarball/${MAWK_TAG}"
+  curl -fsSL "$TARBALL_URL" | tar xz --strip-components=1 -C "$SOURCE_DIR" 2>/dev/null || \
+    curl -fsSL "${MAWK_REPO%.git}/tarball/master" | tar xz --strip-components=1 -C "$SOURCE_DIR" 2>/dev/null || \
+    curl -fsSL "${MAWK_REPO%.git}/tarball/main" | tar xz --strip-components=1 -C "$SOURCE_DIR"
+
+  cd "$SOURCE_DIR"
+  if [ ! -f "mawk.c" ]; then
+    echo "ERROR: Failed to download mawk source"
+    exit 1
+  fi
 fi
 
 # --- Configure ---
