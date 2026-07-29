@@ -46,9 +46,17 @@ async function init(): Promise<boolean> {
       if (!wasmResp.ok) throw new Error(`bc.wasm HTTP ${wasmResp.status}`);
       wasmModule = await WebAssembly.compileStreaming(wasmResp);
 
-      // 2. 动态加载 emscripten 工厂（ES 模块）
-      const mod = await import(/* @vite-ignore */ wasmUrl('bc.mjs'));
-      bcFactory = mod.default as (opts: Record<string, unknown>) => Promise<Record<string, unknown>>;
+      // 2. 动态加载 emscripten 工厂（绕过 Turbopack 构建时解析）
+      const jsResp = await fetch(wasmUrl('bc.mjs'));
+      if (!jsResp.ok) throw new Error(`bc.mjs HTTP ${jsResp.status}`);
+      const jsCode = await jsResp.text();
+      const blobUrl = URL.createObjectURL(new Blob([jsCode], { type: 'text/javascript' }));
+      try {
+        const mod = await import(blobUrl);
+        bcFactory = mod.default as (opts: Record<string, unknown>) => Promise<Record<string, unknown>>;
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
 
       // 3. 暖机测试：创建一个实例然后丢弃（确保工厂能工作）
       const test = await createInstance('1+1');
