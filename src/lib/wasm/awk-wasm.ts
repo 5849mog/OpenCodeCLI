@@ -79,22 +79,25 @@ async function createInstance(script: string, input: string): Promise<InstanceRe
   const stdout: string[] = [];
   const stderr: string[] = [];
 
-  // mawk reads script from a file (via -f) or from the first argument
-  // We'll pass the script via -f /tmp/script.awk and input via stdin
+  // Prepare stdin buffer as fallback
+  const inputBuf = new TextEncoder().encode(input + '\n');
+  let inputPos = 0;
+
   const inst = (await factory!({
     print: (t: unknown) => stdout.push(String(t)),
     printErr: (t: unknown) => stderr.push(String(t)),
     locateFile: (path: string) => wasmUrl(path),
     wasmBinary: wasmBinary,
-    noFSInit: false,
+    stdin: () => (inputPos < inputBuf.length ? inputBuf[inputPos++] : null),
   })) as Record<string, unknown>;
 
   const FS = inst.FS as any;
 
-  // Write the AWK script to a virtual file
-  FS.writeFile('/tmp/script.awk', script);
+  // Ensure /tmp exists in MEMFS
+  try { FS.mkdir('/tmp'); } catch (_e) { /* already exists */ }
 
-  // Write input data to a virtual file
+  // Write the AWK script and input to virtual files
+  FS.writeFile('/tmp/script.awk', script);
   FS.writeFile('/tmp/input.txt', input);
 
   const callMain = inst.callMain as (args: string[]) => void;
