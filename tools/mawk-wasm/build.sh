@@ -40,8 +40,8 @@ if [ -d "$SOURCE_DIR/.git" ]; then
   git checkout "$MAWK_TAG" 2>/dev/null || echo "  Tag $MAWK_TAG not found, using HEAD"
 else
   echo "[1/3] Cloning mawk source..."
-  git clone --depth 1 --branch "$MAWK_TAG" "$MAWK_REPO" "$SOURCE_DIR" 2>/dev/null || \
-    git clone --depth 1 "$MAWK_REPO" "$SOURCE_DIR"
+  GIT_TERMINAL_PROMPT=0 git clone --depth 1 --branch "$MAWK_TAG" "$MAWK_REPO" "$SOURCE_DIR" 2>/dev/null || \
+    GIT_TERMINAL_PROMPT=0 git clone --depth 1 "$MAWK_REPO" "$SOURCE_DIR"
 fi
 
 # --- Configure ---
