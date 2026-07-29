@@ -75,12 +75,12 @@ emmake make -j"$(nproc)"
 echo "[4/4] Linking bc.wasm..."
 mkdir -p "$OUT_DIR"
 
-# Collect all .o files from the build
-# gavinhoward/bc builds into src/ directory
-BC_OBJECTS=$(find src -name '*.o' 2>/dev/null | tr '\n' ' ')
+# Collect all .o files from the build (src/ + gen/ directories)
+# The gen/ directory holds generated help text and built-in library object files
+BC_OBJECTS=$(find src gen -name '*.o' 2>/dev/null | tr '\n' ' ')
 
 if [ -z "$BC_OBJECTS" ]; then
-  echo "ERROR: No .o files found in src/. Did the compilation step fail?"
+  echo "ERROR: No .o files found in src/ or gen/. Did 'emmake make' succeed?"
   exit 1
 fi
 
