@@ -1629,17 +1629,20 @@ function escapeHtml(s: string): string {
 let mermaidId = 0;
 function MermaidBlock({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const rendered = useRef(false);
   useEffect(() => {
+    if (rendered.current) return;
+    if (!ref.current || !code.trim()) return;
+    const id = ++mermaidId;
     (async () => {
-      if (!ref.current) return;
-      const id = ++mermaidId;
       try {
         const { svg } = await mermaid.render('mermaid-' + id, code);
-        ref.current.innerHTML = svg;
+        if (ref.current) ref.current.innerHTML = svg;
       } catch (e) {
-        ref.current.innerHTML = '<pre class="text-red-500 text-xs">Mermaid error: ' + e + '</pre>';
+        if (ref.current) ref.current.innerHTML = '<pre class=\"text-red-500 text-xs\">Mermaid: syntax error in diagram</pre>';
       }
     })();
+    rendered.current = true;
   }, [code]);
   return <div ref={ref} className="my-2 flex justify-center" />;
 }
