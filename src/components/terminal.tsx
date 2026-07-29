@@ -1629,21 +1629,25 @@ function escapeHtml(s: string): string {
 let mermaidId = 0;
 function MermaidBlock({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const rendered = useRef(false);
+  // 只渲染一次，并且代码必须看起来完整（不是流式中途片段）
+  const shouldSkip = !code.trim() || code.trim().length < 20 || !code.includes('
+');
   useEffect(() => {
-    if (rendered.current) return;
-    if (!ref.current || !code.trim()) return;
+    if (shouldSkip || !ref.current) return;
     const id = ++mermaidId;
     (async () => {
       try {
         const { svg } = await mermaid.render('mermaid-' + id, code);
         if (ref.current) ref.current.innerHTML = svg;
       } catch (e) {
-        if (ref.current) ref.current.innerHTML = '<pre class=\"text-red-500 text-xs\">Mermaid: syntax error in diagram</pre>';
+        if (ref.current) ref.current.innerHTML = '';
       }
     })();
-    rendered.current = true;
-  }, [code]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (shouldSkip) {
+    return <pre class="text-xs text-[#8B8884] italic">[diagram]</pre>;
+  }
   return <div ref={ref} className="my-2 flex justify-center" />;
 }
 
