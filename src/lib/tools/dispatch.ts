@@ -1,5 +1,5 @@
 import type { ToolResult } from "./types";
-import { toolReadFile, toolWriteFile, toolEditFile, toolDeleteFile, toolListFiles, toolListDirs, toolCreateDir, toolMoveFile, toolAppendFile, toolInsertAt, toolUndoEdit } from "./file-ops";
+import { toolReadFile, toolWriteFile, toolEditFile, toolDeleteFile, toolListFiles, toolListDirs, toolCreateDir, toolMoveFile, toolAppendFile, toolInsertAt, toolUndoEdit, toolReadMultipleFiles, toolProjectStats } from "./file-ops";
 import { toolSearchFiles, toolGlob, toolSearchSymbols, toolViewOutline } from "./search";
 import { toolBash } from "./bash";
 import { toolMultiEdit, toolApplyPatch } from "./patch";
@@ -57,6 +57,20 @@ export async function dispatchTool(
         return await toolWebSearch(args);
       case "fetch_url":
         return await toolFetchUrl(args);
+      case "read_multiple_files":
+        return await toolReadMultipleFiles(args);
+      case "project_stats":
+        return await toolProjectStats(args);
+      case "orchestrate_task":
+        // orchestrate_task is handled as a special case in session.ts
+        // (needs AiClientConfig). This fallback prevents unknown-tool errors
+        // if dispatch is called directly.
+        return {
+          ok: false,
+          output: "orchestrate_task must be handled by the session orchestrator (this is an internal routing note — the tool should work normally in the agent loop).",
+          tool: "orchestrate_task",
+          args,
+        };
       default:
         return {
           ok: false,

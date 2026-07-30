@@ -28,6 +28,8 @@ import {
   X,
   Search,
   ClipboardList,
+  Menu,
+  PanelLeft,
 } from "lucide-react";
 import JSZip from "jszip";
 import { vfs, normalizePath, basename, onVfsEvent, type VfsNode } from "@/lib/vfs";
@@ -48,7 +50,7 @@ export function FileBag() {
   if (!hydrated) {
     return (
       <div className="flex h-full items-center justify-center bg-[#FFFFFF] text-[#8B8884]">
-        <div className="animate-pulse text-xs">loading 文件袋…</div>
+        <div className="animate-pulse text-[length:var(--font-size-ui-sm)]">loading 文件袋…</div>
       </div>
     );
   }
@@ -67,6 +69,7 @@ function FileBagInner() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [newFileModal, setNewFileModal] = useState(false);
+  const [treeCollapsed, setTreeCollapsed] = useState(false);
 
   const handleUploadClick = () => fileInputRef.current?.click();
   const handleFolderUploadClick = () => folderInputRef.current?.click();
@@ -135,13 +138,13 @@ function FileBagInner() {
   return (
     <div className="flex h-full flex-col bg-[#FFFFFF] text-[#2D2B27]">
       {/* Toolbar + tabs */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-[#E5E2D9] px-2 py-2 text-xs">
+      <div className="flex flex-wrap items-center gap-1 border-b border-[#E5E2D9] px-2 py-2 text-[length:var(--font-size-ui-sm)]">
         {/* Panel tabs */}
         <div className="mr-3 flex items-center gap-0.5">
           <button
             onClick={() => setRightPanelTab("files")}
             className={cn(
-              "flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+              "flex items-center gap-1.5 rounded px-2.5 py-1.5 font-medium transition-colors",
               rightPanelTab === "files"
                 ? "bg-[#D97757]/10 text-[#D97757]"
                 : "text-[#8B8884] hover:bg-[#F5F3EE] hover:text-[#3D3B37]",
@@ -153,7 +156,7 @@ function FileBagInner() {
           <button
             onClick={() => setRightPanelTab("plan")}
             className={cn(
-              "flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-colors",
+              "flex items-center gap-1.5 rounded px-2.5 py-1.5 font-medium transition-colors",
               rightPanelTab === "plan"
                 ? "bg-[#D97757]/10 text-[#D97757]"
                 : "text-[#8B8884] hover:bg-[#F5F3EE] hover:text-[#3D3B37]",
@@ -167,8 +170,15 @@ function FileBagInner() {
         {/* Files toolbar — only show when on files tab */}
         {rightPanelTab === "files" && (<>
         <button
+          onClick={() => setTreeCollapsed(!treeCollapsed)}
+          className="flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27] tablet:flex desktop:hidden"
+          title={treeCollapsed ? "展开文件树" : "折叠文件树"}
+        >
+          <PanelLeft className="h-3 w-3" />
+        </button>
+        <button
           onClick={handleUploadClick}
-          className="flex items-center gap-1 rounded px-2 py-1 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
+          className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
           title="Upload files"
         >
           <Upload className="h-3 w-3" />
@@ -176,7 +186,7 @@ function FileBagInner() {
         </button>
         <button
           onClick={handleFolderUploadClick}
-          className="flex items-center gap-1 rounded px-2 py-1 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
+          className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
           title="Upload folder"
         >
           <FolderUp className="h-3 w-3" />
@@ -184,7 +194,7 @@ function FileBagInner() {
         </button>
         <button
           onClick={() => setNewFileModal(true)}
-          className="flex items-center gap-1 rounded px-2 py-1 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
+          className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
           title="New file"
         >
           <FilePlus className="h-3 w-3" />
@@ -193,7 +203,7 @@ function FileBagInner() {
         <div className="ml-auto flex items-center gap-1">
           <button
             onClick={handleDownloadZip}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
+            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
             title="Download workspace as zip"
           >
             <Download className="h-3 w-3" />
@@ -201,14 +211,14 @@ function FileBagInner() {
           </button>
           <button
             onClick={handleClear}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[#6B6862] hover:bg-[#E54D2E]/10 hover:text-[#E54D2E]"
+            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#E54D2E]/10 hover:text-[#E54D2E]"
             title="Clear workspace"
           >
             <Trash2 className="h-3 w-3" />
           </button>
           <button
             onClick={() => bump()}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
+            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
             title="Refresh"
           >
             <RefreshCw className="h-3 w-3" />
@@ -244,7 +254,10 @@ function FileBagInner() {
       {/* Body: files tree + editor or Plan panel */}
       {rightPanelTab === "files" ? (
         <div className="flex min-h-0 flex-1">
-          <div className="w-48 shrink-0 border-r border-[#E5E2D9] overflow-y-auto">
+          <div className={cn(
+            "shrink-0 border-r border-[#E5E2D9] overflow-y-auto transition-all duration-200 ease-in-out",
+            treeCollapsed ? "w-0 overflow-hidden border-r-0" : "w-48"
+          )}>
             <FileTree onOpen={(p) => openTab(p)} />
           </div>
           <div className="flex-1 min-w-0 flex flex-col">
@@ -297,7 +310,7 @@ function FileTree({ onOpen }: { onOpen: (path: string) => void }) {
       .filter((f) => f.path.toLowerCase().includes(q))
       .slice(0, 50);
     return (
-      <div className="flex h-full flex-col font-mono text-xs">
+      <div className="flex h-full flex-col font-mono text-[length:var(--font-size-code)]">
         <div className="border-b border-[#E5E2D9] p-2">
           <div className="flex items-center gap-1.5 rounded border border-[#E5E2D9] bg-[#FAF9F7] px-2 py-1">
             <Search className="h-3 w-3 text-[#8B8884]" />
@@ -317,7 +330,7 @@ function FileTree({ onOpen }: { onOpen: (path: string) => void }) {
               </button>
             )}
           </div>
-          <div className="mt-1 text-[10px] text-[#A8A29E]">
+          <div className="mt-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E]">
             {matched.length} match{matched.length !== 1 ? "es" : ""}
           </div>
         </div>
@@ -346,7 +359,7 @@ function FileTree({ onOpen }: { onOpen: (path: string) => void }) {
   }
 
   return (
-    <div className="flex h-full flex-col font-mono text-xs">
+    <div className="flex h-full flex-col font-mono text-[length:var(--font-size-code)]">
       <div className="border-b border-[#E5E2D9] p-2">
         <div className="flex items-center gap-1.5 rounded border border-[#E5E2D9] bg-[#FAF9F7] px-2 py-1">
           <Search className="h-3 w-3 text-[#8B8884]" />
@@ -359,7 +372,7 @@ function FileTree({ onOpen }: { onOpen: (path: string) => void }) {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto py-1 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
-        <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-[#A8A29E]">
+        <div className="px-2 py-1 text-[length:var(--font-size-ui-sm)] uppercase tracking-wider text-[#A8A29E]">
           workspace
         </div>
         <TreeChildren dir={root} depth={0} expanded={expanded} toggleDir={toggleDir} onOpen={onOpen} />
@@ -473,7 +486,7 @@ function EmptyHint() {
   const all = vfs.allSync();
   if (all.length > 0) return null;
   return (
-    <div className="mt-4 px-4 text-[11px] text-[#A8A29E]">
+    <div className="mt-4 px-4 text-[length:var(--font-size-ui-sm)] text-[#A8A29E]">
       <div className="rounded border border-dashed border-[#E5E2D9] p-4 text-center">
         <Upload className="mx-auto mb-2 h-6 w-6 text-[#BFB8B0]" />
         <div>Upload files or ask the AI to create them.</div>
@@ -494,8 +507,8 @@ function NoTabOpen() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-[#A8A29E]">
       <FileIcon className="h-8 w-8 text-[#BFB8B0]" />
-      <div className="text-xs">No file open</div>
-      <div className="text-[11px] text-[#BFB8B0]">
+      <div className="text-[length:var(--font-size-base)]">No file open</div>
+      <div className="text-[length:var(--font-size-ui-sm)] text-[#BFB8B0]">
         Click a file in the tree, or use the New button.
       </div>
     </div>
@@ -697,7 +710,7 @@ function TabbedEditor() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Tab bar — VSCode style */}
-      <div className="flex items-stretch overflow-x-auto border-b border-[#E5E2D9] bg-[#FAF9F7] text-xs [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
+      <div className="flex items-stretch overflow-x-auto border-b border-[#E5E2D9] bg-[#FAF9F7] text-[length:var(--font-size-ui-sm)] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
         {openTabs.map((path) => {
           const isActive = path === activeTab;
           const isDirty = dirtyTabs[path] ?? false;
@@ -745,16 +758,16 @@ function TabbedEditor() {
       </div>
 
       {/* Active tab toolbar */}
-      <div className="flex items-center gap-2 border-b border-[#E5E2D9] bg-[#FFFFFF] px-2 py-1.5 text-xs">
+      <div className="flex items-center gap-2 border-b border-[#E5E2D9] bg-[#FFFFFF] px-2 py-1.5 text-[length:var(--font-size-ui-sm)]">
         <span className="truncate font-mono text-[#6B6862]">{activeTab}</span>
-        <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-[#8B8884]">
+        <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[length:var(--font-size-ui-sm)] text-[#8B8884]">
           {language}
         </span>
         <div className="ml-auto flex items-center gap-1">
           <button
             onClick={saveActive}
             disabled={!dirty}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27] disabled:opacity-40"
+            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27] disabled:opacity-40"
             title="Save (Ctrl+S)"
           >
             <Save className="h-3 w-3" />
@@ -762,14 +775,14 @@ function TabbedEditor() {
           </button>
           <button
             onClick={() => downloadOne(activeTab)}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
+            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
             title="Download this file"
           >
             <Download className="h-3 w-3" />
           </button>
           <button
             onClick={() => remove(activeTab)}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[#6B6862] hover:bg-[#E54D2E]/10 hover:text-[#E54D2E]"
+            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#E54D2E]/10 hover:text-[#E54D2E]"
             title="Delete this file"
           >
             <Trash2 className="h-3 w-3" />
@@ -791,7 +804,7 @@ function TabbedEditor() {
       </div>
 
       {/* Status bar */}
-      <div className="flex items-center justify-between border-t border-[#E5E2D9] bg-[#FAF9F7] px-3 py-1 text-[10px] text-[#A8A29E]">
+      <div className="flex items-center justify-between border-t border-[#E5E2D9] bg-[#FAF9F7] px-3 py-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E]">
         <span>
           {content.length} chars · {content.split("\n").length} lines
         </span>

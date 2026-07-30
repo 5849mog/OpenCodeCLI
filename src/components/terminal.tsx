@@ -518,12 +518,12 @@ export function Terminal() {
   }, [input]);
 
   return (
-    <div className="flex h-full flex-col bg-[#FAF9F7] text-[#2D2B27] font-mono text-[13px] leading-relaxed">
+    <div className="flex h-full flex-col bg-[#FAF9F7] text-[#2D2B27] font-mono text-[length:var(--font-size-base)] leading-relaxed">
       {/* Header bar — model name centered, mode toggle right */}
       <div className="flex items-center justify-between border-b border-[#E5E2D9] px-4 py-2.5 text-xs">
         <div className="flex items-center gap-2 text-[#6B6862]">
           {config.hasApiKey && (
-            <span className="flex items-center gap-1.5 rounded-md bg-[#F5F3EE] px-2.5 py-1 text-[11px] font-medium text-[#8B7355]">
+            <span className="flex items-center gap-1.5 rounded-md bg-[#F5F3EE] px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium text-[#8B7355]">
               <span className="h-1.5 w-1.5 rounded-full bg-[#D97757]" />
               {config.model}
             </span>
@@ -534,7 +534,7 @@ export function Terminal() {
           <button
             onClick={toggleMode}
             className={cn(
-              "flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium transition-colors",
               mode === "plan"
                 ? "border-[#D97757]/30 bg-[#D97757]/10 text-[#D97757]"
                 : "border-[#E5E2D9] bg-[#F5F3EE] text-[#8B8884] hover:text-[#2D2B27]",
@@ -547,14 +547,14 @@ export function Terminal() {
           <PlanHeaderBadge />
           <button
             onClick={() => handleSlashCommand("/export json")}
-            className="rounded px-2 py-1 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
+            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
             title="Export session as JSON"
           >
             <Download className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={reset}
-            className="rounded px-2 py-1 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
+            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
             title="Clear session"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -562,7 +562,7 @@ export function Terminal() {
           {isStreaming && (
             <button
               onClick={abort}
-              className="flex items-center gap-1 rounded bg-[#E54D2E]/10 px-2 py-1 text-[#E54D2E] hover:bg-[#E54D2E]/10"
+              className="touch-target flex items-center gap-1 rounded bg-[#E54D2E]/10 px-3 py-1.5 text-[#E54D2E] hover:bg-[#E54D2E]/10"
               title="Stop"
             >
               <Square className="h-3 w-3 fill-current" />
@@ -579,7 +579,7 @@ export function Terminal() {
         className="flex-1 overflow-y-auto px-4 py-3 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] [&::-webkit-scrollbar-track]:bg-transparent"
       >
         {events.length === 0 && !streamingText && <EmptyState />}
-        <div className="space-y-3">
+        <div className="space-y-4">
           {useMemo(() => groupToolEvents(events), [events]).map((ev) => (
             <EventRow key={ev.id} ev={ev} pairedResult={ev.pairedResult} />
           ))}
@@ -649,7 +649,7 @@ export function Terminal() {
                 : "输入消息…  (@ 提及文件)"
             }
             disabled={isStreaming}
-            className="max-h-[200px] flex-1 resize-none bg-transparent text-[13px] text-[#1A1815] placeholder:text-[#A8A29E] focus:outline-none disabled:opacity-50"
+            className="max-h-[200px] flex-1 resize-none bg-transparent text-[length:var(--font-size-base)] text-[#1A1815] placeholder:text-[#A8A29E] focus:outline-none disabled:opacity-50"
           />
           <button
             onClick={submit}
@@ -660,7 +660,7 @@ export function Terminal() {
             <ArrowUp className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="mt-2 flex items-center justify-between px-1 text-[10px] text-[#A8A29E]">
+        <div className="mt-2 flex items-center justify-between px-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E]">
           <span className="flex items-center gap-3">
             {totalTokens > 0 && (
               <span
@@ -830,7 +830,7 @@ function QuestionPanel({
                       <div>
                         <div className="text-[#2D2B27]">{opt.label}</div>
                         {opt.description && (
-                          <div className="mt-0.5 text-[11px] text-[#8B8884]">{opt.description}</div>
+                          <div className="mt-0.5 text-[length:var(--font-size-ui-sm)] text-[#8B8884]">{opt.description}</div>
                         )}
                       </div>
                     </label>
@@ -891,7 +891,7 @@ function QuestionPanel({
                       <div>
                         <div className="text-[#2D2B27]">{opt.label}</div>
                         {opt.description && (
-                          <div className="mt-0.5 text-[11px] text-[#8B8884]">{opt.description}</div>
+                          <div className="mt-0.5 text-[length:var(--font-size-ui-sm)] text-[#8B8884]">{opt.description}</div>
                         )}
                       </div>
                     </label>
@@ -972,7 +972,7 @@ function EmptyState() {
           The <span className="text-[#D97757]">文件袋</span> on the right is your virtual workspace.
         </div>
       </div>
-      <div className="mt-2 grid gap-1 text-[11px] text-[#A8A29E]">
+      <div className="mt-2 grid gap-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E]">
         <div>• Upload files → they appear in the 文件袋</div>
         <div>• Ask the AI to build, edit, or refactor your project</div>
         <div>• Download the result as a zip when done</div>
@@ -1255,7 +1255,7 @@ function ToolGroupRow({
             </button>
           )}
           {!result.diff && !isPlan && output && (
-            <span className="text-[10px] text-[#A8A29E]">
+            <span className="text-[length:var(--font-size-ui-sm)] text-[#A8A29E]">
               {outputLineCount} line{outputLineCount !== 1 ? "s" : ""}
             </span>
           )}
@@ -1422,7 +1422,7 @@ function PlanHeaderBadge() {
   return (
     <button
       onClick={() => useVfsView.getState().setRightPanelTab("plan")}
-      className="flex items-center gap-1.5 rounded-full border border-[#D97757]/20 bg-[#D97757]/8 px-2.5 py-1 text-[11px] font-medium text-[#B87B5A] hover:bg-[#D97757]/15"
+      className="flex items-center gap-1.5 rounded-full border border-[#D97757]/20 bg-[#D97757]/8 px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium text-[#B87B5A] hover:bg-[#D97757]/15"
       title={`Plan: ${stats.done}/${stats.total} steps done`}
     >
       <span>📋</span>
@@ -1469,7 +1469,7 @@ function DiffView({ before, after }: { before: string; after: string }) {
   const diff = lineDiff(beforeLines, afterLines);
 
   return (
-    <div className="overflow-x-auto rounded border border-[#E5E2D9] bg-[#FFFFFF] text-[11px] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
+    <div className="overflow-x-auto rounded border border-[#E5E2D9] bg-[#FFFFFF] text-[length:var(--font-size-code)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
       <table className="min-w-full border-collapse font-mono">
         <tbody>
           {diff.map((row, i) => (
@@ -1730,7 +1730,7 @@ const markdownComponents: Components = {
     if (isInline) {
       return (
         <code
-          className="rounded bg-[#F0EDE5] px-1 py-0.5 text-[12px] text-emerald-300 font-mono"
+          className="rounded bg-[#F0EDE5] px-1 py-0.5 text-[length:var(--font-size-code)] text-emerald-300 font-mono"
           {...props}
         >
           {children}
@@ -1767,7 +1767,7 @@ const markdownComponents: Components = {
     }
     return (
       <div className="my-2 overflow-hidden rounded-md border border-[#E5E2D9] bg-[#FFFFFF]">
-        <div className="flex items-center justify-between border-b border-[#E5E2D9] px-3 py-1 text-[10px] uppercase tracking-wider text-[#8B8884]">
+        <div className="flex items-center justify-between border-b border-[#E5E2D9] px-3 py-1 text-[length:var(--font-size-ui-sm)] uppercase tracking-wider text-[#8B8884]">
           <span>{lang}</span>
           <button
             onClick={() => {
@@ -1779,7 +1779,7 @@ const markdownComponents: Components = {
             copy
           </button>
         </div>
-        <pre className="overflow-x-auto px-3 py-2 text-[12px] leading-relaxed [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
+        <pre className="overflow-x-auto px-4 py-3 text-[length:var(--font-size-code)] leading-relaxed [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
           {children}
         </pre>
       </div>
@@ -1793,7 +1793,7 @@ const MarkdownRenderer = memo(function MarkdownRenderer({
   text: string;
 }) {
   return (
-    <div className="prose-invert max-w-none break-words text-[13px]">
+    <div className="prose-invert max-w-none break-words text-[length:var(--font-size-base)]">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}

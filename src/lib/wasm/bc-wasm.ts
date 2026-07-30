@@ -13,6 +13,10 @@ let bcFactory: ((opts: Record<string, unknown>) => Promise<Record<string, unknow
 let wasmReady = false;
 let initPromise: Promise<boolean> | null = null;
 
+/** Max chars allowed from a single bc evaluation. Prevents AI context overflow
+ *  from astronomical numbers (e.g. 2^1000000 outputs ~300K digits). */
+const MAX_BC_OUTPUT_LENGTH = 10_000;
+
 // ─── 路径解析 ────────────────────────────────────────────────────
 
 function wasmUrl(file: string): string {
@@ -107,7 +111,14 @@ async function createInstance(expr: string, opts?: InstanceOptions): Promise<Ins
   const errOutput = stderr.join('\n').trim();
   if (errOutput) return { ok: false, output: errOutput };
 
-  const outOutput = stdout.join('\n').trim();
+  let outOutput = stdout.join('\n').trim();
+  if (outOutput.length > MAX_BC_OUTPUT_LENGTH) {
+    outOutput = outOutput.slice(0, MAX_BC_OUTPUT_LENGTH) +
+      `\n\n[... bc output truncated at ${MAX_BC_OUTPUT_LENGTH.toLocaleString()} chars; ` +
+      `original output was ${outOutput.length.toLocaleString()} chars ` +
+      `(${outOutput.split('\n').length} lines) — ` +
+      `re-run with a smaller scale / narrower expression for full result]`;
+  }
   return { ok: true, output: outOutput || '(no output)' };
 }
 

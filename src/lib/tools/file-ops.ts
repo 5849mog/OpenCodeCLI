@@ -456,6 +456,145 @@ async function toolUndoEdit(args: Record<string, unknown>): Promise<ToolResult> 
   };
 }
 
+// ---------------------------------------------------------------------------
+// read_multiple_files — batch read files
+// ---------------------------------------------------------------------------
+
+async function toolReadMultipleFiles(args: Record<string, unknown>): Promise<ToolResult> {
+  const raw = args.paths;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return {
+      ok: false,
+      output: "read_multiple_files requires a non-empty 'paths' array.",
+      tool: "read_multiple_files",
+      args,
+    };
+  }
+  const maxFiles = 20;
+  if (raw.length > maxFiles) {
+    return {
+      ok: false,
+      output: `Too many files. Maximum ${maxFiles} files per call, got ${raw.length}.`,
+      tool: "read_multiple_files",
+      args,
+    };
+  }
+
+  const parts: string[] = [];
+  const errors: string[] = [];
+  let totalChars = 0;
+  const maxTotal = 500_000;
+
+  for (const item of raw) {
+    const path = String(item);
+    const content = vfs.readFileSync(path);
+    if (content === null) {
+      errors.push(`NOT FOUND: ${path}`);
+      continue;
+    }
+    totalChars += content.length;
+    if (totalChars > maxTotal) {
+      errors.push(`TRUNCATED: ${path} (total output exceeds ${maxTotal.toLocaleString()} chars, remaining files skipped)`);
+      break;
+    }
+    parts.push(`=== ${path} ===\n${content}`);
+  }
+
+  let output = parts.join("\n\n");
+  if (errors.length > 0) {
+    output += `\n\n--- Issues ---\n${errors.join("\n")}`;
+  }
+  return { ok: true, output, tool: "read_multiple_files", args };
+}
+
+// ---------------------------------------------------------------------------
+// project_stats — workspace statistics
+// ---------------------------------------------------------------------------
+
+async function toolProjectStats(args: Record<string, unknown>): Promise<ToolResult> {
+  const scopePath = args.path ? String(args.path).trim() : "";
+  const all = vfs.allSync();
+  const files = all.filter((n) => n.type === "file" && (!scopePath || n.path.startsWith(scopePath)));
+  const dirs = all.filter((n) => n.type === "dir" && (!scopePath || n.path.startsWith(scopePath)));
+
+  if (files.length === 0) {
+    return {
+      ok: true,
+      output: `📊 项目统计：\n文件 0，目录 ${dirs.length}。文件袋为空。`,
+      tool: "project_stats",
+      args,
+    };
+  }
+
+  type ExtInfo = { count: number; lines: number; chars: number };
+  const extMap = new Map<string, ExtInfo>();
+  let totalLines = 0;
+  let totalChars = 0;
+  let todoCount = 0;
+  let fixmeCount = 0;
+
+  const details: { path: string; lines: number; chars: number; updatedAt: number }[] = [];
+
+  for (const f of files) {
+    const content = f.content ?? "";
+    const lines = content === "" ? 0 : content.split("\n").length;
+    const chars = content.length;
+    const ext = f.path.includes(".") ? f.path.split(".").pop()!.toLowerCase() : "(no ext)";
+
+    const info = extMap.get(ext) ?? { count: 0, lines: 0, chars: 0 };
+    info.count++;
+    info.lines += lines;
+    info.chars += chars;
+    extMap.set(ext, info);
+
+    totalLines += lines;
+    totalChars += chars;
+    todoCount += countOccurrences(content, "TODO");
+    fixmeCount += countOccurrences(content, "FIXME") + countOccurrences(content, "HACK");
+    details.push({ path: f.path, lines, chars, updatedAt: f.updatedAt });
+  }
+
+  // Format extension breakdown
+  const extRows = [...extMap.entries()]
+    .sort((a, b) => b[1].count - a[1].count)
+    .map(([ext, info]) => `  ${ext.padEnd(14)} ${String(info.count).padStart(4)} 个  ${String(info.lines).padStart(7)} 行  ${String(info.chars).padStart(8)} 字符`);
+
+  // Top 10 largest
+  const largest = [...details].sort((a, b) => b.chars - a.chars).slice(0, 10);
+  const largestRows = largest.map((f, i) =>
+    `  ${i + 1}. ${f.path.padEnd(40)} ${String(f.lines).padStart(5)} 行  ${String(f.chars).padStart(7)} 字符`);
+
+  // Top 5 most recently modified
+  const recent = [...details].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5);
+  const recentRows = recent.map((f) =>
+    `  ${f.path.padEnd(40)} ${new Date(f.updatedAt).toLocaleString()}`);
+
+  const output = [
+    `📊 项目概览`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `文件数:    ${files.length}`,
+    `目录数:    ${dirs.length}`,
+    `总代码行:  ${totalLines.toLocaleString()}`,
+    `总字符数:  ${totalChars.toLocaleString()}`,
+    ``,
+    scopePath ? `(限定路径: ${scopePath})` : ``,
+    `📁 文件类型分布`,
+    ...extRows,
+    ``,
+    `📌 待办标记`,
+    `  TODO:  ${todoCount}`,
+    `  FIXME: ${fixmeCount}`,
+    ``,
+    `📏 最大文件 Top 10`,
+    ...largestRows,
+    ``,
+    `🕐 最近修改 Top 5`,
+    ...recentRows,
+  ].filter(Boolean).join("\n");
+
+  return { ok: true, output, tool: "project_stats", args };
+}
+
 export {
   toolReadFile,
   toolWriteFile,
@@ -468,4 +607,6 @@ export {
   toolAppendFile,
   toolInsertAt,
   toolUndoEdit,
+  toolReadMultipleFiles,
+  toolProjectStats,
 };

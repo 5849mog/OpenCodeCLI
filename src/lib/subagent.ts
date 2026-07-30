@@ -129,6 +129,13 @@ Begin. Use tools as needed, then summarize your work in your final response.` },
     // Execute the subagent's tool calls
     for (const tc of result.message.tool_calls) {
       if (opts.signal?.aborted) break;
+      // Parse args first so we can use them for the snapshot label
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(tc.function.arguments || "{}");
+      } catch {
+        args = {};
+      }
       // Push a snapshot before mutating tools (so /undo works across subagent edits)
       const mutatingTools = new Set([
         "write_file", "edit_file", "multi_edit", "delete_file",
@@ -136,21 +143,8 @@ Begin. Use tools as needed, then summarize your work in your final response.` },
         "apply_patch", "insert_at",
       ]);
       if (mutatingTools.has(tc.function.name)) {
-        vfs.takeSnapshot(`subagent:${tc.function.name}`);
-      }
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(tc.function.arguments || "{}");
-      } catch {
-        // malformed args — tell the subagent
-        messages.push({
-          role: "tool",
-          content: `Failed to parse arguments as JSON.`,
-          tool_call_id: tc.id || `tc_${Date.now()}`,
-          name: tc.function.name,
-        });
-        toolCallCount++;
-        continue;
+        const preview = (typeof args.path === "string") ? args.path : (typeof args.from === "string") ? args.from : "";
+        vfs.takeSnapshot(`subagent:${tc.function.name}(${preview})`);
       }
       const toolResult: ToolResult = await dispatchTool(tc.function.name, args);
       toolCallCount++;

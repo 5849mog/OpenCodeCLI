@@ -28,6 +28,7 @@ import {
 } from "@/lib/tools/index";
 import { buildWorkspaceContext } from "@/lib/tools/system-prompt";
 import { vfs } from "@/lib/vfs";
+import { useVfsView } from "@/store/vfs-view";
 import {
   truncateConversation,
   DEFAULT_TOKEN_BUDGET,
@@ -39,6 +40,7 @@ import {
   type PersistedSession,
 } from "@/lib/session-storage";
 import { runSubagent } from "@/lib/subagent";
+import { orchestrateTask } from "@/lib/orchestrator";
 import { apiKeyVault } from "@/lib/api-key-vault";
 
 // ---------------------------------------------------------------------------
@@ -655,21 +657,35 @@ async function runAgentLoop(
     if (!toolCalls) return;
     if (toolCalls.length === 1) {
       set({ agentStatus: `Calling ${toolCalls[0].function.name}…` });
-      await executeToolCallSafe(set, get, toolCalls[0], signal);
+      await executeToolCallSafe(set, get, toolCalls[0], signal, false);
     } else {
-      // Run all tool calls in parallel. Use executeToolCallSafe which
-      // guarantees a tool result message is ALWAYS added to the conversation,
-      // even if the tool throws. This prevents "insufficient tool messages
-      // following tool_calls" API errors.
+      // Take a SINGLE snapshot before the batch so that undo reverts the
+      // entire batch, not just the last tool call. With Promise.all, all
+      // tool calls start simultaneously — if each took its own snapshot,
+      // they'd all capture the SAME pre-batch state (race condition), and
+      // one undo would wipe everything.
+      const hasMutating = toolCalls.some((tc) => MUTATING_TOOLS.has(tc.function.name));
+      if (hasMutating) {
+        vfs.takeSnapshot(`batch:${toolCalls.length} tools`);
+      }
+      // Run all tool calls in parallel with skipSnapshot=true since we
+      // already took the batch snapshot above.
       set({ agentStatus: `Calling ${toolCalls.length} tools…` });
       await Promise.all(
-        toolCalls.map((tc) => executeToolCallSafe(set, get, tc, signal)),
+        toolCalls.map((tc) => executeToolCallSafe(set, get, tc, signal, true)),
       );
     }
     iter++;
   }
   // unreachable — loop exits via return statements above
 }
+
+/** Tools that mutate the VFS. Undo snapshots are taken before these. */
+const MUTATING_TOOLS = new Set([
+  "write_file", "edit_file", "multi_edit", "delete_file",
+  "move_file", "append_file", "create_dir", "update_plan",
+  "apply_patch", "insert_at",
+]);
 
 /** Wrapper that guarantees a tool result message is ALWAYS added to the
  *  conversation, even if executeToolCall throws. This prevents the
@@ -681,11 +697,12 @@ async function executeToolCallSafe(
   get: () => SessionState,
   tc: ToolCall,
   signal?: AbortSignal,
+  skipSnapshot = false,
 ): Promise<void> {
   const toolCallId = tc.id || `tc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   if (!tc.id) tc.id = toolCallId;
   try {
-    await executeToolCall(set, get, tc, signal);
+    await executeToolCall(set, get, tc, signal, skipSnapshot);
   } catch (e) {
     // Tool execution threw — add a fallback tool result so the API
     // doesn't complain about missing tool_call_id responses.
@@ -710,6 +727,7 @@ async function executeToolCall(
   get: () => SessionState,
   tc: ToolCall,
   signal?: AbortSignal,
+  skipSnapshot = false,
 ) {
   // H3: ensure tool_call_id is non-empty (some providers don't return it)
   const toolCallId = tc.id || `tc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -827,6 +845,60 @@ async function executeToolCall(
           args,
         };
       }
+    } else if (tc.function.name === "orchestrate_task") {
+      const task = String(args.task ?? "");
+      const maxSub = Math.min(Number(args.max_sub_agents) || 3, 5);
+      const subMaxIter = Number(args.sub_agent_max_iterations) || 8;
+      if (!task) {
+        result = {
+          ok: false,
+          output: "orchestrate_task requires a 'task' argument.",
+          tool: "orchestrate_task",
+          args,
+        };
+      } else {
+        const config = get().config;
+        const aiConfig: AiClientConfig = {
+          baseUrl: config.baseUrl,
+          apiKey: apiKeyVault.getKey() ?? "",
+          model: config.model,
+          temperature: config.temperature,
+          maxTokens: config.maxTokens,
+          thinkingEnabled: config.thinkingEnabled,
+          reasoningEffort: config.reasoningEffort,
+        };
+        set({ agentStatus: `🧠 Orchestrator: 分解任务中…` });
+        try {
+          const orchResult = await orchestrateTask(aiConfig, {
+            task,
+            maxSubAgents: maxSub,
+            subAgentMaxIterations: subMaxIter,
+            onStatus: (s) => {
+              set({ agentStatus: `🧠 ${s}` });
+            },
+            onUsage: (usage) => {
+              set((s) => ({
+                totalTokens: s.totalTokens + usage.total_tokens,
+                lastUsage: usage,
+              }));
+            },
+            signal,
+          });
+          result = {
+            ok: true,
+            output: `Orchestration completed: ${orchResult.subTasks.length} subtasks, ${orchResult.totalToolCalls} total tool calls.\n\n--- Synthesized result ---\n${orchResult.summary}`,
+            tool: "orchestrate_task",
+            args,
+          };
+        } catch (e) {
+          result = {
+            ok: false,
+            output: `Orchestration failed: ${e instanceof Error ? e.message : String(e)}`,
+            tool: "orchestrate_task",
+            args,
+          };
+        }
+      }
     } else {
       // Plan mode: block all mutating tools — AI can only read/analyze.
       const mutatingTools = new Set([
@@ -842,14 +914,16 @@ async function executeToolCall(
           args,
         };
       } else {
-        // Before executing a mutating tool, push a VFS snapshot so /undo and the
-        // undo_edit tool can restore the previous state.
-        // undo_edit itself should NOT take a snapshot — it would stack on top of
-        // the snapshot it needs to restore, causing a no-op restore.
-        if (mutatingTools.has(tc.function.name) && tc.function.name !== "undo_edit") {
+        // Push a VFS snapshot before mutating tools (for /undo).
+        // When skipSnapshot is true (parallel batch), the caller already took
+        // a single batch snapshot — we must not take individual ones or they'd
+        // all capture the same pre-batch state (race via Promise.all).
+        if (!skipSnapshot && MUTATING_TOOLS.has(tc.function.name) && tc.function.name !== "undo_edit") {
           vfs.takeSnapshot(`${tc.function.name}(${formatToolArgsPreview(args)})`);
         }
         result = await dispatchTool(tc.function.name, args);
+        // Ensure the file bag UI refreshes after any mutating tool
+        if (result.mutated) useVfsView.getState().bump();
       }
     }
   }

@@ -401,6 +401,69 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "orchestrate_task",
+      description:
+        "[PREFERRED for multi-file tasks] Decompose a complex task into independent subtasks, execute them with PARALLEL sub-agents, and synthesize the results. EACH sub-agent runs independently so the total wall-clock time is much FASTER than doing it yourself. Use this WHENEVER the request asks for multiple independent files, features, or components that don't depend on each other (e.g. creating 4 independent project files, building a frontend + backend + docs simultaneously). More efficient than dispatching sub-agents one-by-one. Do NOT treat this as a 'last resort' — it's the BEST tool for multi-component work.",
+      parameters: {
+        type: "object",
+        properties: {
+          task: {
+            type: "string",
+            description: "The high-level task description. Will be automatically decomposed into independent subtasks.",
+          },
+          max_sub_agents: {
+            type: "number",
+            description: "Maximum number of parallel sub-agents. Default 3. Capped at 5.",
+          },
+          sub_agent_max_iterations: {
+            type: "number",
+            description: "Max tool-call iterations per sub-agent. Default 8.",
+          },
+        },
+        required: ["task"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_multiple_files",
+      description:
+        "Read MULTIPLE files at once. Takes an array of file paths and returns each file's content with a clear header separator. More efficient than calling read_file repeatedly when you need to understand several files together. Maximum 20 files per call. For individual files with pagination, use read_file instead.",
+      parameters: {
+        type: "object",
+        properties: {
+          paths: {
+            type: "array",
+            items: { type: "string" },
+            description: "Array of file paths to read, relative to workspace root. e.g. ['src/index.ts', 'src/utils.ts', 'README.md']",
+          },
+        },
+        required: ["paths"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "project_stats",
+      description:
+        "Get workspace statistics: file/directory count, total lines of code, characters, file type breakdown by extension, TODO/FIXME markers count, largest files, and recently modified files. Pass an optional 'path' to scope the analysis to a subdirectory.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Optional subdirectory path to scope the analysis (e.g. 'src/components'). If omitted, analyzes the entire workspace.",
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "ask_user_input",
       description:
         "向用户展示结构化问答面板，支持单选/多选/其他输入和必填校验。用户填写提交后结果会返回给你。当你需要用户做选择、确认、或提供信息时使用此工具。",

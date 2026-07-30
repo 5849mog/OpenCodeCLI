@@ -34,12 +34,13 @@ const claudeTheme = EditorView.theme(
       backgroundColor: "#FAF9F7",
       color: "#2D2B27",
       height: "100%",
-      fontSize: "12.5px",
+      fontSize: "var(--font-size-code, 12.5px)",
     },
     ".cm-content": {
       caretColor: "#D97757",
       fontFamily: 'var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, Monaco, monospace',
-      padding: "12px 0",
+      padding: "16px 0",
+      lineHeight: "1.6",
     },
     ".cm-gutters": {
       backgroundColor: "#FAF9F7",

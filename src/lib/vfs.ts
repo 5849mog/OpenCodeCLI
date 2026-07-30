@@ -248,8 +248,8 @@ function ensureAncestorsSync(path: string) {
 // ---------------------------------------------------------------------------
 
 interface Snapshot {
-  // Map from path -> content snapshot (only files; dirs are derived).
-  files: Map<string, string>;
+  // Map from path -> { content, createdAt, updatedAt }.
+  files: Map<string, { content: string; createdAt: number; updatedAt: number }>;
   ts: number;
   label: string;
 }
@@ -259,9 +259,9 @@ const MAX_SNAPSHOTS = 30;
 
 /** Take a snapshot of all current file contents. Returns nothing. */
 function takeSnapshot(label: string): void {
-  const files = new Map<string, string>();
+  const files = new Map<string, { content: string; createdAt: number; updatedAt: number }>();
   for (const [path, node] of cache.entries()) {
-    if (node.type === "file") files.set(path, node.content ?? "");
+    if (node.type === "file") files.set(path, { content: node.content ?? "", createdAt: node.createdAt, updatedAt: node.updatedAt });
   }
   snapshotStack.push({ files, ts: Date.now(), label });
   if (snapshotStack.length > MAX_SNAPSHOTS) snapshotStack.shift();
@@ -274,32 +274,36 @@ function restoreLastSnapshot(): string | null {
   // Wipe current cache and rebuild from snapshot
   const toDelete = Array.from(cache.keys());
   for (const p of toDelete) cache.delete(p);
-  for (const [path, content] of snap.files.entries()) {
-    const now = Date.now();
+  for (const [path, meta] of snap.files.entries()) {
     cache.set(path, {
       path,
       type: "file",
-      content,
-      createdAt: now,
-      updatedAt: now,
+      content: meta.content,
+      createdAt: meta.createdAt,
+      updatedAt: meta.updatedAt,
     });
+    // Re-create ancestor directory nodes (they were destroyed by the wipe)
+    ensureAncestorsSync(path);
   }
-  // Persist: clear IDB and re-write all
-  void getDB().then(async (db) => {
-    if (!db) return;
-    const tx = db.transaction(STORE, "readwrite");
-    for (const p of toDelete) await tx.store.delete(p);
-    for (const [path, content] of snap.files.entries()) {
-      await tx.store.put({
-        path,
-        type: "file",
-        content,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      });
-    }
-    await tx.done;
-  });
+  // Persist: clear IDB and re-write all (fire-and-forget to not block UX,
+  // but with error logging)
+  getDB()
+    .then(async (db) => {
+      if (!db) return;
+      const tx = db.transaction(STORE, "readwrite");
+      for (const p of toDelete) await tx.store.delete(p);
+      for (const [path, meta] of snap.files.entries()) {
+        await tx.store.put({
+          path,
+          type: "file",
+          content: meta.content,
+          createdAt: meta.createdAt,
+          updatedAt: meta.updatedAt,
+        });
+      }
+      await tx.done;
+    })
+    .catch((e) => console.warn("[vfs] snapshot persist failed:", e));
   emit({ type: "clear" });
   return snap.label;
 }
@@ -312,6 +316,11 @@ function peekSnapshot(): Snapshot | null {
 /** List all snapshots for display. */
 function listSnapshots(): Array<{ label: string; ts: number; fileCount: number }> {
   return snapshotStack.map((s) => ({ label: s.label, ts: s.ts, fileCount: s.files.size }));
+}
+
+/** Clear all snapshots (e.g. after clearing workspace). */
+function clearSnapshots(): void {
+  snapshotStack.length = 0;
 }
 
 export const vfs = {
@@ -650,6 +659,7 @@ export const vfs = {
   restoreLastSnapshot,
   peekSnapshot,
   listSnapshots,
+  clearSnapshots,
   /** Number of snapshots currently in the stack. */
   snapshotCount: () => snapshotStack.length,
 };
