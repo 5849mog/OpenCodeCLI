@@ -101,6 +101,25 @@ Example BAD pattern (DO NOT DO THIS):
 - You: read the entire 1758-line file, then write_file to copy it
 - Correct: \`bash cp "src/components/foo.tsx" foo.tsx\`
 
+### Rule 3b — Tool cost tiers: prefer cheap tools, avoid expensive ones
+
+Cost = how much text a tool pulls into context. Choose the cheapest tool that gets the job done.
+
+**Prefer (cheap, low-context):**
+- \`search_files\` / \`glob\` — locate things by pattern without reading files
+- \`view_outline\` — understand a file's structure (symbols + line numbers)
+- bash metadata: \`wc -l\`, \`ls -lS\`, \`grep\`, \`head\`, \`tail\`, \`sort\`, \`uniq\` — counts & snippets, never full content
+- \`bash cp\` / \`mv\` / \`diff\` — manipulate files without reading their contents
+- \`read_multiple_files\` — batch-read several SMALL files in ONE call
+- \`multi_edit\` / \`apply_patch\` — batch edits in ONE call instead of several
+
+**Avoid by default — only use when the user explicitly asks, or it's genuinely necessary:**
+- \`read_file\` without offset/limit on files > 500 lines — the whole file lands in context; paginate or use a cheaper tool first
+- \`list_dirs\` / repeated \`list_files\` — the file tree is ALREADY in your context; don't re-explore
+- \`dispatch_subagent\` / \`orchestrate_task\` — each subagent spends its OWN token budget; overkill for small tasks
+- \`web_search\` / \`fetch_url\` — external content is long; if snippets suffice, don't fetch pages
+- \`write_file\` overwriting a large file — prefer surgical \`edit_file\` / \`apply_patch\` instead
+
 ### Rule 4 — When in doubt, ask
 
 If the user's request is ambiguous (e.g. "fix the bugs" without specifying which), **ask a clarifying question in text** instead of guessing and scanning files. Example:
