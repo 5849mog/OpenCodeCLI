@@ -23,6 +23,7 @@ import {
   ChevronRight,
   FileText,
   Terminal as TerminalIcon,
+  Check,
   CheckCircle2,
   XCircle,
   Wrench,
@@ -1092,6 +1093,40 @@ function EventRow({
   }
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for non-secure contexts (e.g. plain http)
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  };
+  return (
+    <button
+      onClick={copy}
+      className="shrink-0 self-start pt-0.5 text-[#A8A29E] transition-opacity hover:text-[#3D3B37]"
+      title={copied ? "Copied" : "Copy message"}
+    >
+      {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+    </button>
+  );
+}
+
 function UserRow({ text }: { text: string }) {
   return (
     <div className="group flex gap-2">
@@ -1099,13 +1134,7 @@ function UserRow({ text }: { text: string }) {
       <div className="flex-1 whitespace-pre-wrap break-words text-[#1A1815]">
         {text}
       </div>
-      <button
-        onClick={() => navigator.clipboard?.writeText(text)}
-        className="shrink-0 self-start pt-0.5 opacity-0 transition-opacity group-hover:opacity-100 text-[#A8A29E] hover:text-[#3D3B37]"
-        title="Copy message"
-      >
-        <Copy size={14} />
-      </button>
+      <CopyButton text={text} />
     </div>
   );
 }
@@ -1123,13 +1152,7 @@ function AssistantRow({ text, streaming }: { text: string; streaming: boolean })
           <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-emerald-400 align-middle" />
         )}
       </div>
-      <button
-        onClick={() => navigator.clipboard?.writeText(text)}
-        className="shrink-0 self-start pt-0.5 opacity-0 transition-opacity group-hover:opacity-100 text-[#A8A29E] hover:text-[#3D3B37]"
-        title="Copy message"
-      >
-        <Copy size={14} />
-      </button>
+      <CopyButton text={text} />
     </div>
   );
 }
