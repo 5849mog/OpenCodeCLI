@@ -381,7 +381,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "dispatch_subagent",
       description:
-        "Dispatch a subagent to work on an independent subtask. The subagent gets a CLEAN conversation context (it does NOT see the main conversation) and runs its own agent loop with full tool access. Use this for: (1) tasks that would pollute the main context with many tool calls, (2) parallel-ish independent subtasks, (3) deep exploration of a specific area. The subagent shares the same workspace — its file changes are visible to you immediately. Returns the subagent's final text summary. Use sparingly — each subagent call consumes its own token budget.",
+        "⭐ 推荐：当需要读多个文件做探索/研究、或想避免把大量文件内容灌进主上下文时，优先用它而非连续 read_file。Dispatch a subagent to work on an independent subtask. The subagent gets a CLEAN conversation context (it does NOT see the main conversation) and runs its own agent loop with full tool access. Use this for: (1) tasks that would pollute the main context with many tool calls, (2) parallel-ish independent subtasks, (3) deep exploration of a specific area. The subagent shares the same workspace — its file changes are visible to you immediately. Returns the subagent's final text summary. Use sparingly — each subagent call consumes its own token budget.",
       parameters: {
         type: "object",
         properties: {

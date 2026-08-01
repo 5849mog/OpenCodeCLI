@@ -277,15 +277,14 @@ export function SettingsDialog({
                   className="rounded border border-[#E5E2D9] bg-white px-2 py-1 text-sm font-mono focus:border-[#D97757] focus:outline-none"
                 >
                   <option value="low">low</option>
-                  <option value="medium">medium</option>
                   <option value="high">high</option>
-                  <option value="max">max</option>
                   <option value="xhigh">xhigh</option>
+                  <option value="max">max</option>
                 </select>
               </label>
             </div>
             <div className="mt-1.5 text-[11px] text-[#A8A29E]">
-              For DeepSeek V4 models. Enables <code className="text-[#D97757]">thinking</code> + <code className="text-[#D97757]">reasoning_effort</code> in API requests. Default: thinking=enabled, effort=max (agent-grade).
+              For DeepSeek V4 models. On sends <code className="text-[#D97757]">thinking=enabled</code> + <code className="text-[#D97757]">reasoning_effort</code>; off sends <code className="text-[#D97757]">thinking=disabled</code>. Valid efforts: low/high/xhigh/max. Note: thinking &amp; answer share the Max tokens budget.
             </div>
           </div>
 

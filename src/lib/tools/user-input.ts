@@ -1,5 +1,6 @@
 import { useSession } from "@/store/session";
 import type { ToolResult } from "./types";
+import { uuid } from "@/lib/utils";
 
 async function toolAskUserInput(args: Record<string, unknown>): Promise<ToolResult> {
   // Check if there are already pending questions — don't overlay them
@@ -42,17 +43,17 @@ async function toolAskUserInput(args: Record<string, unknown>): Promise<ToolResu
     title: args.title ? String(args.title) : "",
     description: args.description ? String(args.description) : "",
     submit_label: args.submit_label ? String(args.submit_label) : "提交",
-    request_id: args.request_id ? String(args.request_id) : crypto.randomUUID().slice(0, 12),
+    request_id: args.request_id ? String(args.request_id) : uuid().slice(0, 12),
     questions: rawQuestions.map((q: Record<string, unknown>) => {
       const qType = String(q.type ?? "text_input");
       const isSelect = qType === "single_select" || qType === "multi_select";
       return {
-        id: q.id ? String(q.id) : `q_${crypto.randomUUID().slice(0, 6)}`,
+        id: q.id ? String(q.id) : `q_${uuid().slice(0, 6)}`,
         question: String(q.question),
         type: qType as "single_select" | "multi_select" | "text_input",
         options: isSelect
           ? (q.options as Array<Record<string, unknown>>)?.map((o) => ({
-              id: o.id ? String(o.id) : `opt_${crypto.randomUUID().slice(0, 6)}`,
+              id: o.id ? String(o.id) : `opt_${uuid().slice(0, 6)}`,
               label: String(o.label),
               description: o.description ? String(o.description) : "",
             })) ?? []

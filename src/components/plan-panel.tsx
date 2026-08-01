@@ -7,9 +7,11 @@
  */
 
 import { useMemo } from "react";
+import { motion } from "framer-motion";
 import { ClipboardList } from "lucide-react";
 import { vfs } from "@/lib/vfs";
 import { cn } from "@/lib/utils";
+import { useSession } from "@/store/session";
 import {
   parsePlan,
   nodeStats,
@@ -17,6 +19,21 @@ import {
   tagColor,
   type PlanNode,
 } from "@/lib/plan-utils";
+
+/** First in-progress node (fallback: first todo), depth-first. */
+function findCurrentPath(nodes: PlanNode[]): string | null {
+  for (const n of nodes) {
+    if (n.status === "in-progress") return n.path;
+  }
+  for (const n of nodes) {
+    if (n.status === "todo") return n.path;
+  }
+  for (const n of nodes) {
+    const child = findCurrentPath(n.children);
+    if (child) return child;
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Status icon
@@ -56,21 +73,37 @@ function StatusIcon({ status }: { status: PlanNode["status"] }) {
 // Plan node row (recursive)
 // ---------------------------------------------------------------------------
 
-function PlanNodeRow({ node, depth }: { node: PlanNode; depth: number }) {
+function PlanNodeRow({ node, depth, currentPath }: { node: PlanNode; depth: number; currentPath: string | null }) {
   const { total, done } = nodeStats(node);
   const hasChildren = node.children.length > 0;
   const padLeft = depth * 18;
+  const isCurrent = currentPath !== null && node.path === currentPath;
 
   return (
     <>
       <li
         className={cn(
-          "flex items-start gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-[#F5F3EE]",
+          "flex items-start gap-2.5 rounded-md border-l-2 border-transparent px-2 py-1.5 transition-colors hover:bg-[#F5F3EE]",
           node.status === "done" ? "text-[#8B8884]" : "text-[#2D2B27]",
+          isCurrent && "border-l-[#D97757] bg-[#D97757]/5",
         )}
         style={{ paddingLeft: `${12 + padLeft}px` }}
       >
-        <StatusIcon status={node.status} />
+        {isCurrent && (
+          <span className="relative mt-1.5 flex h-2 w-2 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#D97757] opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-[#D97757]" />
+          </span>
+        )}
+        {/* key on status so the spring animation replays only when status changes */}
+        <motion.span
+          key={node.status}
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 500, damping: 22 }}
+        >
+          <StatusIcon status={node.status} />
+        </motion.span>
         <span className={cn("flex-1 text-sm leading-relaxed", node.status === "done" && "line-through")}>
           {node.text}
         </span>
@@ -93,7 +126,7 @@ function PlanNodeRow({ node, depth }: { node: PlanNode; depth: number }) {
         )}
       </li>
       {node.children.map((child, i) => (
-        <PlanNodeRow key={i} node={child} depth={depth + 1} />
+        <PlanNodeRow key={i} node={child} depth={depth + 1} currentPath={currentPath} />
       ))}
     </>
   );
@@ -104,6 +137,7 @@ function PlanNodeRow({ node, depth }: { node: PlanNode; depth: number }) {
 // ---------------------------------------------------------------------------
 
 export function PlanPanel({ eventsLen }: { eventsLen: number }) {
+  const mode = useSession((s) => s.mode);
   const parsed = useMemo(() => {
     const content = vfs.readFileSync("PLAN.md");
     if (!content) return null;
@@ -120,6 +154,11 @@ export function PlanPanel({ eventsLen }: { eventsLen: number }) {
         <div className="max-w-xs text-xs text-[#8B8884]">
           Ask the AI to create a plan. It will use <code className="text-[#D97757]">update_plan</code> to build a structured checklist here.
         </div>
+        {mode === "bypass" && (
+          <div className="max-w-xs text-xs text-[#8B8884]">
+            当前为 Bypass 模式，可直接让 AI 先用 <code className="text-[#D97757]">update_plan</code> 规划再执行。
+          </div>
+        )}
       </div>
     );
   }
@@ -128,6 +167,7 @@ export function PlanPanel({ eventsLen }: { eventsLen: number }) {
   const allNodes = sections.flatMap((s) => s.nodes);
   const { total, done } = computeTotals(allNodes);
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const currentPath = findCurrentPath(allNodes);
 
   if (total === 0) {
     return (
@@ -157,8 +197,17 @@ export function PlanPanel({ eventsLen }: { eventsLen: number }) {
           </span>
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#F0EDE5]">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-[#D97757] to-[#C66B4A] transition-all duration-500 ease-out"
+          {/* key flips when plan completes → replays the emerald fade-in once */}
+          <motion.div
+            key={pct === 100 ? "done" : "running"}
+            initial={pct === 100 ? { opacity: 0 } : false}
+            animate={{ opacity: 1 }}
+            className={cn(
+              "h-full rounded-full transition-all duration-500 ease-out",
+              pct === 100
+                ? "bg-gradient-to-r from-emerald-500 to-emerald-400"
+                : "bg-gradient-to-r from-[#D97757] to-[#C66B4A]",
+            )}
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -166,33 +215,44 @@ export function PlanPanel({ eventsLen }: { eventsLen: number }) {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-4 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
-        {sections.map((section, si) => (
-          <div key={si} className="mb-4 last:mb-0">
-            {section.title && (
-              <div className="mb-2 flex items-center gap-3">
-                <span className="text-xs font-semibold uppercase tracking-wider text-[#6B6862]">
-                  {section.title}
-                </span>
-                <span className="h-px flex-1 bg-[#E5E2D9]" />
-                {(() => {
-                  const st = computeTotals(section.nodes);
-                  return st.total > 0 ? (
-                    <span className="text-[11px] text-[#A8A29E] tabular-nums">
-                      {st.done}/{st.total}
+        {sections.map((section, si) => {
+          const st = computeTotals(section.nodes);
+          const sectionPct = st.total > 0 ? Math.round((st.done / st.total) * 100) : 0;
+          return (
+            <div key={si} className="mb-4 last:mb-0">
+              {section.title && (
+                <div className="mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[#6B6862]">
+                      {section.title}
                     </span>
-                  ) : null;
-                })()}
-              </div>
-            )}
-            <ul className="space-y-0.5">
-              {section.nodes
-                .filter((n) => n.depth === 0)
-                .map((node, ni) => (
-                  <PlanNodeRow key={ni} node={node} depth={0} />
-                ))}
-            </ul>
-          </div>
-        ))}
+                    <span className="h-px flex-1 bg-[#E5E2D9]" />
+                    {st.total > 0 && (
+                      <span className="text-[11px] text-[#A8A29E] tabular-nums">
+                        {st.done}/{st.total}
+                      </span>
+                    )}
+                  </div>
+                  {st.total > 0 && (
+                    <div className="mt-1 h-[3px] overflow-hidden rounded-full bg-[#F0EDE5]">
+                      <div
+                        className="h-full rounded-full bg-[#D97757]/60 transition-all duration-500"
+                        style={{ width: `${sectionPct}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+              <ul className="space-y-0.5">
+                {section.nodes
+                  .filter((n) => n.depth === 0)
+                  .map((node, ni) => (
+                    <PlanNodeRow key={ni} node={node} depth={0} currentPath={currentPath} />
+                  ))}
+              </ul>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

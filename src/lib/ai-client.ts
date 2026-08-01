@@ -16,6 +16,8 @@ export interface ChatMessage {
   tool_calls?: ToolCall[];
   tool_call_id?: string;
   name?: string;
+  /** DeepSeek chain-of-thought. MUST be round-tripped in tool-calling turns or the API returns 400. */
+  reasoning_content?: string;
 }
 
 export interface ToolCall {
@@ -58,6 +60,8 @@ export interface TokenUsage {
 
 export interface StreamCallbacks {
   onText?: (delta: string) => void;
+  /** Reasoning/thinking text deltas (e.g. DeepSeek's reasoning_content). */
+  onReasoning?: (delta: string) => void;
   onToolCallDelta?: (toolCall: Partial<ToolCall> & { index: number }) => void;
   onMessage?: (msg: ChatMessage) => void;
   onError?: (err: Error) => void;
@@ -72,6 +76,8 @@ export interface StreamResult {
   usage: TokenUsage | null;
   /** The finish_reason from the API: "stop", "length", "tool_calls", "content_filter". */
   finishReason: string | null;
+  /** Reasoning/thinking text the model emitted before its answer (e.g. DeepSeek reasoning_content). */
+  reasoning: string;
 }
 
 /**
@@ -105,8 +111,12 @@ export async function streamChatCompletion(
   if (config.maxTokens) {
     body.max_tokens = config.maxTokens;
   }
-  // DeepSeek V4: thinking mode + reasoning effort
-  if (config.thinkingEnabled ?? true) {
+  // DeepSeek V4: thinking mode + reasoning effort.
+  // Thinking is DEFAULT ON at the API — sending nothing means "on". So an
+  // explicit {type:"disabled"} is required to actually turn it off.
+  if (config.thinkingEnabled === false) {
+    body.thinking = { type: "disabled" };
+  } else {
     body.thinking = { type: "enabled" };
     if (config.reasoningEffort) {
       body.reasoning_effort = config.reasoningEffort;
@@ -128,6 +138,13 @@ export async function streamChatCompletion(
       signal,
     });
   } catch (e) {
+    // Never wrap abort errors — their .name must survive so the caller can
+    // distinguish user-abort / timeout from a real network failure. fetch
+    // rejects aborts with name === "AbortError".
+    if (signal?.aborted || (e as { name?: string })?.name === "AbortError") {
+      callbacks.onError?.(e as Error);
+      throw e;
+    }
     const err = new Error(
       `Network error: ${e instanceof Error ? e.message : String(e)}`,
     );
@@ -149,6 +166,7 @@ export async function streamChatCompletion(
   let buffer = "";
 
   let content = "";
+  let reasoning = "";
   const toolCalls: ToolCall[] = [];
   const toolCallMap = new Map<number, ToolCall>();
   let usage: TokenUsage | null = null;
@@ -190,6 +208,12 @@ export async function streamChatCompletion(
           if (typeof delta.content === "string" && delta.content) {
             content += delta.content;
             callbacks.onText?.(delta.content);
+          }
+          // DeepSeek reasoning model streams its thinking in reasoning_content.
+          // The truthy check skips the common first frame {reasoning_content:"",content:""}.
+          if (typeof delta.reasoning_content === "string" && delta.reasoning_content) {
+            reasoning += delta.reasoning_content;
+            callbacks.onReasoning?.(delta.reasoning_content);
           }
           if (Array.isArray(delta.tool_calls)) {
             for (const tc of delta.tool_calls) {
@@ -236,10 +260,13 @@ export async function streamChatCompletion(
     role: "assistant",
     content: content || null,
     tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+    // Round-trip DeepSeek chain-of-thought. Required when tools are in play
+    // (otherwise the API 400s); ignored by the API in non-tool turns.
+    reasoning_content: reasoning || undefined,
   };
   callbacks.onMessage?.(finalMsg);
   if (usage) callbacks.onUsage?.(usage);
-  return { message: finalMsg, usage, finishReason };
+  return { message: finalMsg, usage, finishReason, reasoning };
 }
 
 /**

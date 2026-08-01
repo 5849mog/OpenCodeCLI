@@ -54,6 +54,7 @@ import "prismjs/components/prism-go";
 import "prismjs/components/prism-rust";
 import "prismjs/components/prism-sql";
 import { useSession, type SessionEvent, type QuestionPanelData } from "@/store/session";
+import { buildHelpText } from "@/lib/help-content";
 import { useVfsView } from "@/store/vfs-view";
 import { vfs } from "@/lib/vfs";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,7 @@ export function Terminal() {
   const mode = useSession((s) => s.mode);
   const toggleMode = useSession((s) => s.toggleMode);
   const streamingText = useSession((s) => s.streamingText);
+  const streamingReasoning = useSession((s) => s.streamingReasoning);
   const send = useSession((s) => s.send);
   const abort = useSession((s) => s.abort);
   const reset = useSession((s) => s.reset);
@@ -93,7 +95,7 @@ export function Terminal() {
     if (autoScroll) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [events, streamingText, autoScroll]);
+  }, [events, streamingText, streamingReasoning, autoScroll]);
 
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -195,25 +197,7 @@ export function Terminal() {
         break;
 
       case "help":
-        pushSystem([
-          "Slash commands:",
-          "  /clear            Clear the session (keep workspace)",
-          "  /reset            Same as /clear",
-          "  /model <name>     Switch AI model without opening Settings",
-          "  /compact          Compress conversation history to save tokens",
-          "  /export           Download the conversation as a Markdown file",
-          "  /cost             Estimate cumulative API cost",
-          "  /tokens           Show real token usage from the API",
-          "  /undo             Undo the last AI file edit (restore snapshot)",
-          "  /diff             Show all file changes made this session",
-          "  /help             Show this help",
-          "",
-          "Tips:",
-          "  • Press Enter to send, Shift+Enter for newline",
-          "  • Click any file path in tool results to open it in the editor",
-          "  • Use Ctrl+S in the editor to save the active file",
-          "  • The AI can call undo_edit itself to revert its own mistakes",
-        ].join("\n"));
+        pushSystem(buildHelpText());
         break;
 
       case "tokens":
@@ -579,14 +563,18 @@ export function Terminal() {
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto px-4 py-3 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] [&::-webkit-scrollbar-track]:bg-transparent"
       >
-        {events.length === 0 && !streamingText && <EmptyState />}
+        {events.length === 0 && !streamingText && !streamingReasoning && <EmptyState />}
         <div className="space-y-4">
           {useMemo(() => groupToolEvents(events), [events]).map((ev) => (
             <EventRow key={ev.id} ev={ev} pairedResult={ev.pairedResult} />
           ))}
           {/* Live streaming bubble — separate from events to avoid O(n) re-render */}
-          {streamingText && streamingText.text && (
-            <AssistantRow text={streamingText.text} streaming={true} />
+          {(streamingText?.text || streamingReasoning?.text) && (
+            <AssistantRow
+              text={streamingText?.text ?? ""}
+              reasoning={streamingReasoning?.text ?? ""}
+              streaming={true}
+            />
           )}
           {isStreaming && (
             <AgentStatusRow status={agentStatus} />
@@ -1058,7 +1046,7 @@ function EventRow({
       return <UserRow text={ev.text ?? ""} />;
     case "assistant-message":
       return (
-        <AssistantRow text={ev.text ?? ""} streaming={false} />
+        <AssistantRow text={ev.text ?? ""} reasoning={ev.reasoning} streaming={false} />
       );
     case "tool-call":
       // Merged card: tool-call + its matching tool-result
@@ -1139,20 +1127,81 @@ function UserRow({ text }: { text: string }) {
   );
 }
 
-function AssistantRow({ text, streaming }: { text: string; streaming: boolean }) {
+/**
+ * Thinking block — shows the model's reasoning_content (real thinking) as a
+ * collapsible plain-text panel. Live (streaming) and final states share this
+ * component, distinguished by the `streaming` prop.
+ */
+function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }) {
   const deferredText = useDeferredValue(text);
   const isStale = deferredText !== text;
-  if (!text) return null;
+  // Live always stays open (the thinking must be visible); final long blocks
+  // default collapsed. Evaluated once on mount — no cross-instance state.
+  const [collapsed, setCollapsed] = useState(() => !streaming && text.length > 400);
+  const preview = text.split("\n").find((l) => l.trim()) ?? text;
+  const shown = streaming ? deferredText : text;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 2 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.15 }}
+      className="mb-1.5 overflow-hidden rounded-md border border-[#D97757]/20 bg-[#D97757]/5"
+    >
+      <button
+        onClick={() => setCollapsed((c) => !c)}
+        disabled={streaming}
+        className="flex w-full items-center gap-1.5 px-2.5 py-1 text-left text-xs text-[#8B7355] disabled:cursor-default"
+      >
+        <ChevronRight className={cn("h-3 w-3 transition-transform", !collapsed && "rotate-90")} />
+        <Sparkles className="h-3 w-3 text-[#D97757]/70" />
+        <span className="font-medium">thinking</span>
+        {streaming && (
+          <span className="flex gap-0.5 pl-1">
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#D97757]/70" style={{ animationDelay: "0ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#D97757]/70" style={{ animationDelay: "120ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#D97757]/70" style={{ animationDelay: "240ms" }} />
+          </span>
+        )}
+        {!streaming && collapsed && <span className="ml-2 truncate text-[#A8A29E]">{preview}</span>}
+        {!streaming && <span className="ml-auto text-[#A8A29E]">{collapsed ? "show" : "hide"}</span>}
+      </button>
+      {!collapsed && (
+        <pre
+          className="max-h-64 overflow-auto whitespace-pre-wrap break-words px-3 pb-2.5 pt-0.5 font-mono text-xs leading-relaxed text-[#6B6862] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]"
+          style={{ opacity: isStale ? 0.9 : 1 }}
+        >
+          {shown}
+        </pre>
+      )}
+    </motion.div>
+  );
+}
+
+function AssistantRow({
+  text,
+  reasoning,
+  streaming,
+}: {
+  text: string;
+  reasoning?: string;
+  streaming: boolean;
+}) {
+  const deferredText = useDeferredValue(text);
+  const isStale = deferredText !== text;
+  const showReasoning = !!reasoning && reasoning.trim().length > 0;
+  if (!text && !showReasoning) return null;
   return (
     <div className="group flex gap-2">
       <span className="shrink-0 pt-0.5 text-[#8B7355]">⟫</span>
       <div className="flex-1 min-w-0 break-words text-[#2D2B27]" style={{ opacity: isStale ? 0.95 : 1 }}>
-        <MarkdownRenderer text={streaming ? deferredText : text} />
+        {showReasoning && <ThinkingBlock text={reasoning!} streaming={streaming} />}
+        {text && <MarkdownRenderer text={streaming ? deferredText : text} />}
         {streaming && (
           <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-emerald-400 align-middle" />
         )}
       </div>
-      <CopyButton text={text} />
+      <CopyButton text={text || reasoning || ""} />
     </div>
   );
 }

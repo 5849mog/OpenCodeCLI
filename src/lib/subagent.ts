@@ -26,11 +26,14 @@ import {
   type ToolResult,
 } from "./tools/index";
 import { buildWorkspaceContext } from "./tools/system-prompt";
+import { truncateConversation, DEFAULT_TOKEN_BUDGET } from "./context";
 export interface SubagentOptions {
   /** The task description for the subagent. */
   task: string;
   /** Max iterations for the subagent's agent loop. Default 8. */
   maxIterations?: number;
+  /** Token budget for the subagent's own context. Default DEFAULT_TOKEN_BUDGET. */
+  tokenBudget?: number;
   /** Optional callback to receive token usage from the subagent. */
   onUsage?: (usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number }) => void;
   /** Optional callback to receive status updates (for UI display). */
@@ -73,7 +76,9 @@ export async function runSubagent(
   // context (cache-friendly) + task description.
   const systemPrompt = buildSystemPrompt({});
   const contextBlock = buildWorkspaceContext({ mode: "bypass" });
-  const messages: ChatMessage[] = [
+  // NOTE: index 0 = system prompt, index 1 = workspace context block.
+  // truncateConversation below protects both by index — keep this order.
+  let messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
     { role: "user", content: contextBlock },
     { role: "user", content: `You are a subagent — a focused assistant working on a specific subtask delegated by the main agent.
@@ -98,6 +103,16 @@ Begin. Use tools as needed, then summarize your work in your final response.` },
     iterations++;
     if (opts.signal?.aborted) break;
     opts.onStatus?.(`Subagent iteration ${iter + 1}/${maxIter}`);
+
+    // Safety net: keep the subagent's own context under budget. Only triggers
+    // when a big tool result blows the budget — do NOT shrink tokenBudget to
+    // proactively truncate (it would make the model re-read files, costing more).
+    const { messages: truncated } = truncateConversation(
+      messages,
+      opts.tokenBudget ?? DEFAULT_TOKEN_BUDGET,
+      8,
+    );
+    if (truncated.length < messages.length) messages = truncated;
 
     const result = await streamChatCompletionWithRetry(
       aiConfig,

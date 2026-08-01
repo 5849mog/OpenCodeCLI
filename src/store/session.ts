@@ -34,14 +34,22 @@ import {
   DEFAULT_TOKEN_BUDGET,
 } from "@/lib/context";
 import {
+  createSession,
   saveSession,
   loadSession,
-  clearSession,
+  deleteSession as deleteSessionStorage,
+  renameSession as renameSessionStorage,
+  listSessions,
+  getActiveSessionId,
+  setActiveSessionId,
+  deriveTitle,
   type PersistedSession,
+  type SessionMeta,
 } from "@/lib/session-storage";
 import { runSubagent } from "@/lib/subagent";
 import { orchestrateTask } from "@/lib/orchestrator";
 import { apiKeyVault } from "@/lib/api-key-vault";
+import { uuid } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // UI-facing event types — what gets rendered in the terminal
@@ -60,6 +68,8 @@ export interface SessionEvent {
   id: string;
   kind: EventKind;
   text?: string;
+  /** Model reasoning/thinking content (DeepSeek reasoning_content), rendered as a thinking block. */
+  reasoning?: string;
   toolName?: string;
   toolArgs?: Record<string, unknown>;
   toolOutput?: string;
@@ -150,6 +160,11 @@ function loadConfig(): AiConfig {
     const parsed = JSON.parse(raw);
     // Never accept apiKey from localStorage — it shouldn't be there
     delete parsed.apiKey;
+    // "medium" was offered by older versions but is not a valid DeepSeek
+    // reasoning_effort value — coerce to "high" so we never send an invalid enum.
+    if (typeof parsed.reasoningEffort === "string" && !["low", "high", "xhigh", "max"].includes(parsed.reasoningEffort)) {
+      parsed.reasoningEffort = "high";
+    }
     return { ...DEFAULT_CONFIG, ...parsed };
   } catch {
     return DEFAULT_CONFIG;
@@ -174,6 +189,12 @@ function saveConfig(c: AiConfig) {
 interface SessionState {
   events: SessionEvent[];
   messages: ChatMessage[];
+  /** Id of the active session (IndexedDB key + localStorage pointer). */
+  sessionId: string;
+  /** Auto-derived (or user-renamed) session title. */
+  title: string;
+  /** Lightweight session list for the sidebar (meta only, newest first). */
+  sessions: SessionMeta[];
   config: AiConfig;
   isStreaming: boolean;
   abortController: AbortController | null;
@@ -184,6 +205,8 @@ interface SessionState {
    *  for the live streaming bubble, and only touches events when streaming
    *  completes. */
   streamingText: { id: string; text: string } | null;
+  /** Live reasoning/thinking text (streamed before the answer). Cleared together with streamingText. */
+  streamingReasoning: { id: string; text: string } | null;
   /** Current agent loop iteration (1-based) for the progress bar. */
   agentIteration: number;
   /** Max iterations for the current loop (for progress bar denominator). */
@@ -204,7 +227,14 @@ interface SessionState {
 
   init: () => void;
   setConfig: (patch: Partial<AiConfig>) => void;
+  /** Clear the current session's content but keep its entry. Alias of clearSession. */
   reset: () => void;
+  clearSession: () => Promise<void>;
+  newSession: () => Promise<void>;
+  switchSession: (id: string) => Promise<void>;
+  deleteSession: (id: string) => Promise<void>;
+  renameSession: (id: string, title: string) => Promise<void>;
+  refreshSessionList: () => Promise<void>;
   abort: () => void;
   send: (text: string) => Promise<void>;
   toggleMode: () => void;
@@ -219,21 +249,32 @@ function nextId(): string {
 
 /** Debounced session persistence — avoids writing to IndexedDB on every token. */
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Immediately persist the current session, bypassing the debounce. */
+async function flushPersist(get: () => SessionState): Promise<void> {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  const s = get();
+  if (s.messages.length === 0) return;
+  const session: PersistedSession = {
+    id: s.sessionId || getActiveSessionId(),
+    title: s.title || "新会话",
+    messages: s.messages,
+    events: s.events,
+    totalTokens: s.totalTokens,
+    lastUsage: s.lastUsage,
+    createdAt: s.events[0]?.ts ?? Date.now(),
+    updatedAt: Date.now(),
+  };
+  await saveSession(session);
+}
+
 function schedulePersist(get: () => SessionState) {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    const s = get();
-    if (s.messages.length === 0) return;
-    const session: PersistedSession = {
-      id: "active",
-      messages: s.messages,
-      events: s.events,
-      totalTokens: s.totalTokens,
-      lastUsage: s.lastUsage,
-      createdAt: s.events[0]?.ts ?? Date.now(),
-      updatedAt: Date.now(),
-    };
-    void saveSession(session);
+    void flushPersist(get);
   }, 500);
 }
 
@@ -248,11 +289,15 @@ function formatToolArgsPreview(args: Record<string, unknown>): string {
 export const useSession = create<SessionState>((set, get) => ({
   events: [],
   messages: [],
+  sessionId: "",
+  title: "",
+  sessions: [],
   config: DEFAULT_CONFIG,
   isStreaming: false,
   abortController: null,
   agentStatus: "",
   streamingText: null,
+      streamingReasoning: null,
   agentIteration: 0,
   agentMaxIterations: 12,
   totalTokens: 0,
@@ -275,17 +320,21 @@ export const useSession = create<SessionState>((set, get) => ({
         },
       }));
     });
-    // Restore persisted session (messages + events + token counts) so that
+    // Restore the active session (messages + events + token counts) so that
     // a page refresh doesn't lose the conversation.
-    void loadSession().then((persisted) => {
-      if (persisted && persisted.messages.length > 0) {
+    const sessionId = getActiveSessionId();
+    set({ sessionId });
+    void loadSession(sessionId).then((persisted) => {
+      if (persisted) {
         set({
+          title: persisted.title || "",
           messages: persisted.messages,
           events: persisted.events,
           totalTokens: persisted.totalTokens,
           lastUsage: persisted.lastUsage,
         });
       }
+      void get().refreshSessionList();
     });
   },
 
@@ -295,28 +344,128 @@ export const useSession = create<SessionState>((set, get) => ({
     saveConfig(next);
   },
 
-  reset: () => {
+  clearSession: async () => {
     get().abort();
-    void clearSession();
+    const now = Date.now();
+    // Persist the now-empty record so the session entry (and its title) survives.
+    const session: PersistedSession = {
+      id: get().sessionId || getActiveSessionId(),
+      title: get().title || "新会话",
+      messages: [],
+      events: [],
+      totalTokens: 0,
+      lastUsage: null,
+      createdAt: get().events[0]?.ts ?? now,
+      updatedAt: now,
+    };
+    await saveSession(session);
     set({
       events: [
         {
           id: nextId(),
           kind: "system",
           text: "Session cleared. The workspace (文件袋) is unchanged.",
-          ts: Date.now(),
+          ts: now,
         },
       ],
       messages: [],
       isStreaming: false,
       agentStatus: "",
-  streamingText: null,
+      streamingText: null,
+      streamingReasoning: null,
       agentIteration: 0,
       totalTokens: 0,
       lastUsage: null,
       truncated: false,
       pendingQuestions: null,
     });
+    await get().refreshSessionList();
+  },
+
+  reset: () => {
+    void get().clearSession();
+  },
+
+  newSession: async () => {
+    get().abort();
+    await flushPersist(get);
+    const session = await createSession();
+    setActiveSessionId(session.id);
+    set({
+      sessionId: session.id,
+      title: "",
+      events: [
+        {
+          id: nextId(),
+          kind: "system",
+          text: "New session started. The workspace (文件袋) is unchanged.",
+          ts: Date.now(),
+        },
+      ],
+      messages: [],
+      isStreaming: false,
+      agentStatus: "",
+      streamingText: null,
+      streamingReasoning: null,
+      agentIteration: 0,
+      totalTokens: 0,
+      lastUsage: null,
+      truncated: false,
+      pendingQuestions: null,
+    });
+    await get().refreshSessionList();
+  },
+
+  switchSession: async (id: string) => {
+    if (id === get().sessionId) return;
+    get().abort();
+    await flushPersist(get);
+    setActiveSessionId(id);
+    const rec = await loadSession(id);
+    const events = rec?.events?.length ? rec.events : [];
+    set({
+      sessionId: id,
+      title: rec?.title ?? "",
+      messages: rec?.messages ?? [],
+      events: events.length
+        ? events
+        : [
+            {
+              id: nextId(),
+              kind: "system",
+              text: "Empty session — send a message to get started.",
+              ts: Date.now(),
+            },
+          ],
+      totalTokens: rec?.totalTokens ?? 0,
+      lastUsage: rec?.lastUsage ?? null,
+      isStreaming: false,
+      agentStatus: "",
+      streamingText: null,
+      streamingReasoning: null,
+      agentIteration: 0,
+      truncated: false,
+      pendingQuestions: null,
+    });
+    await get().refreshSessionList();
+  },
+
+  deleteSession: async (id: string) => {
+    const isCurrent = id === get().sessionId;
+    await deleteSessionStorage(id);
+    await get().refreshSessionList();
+    // Never leave the active pointer dangling on a deleted session.
+    if (isCurrent) await get().newSession();
+  },
+
+  renameSession: async (id: string, title: string) => {
+    await renameSessionStorage(id, title);
+    if (id === get().sessionId) set({ title });
+    await get().refreshSessionList();
+  },
+
+  refreshSessionList: async () => {
+    set({ sessions: await listSessions() });
   },
 
   abort: () => {
@@ -328,6 +477,7 @@ export const useSession = create<SessionState>((set, get) => ({
         isStreaming: false,
         agentStatus: "",
   streamingText: null,
+      streamingReasoning: null,
         agentIteration: 0,
       });
     }
@@ -395,9 +545,12 @@ export const useSession = create<SessionState>((set, get) => ({
     const ac = new AbortController();
     set((s) => {
       const newMessages = [...s.messages, userMsg];
+      // Auto-title from the first user message (empty/new sessions only).
+      const title = !s.title ? deriveTitle(trimmed) : s.title;
       return {
         events: [...s.events, userEvent],
         messages: newMessages,
+        title,
         isStreaming: true,
         abortController: ac,
         agentStatus: "Thinking…",
@@ -425,6 +578,7 @@ export const useSession = create<SessionState>((set, get) => ({
         abortController: null,
         agentStatus: "",
   streamingText: null,
+      streamingReasoning: null,
         agentIteration: 0,
       }));
     } finally {
@@ -433,6 +587,7 @@ export const useSession = create<SessionState>((set, get) => ({
         abortController: null,
         agentStatus: "",
   streamingText: null,
+      streamingReasoning: null,
         agentIteration: 0,
       });
       // Persist the final state of this turn.
@@ -450,7 +605,7 @@ async function runAgentLoop(
   get: () => SessionState,
   signal: AbortSignal,
 ) {
-  const PER_REQUEST_TIMEOUT_MS = 90_000; // 90 seconds per AI request
+  const PER_REQUEST_TIMEOUT_MS = 300_000; // 5 minutes per AI request (long thinking)
   const config = get().config;
   const aiConfig: AiClientConfig = {
     baseUrl: config.baseUrl,
@@ -518,6 +673,7 @@ async function runAgentLoop(
     const messagesForAI = truncatedMsgs;
 
     let streamedText = "";
+    let reasoning = "";
     let firstTokenReceived = false;
     const streamEventId = nextId();
     // Don't push to events yet — use streamingText for live updates.
@@ -525,11 +681,14 @@ async function runAgentLoop(
     set({ streamingText: { id: streamEventId, text: "" } });
 
     // Combine the user's abort signal with a per-request timeout.
+    // The flag disambiguates timeout from user-abort: fetch rejects a timeout
+    // abort with name === "AbortError", so e.name alone cannot tell them apart.
+    let requestTimedOut = false;
     const timeoutController = new AbortController();
-    const timeoutId = setTimeout(
-      () => timeoutController.abort(new DOMException("Request timed out", "TimeoutError")),
-      PER_REQUEST_TIMEOUT_MS,
-    );
+    const timeoutId = setTimeout(() => {
+      requestTimedOut = true;
+      timeoutController.abort(new DOMException("Request timed out", "TimeoutError"));
+    }, PER_REQUEST_TIMEOUT_MS);
     const onUserAbort = () => timeoutController.abort(signal.reason);
     if (signal.aborted) timeoutController.abort(signal.reason);
     else signal.addEventListener("abort", onUserAbort, { once: true });
@@ -550,6 +709,10 @@ async function runAgentLoop(
             streamedText += delta;
             set({ streamingText: { id: streamEventId, text: streamedText } });
           },
+          onReasoning: (delta) => {
+            reasoning += delta;
+            set({ streamingReasoning: { id: streamEventId, text: reasoning } });
+          },
           onUsage: (usage) => {
             set((s) => ({
               totalTokens: s.totalTokens + usage.total_tokens,
@@ -565,24 +728,25 @@ async function runAgentLoop(
       clearTimeout(timeoutId);
       signal.removeEventListener("abort", onUserAbort);
       // Clear streaming text
-      set({ streamingText: null });
-      const isTimeout = e instanceof Error && e.name === "TimeoutError";
-      const isAbort = e instanceof Error && e.name === "AbortError";
-      if (isAbort) return;
-      if (isTimeout) {
+      set({ streamingText: null, streamingReasoning: null });
+      // Timeout must be checked before isAbort: a timeout abort also surfaces
+      // as name === "AbortError", but should show a real error, not go silent.
+      if (requestTimedOut) {
         set((s) => ({
           events: [
             ...s.events,
             {
               id: nextId(),
               kind: "error",
-              text: `The AI took longer than ${PER_REQUEST_TIMEOUT_MS / 1000}s to respond. The request was aborted. You can try again or switch to a faster model.`,
+              text: `AI 请求超过 ${PER_REQUEST_TIMEOUT_MS / 1000 / 60} 分钟仍无响应，已中止。可能是思考内容过长或网络问题；可重试，或到设置里调大 Max tokens。`,
               ts: Date.now(),
             },
           ],
         }));
         return;
       }
+      const isAbort = e instanceof Error && e.name === "AbortError";
+      if (isAbort) return; // user pressed Stop — stay silent
       throw e;
     }
     clearTimeout(timeoutId);
@@ -604,19 +768,23 @@ async function runAgentLoop(
     }
 
     // Clear streaming text and push the final event to events ONCE.
-    set({ streamingText: null });
+    set({ streamingText: null, streamingReasoning: null });
     const hasText = streamedText.trim().length > 0;
+    const hasReasoning = reasoning.trim().length > 0;
     const hasToolCalls =
       !!assistantMsg.tool_calls && assistantMsg.tool_calls.length > 0;
 
-    if (hasText) {
+    // Push the final assistant event (text and/or reasoning). Reasoning-only
+    // responses (e.g. thinking consumed the whole budget) still render.
+    if (hasText || hasReasoning) {
       set((s) => ({
         events: [
           ...s.events,
           {
             id: streamEventId,
             kind: "assistant-message" as const,
-            text: streamedText,
+            text: hasText ? streamedText : undefined,
+            reasoning: hasReasoning ? reasoning : undefined,
             ts: Date.now(),
           },
         ],
@@ -631,9 +799,9 @@ async function runAgentLoop(
 
     if (!hasToolCalls) {
       // AI is done — either it replied with text, or it returned nothing
-      // at all (empty response). If empty, surface a system notice so the
-      // user isn't left wondering what happened.
-      if (!hasText) {
+      // at all (no text AND no reasoning). If empty, surface a system notice
+      // so the user isn't left wondering what happened.
+      if (!hasText && !hasReasoning) {
         set((s) => ({
           events: [
             ...s.events,
@@ -769,17 +937,17 @@ async function executeToolCall(
           title: args.title ? String(args.title) : "",
           description: args.description ? String(args.description) : "",
           submit_label: args.submit_label ? String(args.submit_label) : "提交",
-          request_id: args.request_id ? String(args.request_id) : crypto.randomUUID().slice(0, 12),
+          request_id: args.request_id ? String(args.request_id) : uuid().slice(0, 12),
           questions: rawQuestions.map((q: Record<string, unknown>) => {
             const qType = String(q.type ?? "text_input");
             const isSelect = qType === "single_select" || qType === "multi_select";
             return {
-              id: q.id ? String(q.id) : `q_${crypto.randomUUID().slice(0, 6)}`,
+              id: q.id ? String(q.id) : `q_${uuid().slice(0, 6)}`,
               question: String(q.question),
               type: qType as "single_select" | "multi_select" | "text_input",
               options: isSelect
                 ? (q.options as Array<Record<string, unknown>>)?.map((o) => ({
-                    id: o.id ? String(o.id) : `opt_${crypto.randomUUID().slice(0, 6)}`,
+                    id: o.id ? String(o.id) : `opt_${uuid().slice(0, 6)}`,
                     label: String(o.label),
                     description: o.description ? String(o.description) : "",
                   })) ?? []

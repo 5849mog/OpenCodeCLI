@@ -9,6 +9,8 @@ export interface PlanNode {
   text: string;
   tags: string[];
   children: PlanNode[];
+  /** Stable unique path ("<sectionIdx>/<nodeIdx>/<childIdx>…") for highlighting. */
+  path: string;
 }
 
 export interface PlanSection {
@@ -55,7 +57,7 @@ export function parsePlan(plan: string): { sections: PlanSection[]; title: strin
         tags.push(tag);
         return "";
       }).trim();
-      currentSection.nodes.push({ depth, status, text: cleanText, tags, children: [] });
+      currentSection.nodes.push({ depth, status, text: cleanText, tags, children: [], path: "" });
     }
   }
   if (currentSection.nodes.length > 0 || currentSection.title) {
@@ -75,6 +77,17 @@ export function parsePlan(plan: string): { sections: PlanSection[]; title: strin
       stack.push(node);
     }
   }
+
+  // Assign stable paths ("<sectionIdx>/<idx>/<childIdx>…") after the tree is built
+  sections.forEach((section, si) => {
+    const walk = (nodes: PlanNode[], prefix: string) => {
+      nodes.forEach((node, i) => {
+        node.path = `${prefix}/${i}`;
+        walk(node.children, node.path);
+      });
+    };
+    walk(section.nodes, `${si}`);
+  });
 
   return { sections, title };
 }
