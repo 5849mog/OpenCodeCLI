@@ -60,24 +60,84 @@ async function toolSearchFiles(
   };
 }
 
-/** Convert a glob pattern to a RegExp. Supports * ** ? and {a,b} alternation. */
+/** True when the current regex output is at the start of a path segment. */
+function atSegmentStart(re: string): boolean {
+  return re === "" || re.endsWith("/");
+}
+
+/**
+ * Parse a glob character class starting at pattern[start] === '['.
+ * Supports ranges like [a-z], negation [!a] / [^a], and escaped '\]'.
+ * Returns the regex fragment and the index just past the closing ']',
+ * or null if the class is not closed.
+ */
+function parseCharClass(
+  pattern: string,
+  start: number,
+): { regex: string; end: number } | null {
+  let i = start + 1;
+  let negate = false;
+  if (pattern[i] === "!" || pattern[i] === "^") {
+    negate = true;
+    i++;
+  }
+  let body = "";
+  while (i < pattern.length) {
+    const c = pattern[i];
+    if (c === "]" && body !== "") {
+      return { regex: "[" + (negate ? "^" : "") + body + "]", end: i + 1 };
+    }
+    if (c === "\\" && i + 1 < pattern.length) {
+      body += "\\" + pattern[i + 1];
+      i += 2;
+      continue;
+    }
+    body += c;
+    i++;
+  }
+  return null; // unterminated class
+}
+
+/**
+ * Convert a glob pattern to a RegExp. Supports * ** ? {a,b} and [a-z]/[!a]
+ * character classes. Follows POSIX-ish dotfile rules: * ? and [...] at the
+ * start of a segment do not match a leading dot, and ** does not descend
+ * into dotfile segments, unless the segment pattern itself starts with '.'.
+ */
 function globToRegex(pattern: string): RegExp {
   let re = "";
   let i = 0;
-  while (i < pattern.length) {
+  const n = pattern.length;
+  while (i < n) {
     const c = pattern[i];
     if (c === "*") {
       if (pattern[i + 1] === "*") {
+        // ** : zero or more path segments, excluding dotfile segments
         i += 2;
-        if (pattern[i] === "/") i++;
-        re += ".*";
+        const hasSlash = pattern[i] === "/";
+        if (hasSlash) i++;
+        re += "(?:[^/.][^/]*/)*";
+        if (!hasSlash) re += "(?!\\.)[^/]*";
       } else {
-        i++;
+        // * : within a single segment; at segment start, exclude dotfiles
+        if (atSegmentStart(re)) re += "(?!\\.)";
         re += "[^/]*";
+        i++;
       }
     } else if (c === "?") {
+      if (atSegmentStart(re)) re += "(?!\\.)";
       re += "[^/]";
       i++;
+    } else if (c === "[") {
+      const cls = parseCharClass(pattern, i);
+      if (cls) {
+        if (atSegmentStart(re)) re += "(?!\\.)";
+        re += cls.regex;
+        i = cls.end;
+      } else {
+        re += "\\[";
+        i++;
+      }
     } else if (c === "{") {
       const end = pattern.indexOf("}", i);
       if (end < 0) {
