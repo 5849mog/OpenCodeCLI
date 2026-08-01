@@ -128,7 +128,15 @@ async function toolGlob(args: Record<string, unknown>): Promise<ToolResult> {
   }
   const files = vfs.listAllFilesSync(basePath);
   const matches = files
-    .filter((f) => regex.test(f.path))
+    .filter((f) => {
+      if (!basePath) return regex.test(f.path);
+      // Match against the path relative to basePath so that a bare pattern
+      // like "*.ts" works within the scoped directory. Return full paths.
+      const rel = f.path.startsWith(basePath + "/")
+        ? f.path.slice(basePath.length + 1)
+        : f.path;
+      return regex.test(rel);
+    })
     .map((f) => f.path)
     .sort();
   if (matches.length === 0) {

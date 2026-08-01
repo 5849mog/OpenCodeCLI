@@ -253,7 +253,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           },
           path: {
             type: "string",
-            description: "Optional directory to search in. Default '' (root).",
+            description: "Optional directory to scope the search. The pattern is matched against paths relative to this directory (e.g. path='src/utils' with pattern '*.ts' finds .ts files under src/utils). Default '' (root).",
           },
           case_sensitive: {
             type: "boolean",
