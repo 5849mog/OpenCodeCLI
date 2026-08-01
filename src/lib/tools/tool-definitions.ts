@@ -243,17 +243,25 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "glob",
       description:
-        "Find files in the workspace by glob pattern. Supports * (matches within a single path segment), ** (matches across segments), and ? (single char). e.g. 'src/**/*.ts' finds all TypeScript files under src/, '*.md' finds markdown at the root. Returns matching file paths, sorted.",
+        "Find files in the workspace by glob pattern. Supports * (matches within a single path segment), ** (matches across segments), and ? (single char). e.g. 'src/**/*.ts' finds all TypeScript files under src/, '*.md' finds markdown at the root. Returns matching file paths, sorted. Matching is case-insensitive by default; set case_sensitive to override. Set regex to true to treat the pattern as a regular expression matched against file paths instead of glob syntax.",
       parameters: {
         type: "object",
         properties: {
           pattern: {
             type: "string",
-            description: "Glob pattern. e.g. 'src/**/*.ts', '*.md', '**/*.{js,jsx}'.",
+            description: "Glob pattern (e.g. 'src/**/*.ts', '*.md', '**/*.{js,jsx}') or a regex when regex=true.",
           },
           path: {
             type: "string",
             description: "Optional directory to search in. Default '' (root).",
+          },
+          case_sensitive: {
+            type: "boolean",
+            description: "Match case-sensitively. Default false (case-insensitive).",
+          },
+          regex: {
+            type: "boolean",
+            description: "Treat pattern as a regular expression matched against file paths. Default false (glob syntax).",
           },
         },
         required: ["pattern"],

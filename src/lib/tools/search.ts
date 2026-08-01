@@ -102,10 +102,30 @@ function globToRegex(pattern: string): RegExp {
 async function toolGlob(args: Record<string, unknown>): Promise<ToolResult> {
   const pattern = String(args.pattern ?? "");
   const basePath = String(args.path ?? "");
+  const caseSensitive = Boolean(args.case_sensitive);
+  const useRegex = Boolean(args.regex);
   if (!pattern) {
     return { ok: false, output: "No pattern provided.", tool: "glob", args };
   }
-  const regex = globToRegex(pattern);
+  let regex: RegExp;
+  if (useRegex) {
+    try {
+      regex = new RegExp(pattern, caseSensitive ? "" : "i");
+    } catch {
+      return {
+        ok: false,
+        output: `Invalid regex: ${pattern}`,
+        tool: "glob",
+        args,
+      };
+    }
+  } else {
+    // globToRegex always anchors with ^...$; add the case-insensitive flag unless requested otherwise.
+    regex = globToRegex(pattern);
+    if (!caseSensitive) {
+      regex = new RegExp(regex.source, "i");
+    }
+  }
   const files = vfs.listAllFilesSync(basePath);
   const matches = files
     .filter((f) => regex.test(f.path))
