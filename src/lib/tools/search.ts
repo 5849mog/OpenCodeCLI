@@ -60,11 +60,6 @@ async function toolSearchFiles(
   };
 }
 
-/** True when the current regex output is at the start of a path segment. */
-function atSegmentStart(re: string): boolean {
-  return re === "" || re.endsWith("/");
-}
-
 /**
  * Parse a glob character class starting at pattern[start] === '['.
  * Supports ranges like [a-z], negation [!a] / [^a], and escaped '\]'.
@@ -108,6 +103,7 @@ function globToRegex(pattern: string): RegExp {
   let re = "";
   let i = 0;
   const n = pattern.length;
+  let segStart = true; // pattern start is a segment boundary
   while (i < n) {
     const c = pattern[i];
     if (c === "*") {
@@ -118,42 +114,55 @@ function globToRegex(pattern: string): RegExp {
         if (hasSlash) i++;
         re += "(?:[^/.][^/]*/)*";
         if (!hasSlash) re += "(?!\\.)[^/]*";
+        segStart = hasSlash; // after **/ we are at a segment start
       } else {
         // * : within a single segment; at segment start, exclude dotfiles
-        if (atSegmentStart(re)) re += "(?!\\.)";
+        if (segStart) re += "(?!\\.)";
         re += "[^/]*";
         i++;
+        segStart = false;
       }
     } else if (c === "?") {
-      if (atSegmentStart(re)) re += "(?!\\.)";
+      if (segStart) re += "(?!\\.)";
       re += "[^/]";
       i++;
+      segStart = false;
     } else if (c === "[") {
       const cls = parseCharClass(pattern, i);
       if (cls) {
-        if (atSegmentStart(re)) re += "(?!\\.)";
+        if (segStart) re += "(?!\\.)";
         re += cls.regex;
         i = cls.end;
+        segStart = false;
       } else {
         re += "\\[";
         i++;
+        segStart = false;
       }
     } else if (c === "{") {
       const end = pattern.indexOf("}", i);
       if (end < 0) {
         re += "\\{";
         i++;
+        segStart = false;
       } else {
         const inner = pattern.slice(i + 1, end);
         re += "(" + inner.split(",").join("|") + ")";
         i = end + 1;
+        segStart = false;
       }
+    } else if (c === "/") {
+      re += "/";
+      i++;
+      segStart = true;
     } else if ("\\^$.|+()[]".includes(c)) {
       re += "\\" + c;
       i++;
+      segStart = false;
     } else {
       re += c;
       i++;
+      segStart = false;
     }
   }
   return new RegExp("^" + re + "$");
