@@ -624,6 +624,32 @@ export const vfs = {
     return lines.join("\n");
   },
 
+  /**
+   * Build a **one-level** summary of the workspace root, showing only the
+   * direct children of the given directory. Each directory shows its
+   * recursive total file count; files show just their name. This is a cheap,
+   * token-friendly alternative to treeSync() for injecting into the AI
+   * context — its size depends on the number of top-level items, NOT the
+   * total file count, so it stays tiny even for huge projects.
+   */
+  treeSummary(path?: string): string {
+    const root = path ? normalizePath(path) : "";
+    const children = vfs.listSync(root);
+    if (children.length === 0) {
+      return root ? `(empty directory: ${root})` : "(empty workspace)";
+    }
+    const lines: string[] = [];
+    for (const child of children) {
+      if (child.type === "dir") {
+        const fileCount = vfs.listAllFilesSync(child.path).length;
+        lines.push(`dir   ${child.path}/  (${fileCount} files)`);
+      } else {
+        lines.push(`file  ${child.path}`);
+      }
+    }
+    return `${children.length} item(s) in ${root || "/"}:\n${lines.join("\n")}`;
+  },
+
   /** Get all nodes (for export / debugging). */
   allSync(): VfsNode[] {
     return Array.from(cache.values());
