@@ -747,6 +747,13 @@ export function grepSync(
     // Attach a sentinel so callers can tell the AI the list was cut short.
     (results as GrepMatch[] & { truncated?: boolean }).truncated = true;
   }
+  // Sort by path (then line, then column) so output order is deterministic and
+  // independent of the internal Map iteration order.
+  results.sort((a, b) => {
+    if (a.path !== b.path) return a.path.localeCompare(b.path);
+    if (a.line !== b.line) return a.line - b.line;
+    return a.column - b.column;
+  });
   return results;
 }
 
