@@ -716,24 +716,36 @@ export function grepSync(
   }
   const results: GrepMatch[] = [];
   const max = opts.max ?? 200;
+  let truncated = false;
   outer: for (const [p, node] of cache.entries()) {
     if (node.type !== "file") continue;
     if (root && p !== root && !p.startsWith(prefix)) continue;
     const content = node.content ?? "";
     const lines = content.split("\n");
     for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      // Report EVERY match on the line, not just the first one.
       re.lastIndex = 0;
-      const m = re.exec(lines[i]);
-      if (m) {
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(line)) !== null) {
         results.push({
           path: p,
           line: i + 1,
           column: m.index + 1,
-          text: lines[i],
+          text: line,
         });
-        if (results.length >= max) break outer;
+        if (results.length >= max) {
+          truncated = true;
+          break outer;
+        }
+        // Avoid infinite loop on zero-width matches (e.g. /^/ or /(?=...)/).
+        if (m.index === re.lastIndex) re.lastIndex++;
       }
     }
+  }
+  if (truncated) {
+    // Attach a sentinel so callers can tell the AI the list was cut short.
+    (results as GrepMatch[] & { truncated?: boolean }).truncated = true;
   }
   return results;
 }
