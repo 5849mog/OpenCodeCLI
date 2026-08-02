@@ -268,16 +268,12 @@ Remember: you are operating on the 文件袋 (in-browser workspace). Use relativ
 export function buildWorkspaceContext(opts: {
   mode: "bypass" | "plan";
 }): string {
-  // Build file tree
-  let tree = vfs.treeSync("") || "(empty workspace)";
+  // Build a ONE-LEVEL workspace summary. This shows only the direct children
+  // of the workspace root (each directory with its recursive file count), so
+  // its size depends on the number of top-level items — NOT the total file
+  // count. It stays tiny even for huge projects, keeping token cost flat.
+  const summary = vfs.treeSummary("");
   const fileCount = vfs.listAllFilesSync().length;
-  if (fileCount > 300) {
-    const treeLines = tree.split("\n");
-    if (treeLines.length > 200) {
-      tree = treeLines.slice(0, 200).join("\n") +
-        `\n\n... (${fileCount} files total — tree truncated to 200 lines. Use glob / list_dirs / list_files to explore deeper.)`;
-    }
-  }
 
   // Build mode section
   const modeLabel = opts.mode === "plan"
@@ -297,11 +293,35 @@ export function buildWorkspaceContext(opts: {
 
 ${modeDescription}
 
-## File Tree (${fileCount} files)
+## Workspace Summary (${fileCount} files total)
+
+This shows ONLY the top-level items of the workspace root. It is intentionally
+minimal to save tokens — it does NOT list the full file tree.
 
 \`\`\`
-${tree}
+${summary}
 \`\`\`
+
+### How to explore the workspace (MANDATORY)
+
+The summary above is deliberately shallow. To find files, you MUST use the
+exploration tools — do NOT assume the full tree is available in context:
+
+- **\`list_files({path})\`** — list the direct children of a directory. Use this
+  to drill into a specific directory you saw in the summary (e.g.
+  \`list_files({path: "OpenCodeCLI-main 6/src"})\`). Pass \`""\` for the root.
+- **\`glob({pattern, path})\`** — find files by name pattern. Use this to locate
+  files of a certain type or name (e.g. \`glob({pattern: "**/*.ts", path: "src"})\`).
+- **\`list_dirs({path})\`** — recursively list the ENTIRE tree under a directory.
+  Use sparingly — it can be large for big projects. Prefer \`list_files\` / \`glob\`
+  for targeted exploration.
+- **\`search_files({pattern, path})\`** — grep for text across files. Use this to
+  find where a symbol or string is used.
+
+Always use the FULL path from the workspace root (e.g.
+\`OpenCodeCLI-main 6/src/lib/tools/search.ts\`), including any outer folder shown
+in the summary. Do not guess paths — explore first, then act.
+
 ${planSummary}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
