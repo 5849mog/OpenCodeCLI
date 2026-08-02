@@ -1,4 +1,4 @@
-import { vfs, grepSync } from "../vfs";
+import { vfs, grepSync, type GrepMatch } from "../vfs";
 import type { ToolResult } from "./types";
 
 async function toolSearchFiles(
@@ -11,6 +11,7 @@ async function toolSearchFiles(
   const afterLines = args.after !== undefined ? parseInt(String(args.after), 10) : (args.context !== undefined ? parseInt(String(args.context), 10) : 0);
   const beforeLines = args.before !== undefined ? parseInt(String(args.before), 10) : (args.context !== undefined ? parseInt(String(args.context), 10) : 0);
   const matches = grepSync(pattern, { path, regex, caseSensitive, max: 100 });
+  const truncated = Boolean((matches as GrepMatch[] & { truncated?: boolean }).truncated);
   if (matches.length === 0) {
     return {
       ok: true,
@@ -19,6 +20,9 @@ async function toolSearchFiles(
       args,
     };
   }
+  const truncNote = truncated
+    ? `\n⚠️ Results TRUNCATED at 100 — there are MORE matches than shown. Narrow your search (add 'path', use a more specific pattern, or add 'regex: true') to see all of them.`
+    : "";
   if (afterLines > 0 || beforeLines > 0) {
     const byFile = new Map<string, typeof matches>();
     for (const m of matches) {
@@ -44,7 +48,7 @@ async function toolSearchFiles(
     }
     return {
       ok: true,
-      output: `Found ${matches.length} match(es) with ${beforeLines} before / ${afterLines} after context:\n${out.join("\n")}`,
+      output: `Found ${matches.length} match(es) with ${beforeLines} before / ${afterLines} after context:\n${out.join("\n")}${truncNote}`,
       tool: "search_files",
       args,
     };
@@ -54,7 +58,7 @@ async function toolSearchFiles(
   );
   return {
     ok: true,
-    output: `Found ${matches.length} match(es):\n${lines.join("\n")}`,
+    output: `Found ${matches.length} match(es):\n${lines.join("\n")}${truncNote}`,
     tool: "search_files",
     args,
   };

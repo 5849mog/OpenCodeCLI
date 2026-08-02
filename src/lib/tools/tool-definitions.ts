@@ -170,18 +170,18 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "search_files",
       description:
-        "Search for a text pattern across files in the workspace (grep). Returns matching lines with file path and line number. Supports regex and context lines (-A/-B/-C like grep).",
+        "Search for a text pattern across files in the workspace (grep). Returns matching lines with file path and line number. IMPORTANT: by default the pattern is treated as a LITERAL string (regex=false). Only set regex=true if you intentionally want regex metacharacters (.*, \\d, ^, $, etc.) interpreted. If you pass a pattern containing regex metacharacters but leave regex=false, they are matched literally. Supports context lines (-A/-B/-C like grep). Results are capped at 100 — if the output says 'TRUNCATED', narrow the search.",
       parameters: {
         type: "object",
         properties: {
-          pattern: { type: "string", description: "The search pattern (regex supported)." },
+          pattern: { type: "string", description: "The search pattern. LITERAL by default; set regex=true to interpret as a regular expression." },
           path: {
             type: "string",
             description: "Optional directory to scope the search. Default '' (entire workspace).",
           },
           regex: {
             type: "boolean",
-            description: "Treat pattern as a regex. Default false (literal).",
+            description: "Treat pattern as a regex. Default false (literal). Set true only when you need regex metacharacters.",
           },
           case_sensitive: { type: "boolean", description: "Default false." },
           after: { type: "number", description: "Number of context lines AFTER each match (like grep -A)." },

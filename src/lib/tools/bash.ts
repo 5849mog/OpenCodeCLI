@@ -769,9 +769,11 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
           if (stat && stat.type === "dir") {
             const matches = grepSync(pattern, { path: fileArg, regex: true, caseSensitive, max: 100 });
             if (matches.length === 0) return { ok: true, output: "" };
+            const truncated = Boolean((matches as (typeof matches & { truncated?: boolean })).truncated);
+            const truncNote = truncated ? `\n⚠️ grep: results TRUNCATED at 100 — there are MORE matches. Narrow the search.` : "";
             if (countOnly) return { ok: true, output: String(matches.length) };
             if (filesOnly) return { ok: true, output: matches.map((m) => m.path).filter((p, i, a) => a.indexOf(p) === i).join("\n") };
-            return { ok: true, output: matches.map((m) => `${m.path}:${m.line}: ${m.text}`).join("\n") };
+            return { ok: true, output: matches.map((m) => `${m.path}:${m.line}: ${m.text}`).join("\n") + truncNote };
           }
           return { ok: false, output: `grep: ${fileArg}: not found` };
         }
@@ -782,11 +784,13 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       // Workspace-wide search (no file arg)
       const matches = grepSync(pattern, { regex: true, caseSensitive, max: 100 });
       if (matches.length === 0) return { ok: true, output: "" };
+      const truncated = Boolean((matches as (typeof matches & { truncated?: boolean })).truncated);
+      const truncNote = truncated ? `\n⚠️ grep: results TRUNCATED at 100 — there are MORE matches. Narrow the search.` : "";
       if (countOnly) return { ok: true, output: String(matches.length) };
       if (filesOnly) return { ok: true, output: matches.map((m) => m.path).filter((p, i, a) => a.indexOf(p) === i).join("\n") };
       return {
         ok: true,
-        output: matches.map((m) => `${m.path}:${m.line}: ${m.text}`).join("\n"),
+        output: matches.map((m) => `${m.path}:${m.line}: ${m.text}`).join("\n") + truncNote,
       };
     }
     case "sed": {
