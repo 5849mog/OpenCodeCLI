@@ -227,7 +227,9 @@ function tokenizeWithOperators(cmd: string): string[] {
       }
       i++;
     } else {
-      while (i < cmd.length && !/\s/.test(cmd[i]) && cmd[i] !== "|" && cmd[i] !== ">" && cmd[i] !== "<") {
+      // Stop the word at a quote too: `-t' '` must tokenize as ["-t", " "],
+      // not swallow the rest of the line as one unterminated-quoted token.
+      while (i < cmd.length && !/\s/.test(cmd[i]) && cmd[i] !== "|" && cmd[i] !== ">" && cmd[i] !== "<" && cmd[i] !== '"' && cmd[i] !== "'") {
         token += cmd[i];
         i++;
       }
@@ -261,7 +263,9 @@ function tokenize(cmd: string): string[] {
       }
       i++;
     } else {
-      while (i < cmd.length && !/\s/.test(cmd[i])) {
+      // Stop the word at a quote too, so `-t' '` yields ["-t", " "] instead of
+      // a single unterminated-quoted token that swallows the rest of the line.
+      while (i < cmd.length && !/\s/.test(cmd[i]) && cmd[i] !== '"' && cmd[i] !== "'") {
         token += cmd[i];
         i++;
       }
@@ -432,6 +436,10 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       const fileArg = rest.find((t) => !t.startsWith("-"));
       const { content } = resolveInput(fileArg);
       if (content === null) return { ok: false, output: `cat: ${fileArg ?? "(no input)"}: not found` };
+      if (rest.includes("-n")) {
+        // cat -n: number each line, 6-digit right-aligned (like nl)
+        return { ok: true, output: splitLines(content).map((l, i) => `${String(i + 1).padStart(6)}  ${l}`).join("\n") };
+      }
       return { ok: true, output: content };
     }
     case "head": {
@@ -547,6 +555,18 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       const parts = [`removed ${total} node(s)`];
       if (missing.length > 0) parts.push(`not found: ${missing.join(", ")}`);
       return { ok: missing.length === 0, output: parts.join("; "), mutated: total > 0 };
+    }
+    case "rmdir": {
+      const targets = rest.filter((t) => !t.startsWith("-"));
+      if (targets.length === 0) return { ok: false, output: "rmdir: missing operand" };
+      for (const t of targets) {
+        const node = vfs.statSync(t);
+        if (!node) return { ok: false, output: `rmdir: ${t}: No such file or directory` };
+        if (node.type !== "dir") return { ok: false, output: `rmdir: ${t}: Not a directory` };
+        if (vfs.listSync(t).length > 0) return { ok: false, output: `rmdir: ${t}: Directory not empty` };
+        vfs.delete(t); // fire-and-forget (matches rm's convention; cache update is synchronous-ish)
+      }
+      return { ok: true, output: "", mutated: true };
     }
     case "touch": {
       const targets = rest.filter((t) => !t.startsWith("-"));
@@ -1038,10 +1058,18 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       return { ok: true, output: result };
     }
     case "sort": {
-      const file = rest.find((t) => !t.startsWith("-"));
+      // The file is the LAST non-flag token — flags like -t DELIM or -k KEY
+      // precede it, so a delimiter value (' ' after -t) must not be mistaken
+      // for the file.
+      let file: string | undefined;
+      for (let i = rest.length - 1; i >= 0; i--) {
+        if (!rest[i].startsWith("-")) { file = rest[i]; break; }
+      }
       const { content } = resolveInput(file);
       if (content === null) return { ok: false, output: "sort: no input" };
-      const lines = content === "" ? [] : content.split("\n");
+      // splitLines drops the phantom record from a trailing \n, so a file
+      // ending in newline doesn't sort a stray empty line to the top.
+      const lines = content === "" ? [] : splitLines(content);
       const allFlags = rest.filter((t) => t.startsWith("-")).join("");
       const reverse = /r/.test(allFlags);
       const caseInsensitive = /f/.test(allFlags);
@@ -1092,7 +1120,12 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       return { ok: true, output: result.join("\n") };
     }
     case "cut": {
-      const file = rest.find((t) => !t.startsWith("-") && !t.includes(",") && !t.match(/^\d/) && t !== "-d" && t !== "-f" && t !== "-c");
+      // The file is the LAST non-flag token, so option VALUES (-d DELIM, -f N,
+      // -c RANGE) are never mistaken for the file (e.g. `cut -d' ' -f1 file`).
+      let file: string | undefined;
+      for (let i = rest.length - 1; i >= 0; i--) {
+        if (!rest[i].startsWith("-")) { file = rest[i]; break; }
+      }
       const { content } = resolveInput(file);
       if (content === null) return { ok: false, output: "cut: no input" };
 
@@ -1188,10 +1221,13 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       return { ok: false, output: "cut: use -d DELIM -f FIELDS or -c RANGE" };
     }
     case "tr": {
+      const deleteMode = rest.includes("-d");
       const sets = rest.filter((t) => !t.startsWith("-"));
-      if (sets.length < 2) return { ok: false, output: "tr: needs SET1 and SET2" };
-      const set1 = sets[0], set2 = sets[1];
-      const file = sets[2];
+      const minSets = deleteMode ? 1 : 2;
+      if (sets.length < minSets) return { ok: false, output: deleteMode ? "tr: -d needs SET1" : "tr: needs SET1 and SET2" };
+      const set1 = sets[0];
+      const set2 = deleteMode ? "" : sets[1];
+      const file = sets[deleteMode ? 1 : 2];
       const { content } = resolveInput(file);
       if (content === null) return { ok: false, output: "tr: no input" };
       const unescape = (s: string) => s.replace(/\\t/g, "\t").replace(/\\n/g, "\n").replace(/\\\\/g, "\\");
@@ -1208,7 +1244,12 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       const from = expand(set1);
       const to = expand(set2);
       const map: Record<string, string> = {};
-      for (let i = 0; i < from.length; i++) map[from[i]] = to[i] ?? to[to.length - 1] ?? "";
+      if (deleteMode) {
+        // tr -d 'set': delete every char in set1
+        for (const ch of from) map[ch] = "";
+      } else {
+        for (let i = 0; i < from.length; i++) map[from[i]] = to[i] ?? to[to.length - 1] ?? "";
+      }
       const result = content.replace(/[\s\S]/g, (ch) => map[ch] ?? ch);
       return { ok: true, output: result };
     }
@@ -1333,6 +1374,13 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
     case "tee": {
       const file = rest.find((t) => !t.startsWith("-"));
       if (!file) return { ok: false, output: "tee: missing file" };
+      // Real tee writes its stdin to the file AND echoes it to stdout. When
+      // piped (e.g. `echo hi | tee out`), stdin carries the text; without a
+      // pipe, fall back to the trailing args as the text.
+      if (stdin !== undefined) {
+        vfs.writeFileSync(file, stdin);
+        return { ok: true, output: stdin, mutated: true };
+      }
       const text = rest.slice(rest.indexOf(file) + 1).join(" ");
       vfs.writeFileSync(file, text + "\n");
       return { ok: true, output: text, mutated: true };
@@ -1650,7 +1698,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
     case "whereis": {
       const cmd = rest.find((t) => !t.startsWith("-"));
       if (!cmd) return { ok: false, output: `${program}: missing command` };
-      const knownCmds = ["ls", "cat", "head", "tail", "wc", "mkdir", "rm", "touch", "echo", "cp", "mv", "find", "grep", "sed", "sort", "uniq", "cut", "tr", "awk", "xargs", "pwd", "cd", "tree", "nl", "paste", "bc", "expr", "file", "stat", "diff", "tee", "env", "hostname", "whoami", "id", "uname", "date", "uptime", "rev", "fold", "yes", "basename", "dirname", "realpath", "readlink", "seq", "shuf", "strings", "base64", "column", "comm", "join", "which", "whereis", "true", "false", "test"];
+      const knownCmds = ["ls", "cat", "head", "tail", "wc", "mkdir", "rm", "rmdir", "touch", "echo", "cp", "mv", "find", "grep", "sed", "sort", "uniq", "cut", "tr", "awk", "xargs", "pwd", "cd", "tree", "nl", "paste", "bc", "expr", "file", "stat", "diff", "tee", "env", "hostname", "whoami", "id", "uname", "date", "uptime", "rev", "fold", "yes", "basename", "dirname", "realpath", "readlink", "seq", "shuf", "strings", "base64", "column", "comm", "join", "which", "whereis", "true", "false", "test"];
       return { ok: true, output: knownCmds.includes(cmd) ? `/bin/${cmd}` : "" };
     }
     case "noh":

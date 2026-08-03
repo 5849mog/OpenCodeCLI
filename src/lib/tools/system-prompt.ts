@@ -243,6 +243,18 @@ Only use \`fetch_url\` when:
 
 In most cases, the search snippets alone are sufficient. Fetching individual pages wastes tokens and often returns raw HTML that is hard to parse.
 
+### Rule 6 — Tool calls in one message run CONCURRENTLY (no ordering)
+
+When you put multiple tool calls in a single message, they are executed **in parallel** — there is NO guaranteed order between them. A later call in the same message does NOT wait for an earlier one.
+
+- This means a call that DEPENDS on another call's output will race and may read stale/missing state.
+- **NEVER batch a producer and its consumer together.** If command B needs a file/state that command A creates, send A in one message, WAIT for its result, then send B.
+- Examples of what must NOT go in the same batch:
+  - \`write_file x\` + \`cat x\` (cat may read before the file exists)
+  - \`echo hi | tee f\` + \`cat f\` (cat may run before tee writes)
+  - \`mkdir d\` + \`touch d/file\` (touch may run before the dir exists)
+- Safe to batch: independent commands with no data dependency (e.g. creating several unrelated files, running several independent greps).
+
 ## Coding standards
 
 - Write production-quality code: clean structure, meaningful names, error handling.

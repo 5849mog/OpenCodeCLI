@@ -98,10 +98,20 @@ export function runAwk(script: string, content: string, fieldSep: RegExp | strin
     let pattern: string | undefined;
     let isRegex = false;
 
-    if (script.substring(pos, pos + 6) === "BEGIN") {
+    // Match a keyword ONLY at a boundary (whitespace / '{' / end of script),
+    // so 'BEGINfoo' or a pattern like 'END' is not misdetected as a block.
+    // NOTE: substring length must equal the keyword length — an off-by-one
+    // here ("END " vs "END") silently turns END blocks into per-line patterns.
+    const atKeyword = (kw: string): boolean => {
+      if (script.substring(pos, pos + kw.length) !== kw) return false;
+      const after = script[pos + kw.length];
+      return after === undefined || /\s/.test(after) || after === "{";
+    };
+
+    if (atKeyword("BEGIN")) {
       blockType = "BEGIN";
       pos += 5;
-    } else if (script.substring(pos, pos + 4) === "END") {
+    } else if (atKeyword("END")) {
       blockType = "END";
       pos += 3;
     } else if (script[pos] === "/") {
@@ -147,7 +157,12 @@ export function runAwk(script: string, content: string, fieldSep: RegExp | strin
   // Runtime
   const userVars: Record<string, string | number> = {};
   const out: string[] = [];
-  const lines = content === "" ? [] : content.split("\n");
+  const raw = content === "" ? [] : content.split("\n");
+  // Drop the phantom record created by a trailing \n (real awk does not
+  // process an empty last record for "1\n2\n"), so `{m=$1} END {print m}`
+  // is not corrupted by a final empty line overwriting m with 0.
+  if (raw.length > 1 && raw[raw.length - 1] === "") raw.pop();
+  const lines = raw;
   let _next = false;   // next statement — skip to next record
   let _exit = false;   // exit statement — stop processing, jump to END
 
@@ -269,18 +284,32 @@ export function runAwk(script: string, content: string, fieldSep: RegExp | strin
       let [, left, op, right] = compMatch;
       left = left.trim().replace(/^["']|["']$/g, "");
       right = right.trim().replace(/^["']|["']$/g, "");
+      if (op === "~" || op === "!~") {
+        return op === "~" ? new RegExp(right).test(left) : !new RegExp(right).test(left);
+      }
+      // awk treats an uninitialized variable as "" (numeric 0 in numeric
+      // contexts), so `$1 > m` must compare against 0 the first time m is
+      // seen — enabling cross-line max/aggregation patterns. Applied only to
+      // comparison operands (not regex), so string literals stay untouched.
+      const resolveUndef = (s: string) => /^[a-zA-Z_]\w*$/.test(s) && !(s in userVars) ? "" : s;
+      left = resolveUndef(left);
+      right = resolveUndef(right);
       const leftNum = parseFloat(left);
       const rightNum = parseFloat(right);
-      const useNumeric = !isNaN(leftNum) && !isNaN(rightNum);
+      const leftIsNum = !isNaN(leftNum);
+      const rightIsNum = !isNaN(rightNum);
+      const leftEmpty = left.trim() === "";
+      const rightEmpty = right.trim() === "";
+      const useNumeric = (leftIsNum && rightIsNum) || (leftIsNum && rightEmpty) || (rightIsNum && leftEmpty);
+      const lv = leftEmpty ? 0 : leftNum;
+      const rv = rightEmpty ? 0 : rightNum;
       switch (op) {
-        case "==": return useNumeric ? leftNum === rightNum : left === right;
-        case "!=": return useNumeric ? leftNum !== rightNum : left !== right;
-        case "<=": return useNumeric ? leftNum <= rightNum : left <= right;
-        case ">=": return useNumeric ? leftNum >= rightNum : left >= right;
-        case "<": return useNumeric ? leftNum < rightNum : left < right;
-        case ">": return useNumeric ? leftNum > rightNum : left > right;
-        case "~": return new RegExp(right).test(left);
-        case "!~": return !new RegExp(right).test(left);
+        case "==": return useNumeric ? lv === rv : left === right;
+        case "!=": return useNumeric ? lv !== rv : left !== right;
+        case "<=": return useNumeric ? lv <= rv : left <= right;
+        case ">=": return useNumeric ? lv >= rv : left >= right;
+        case "<": return useNumeric ? lv < rv : left < right;
+        case ">": return useNumeric ? lv > rv : left > right;
       }
     }
     const n = parseFloat(expr);
