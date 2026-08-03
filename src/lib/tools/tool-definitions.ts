@@ -170,7 +170,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "search_files",
       description:
-        "Search for a text pattern across files in the workspace (grep). Returns matching lines with file path and line number. IMPORTANT: by default the pattern is treated as a LITERAL string (regex=false). Only set regex=true if you intentionally want regex metacharacters (.*, \\d, ^, $, etc.) interpreted. If you pass a pattern containing regex metacharacters but leave regex=false, they are matched literally. Supports context lines (-A/-B/-C like grep). Results are capped at 100 — if the output says 'TRUNCATED', narrow the search.",
+        "Search for a text pattern across files in the workspace (grep). Returns matching lines with file path and line number. IMPORTANT: by default the pattern is treated as a LITERAL string (regex=false). Only set regex=true if you intentionally want regex metacharacters (.*, \\d, ^, $, etc.) interpreted. If you pass a pattern containing regex metacharacters but leave regex=false, they are matched literally. Supports context lines (-A/-B/-C like grep) and include/exclude glob filters for file types (like grep --include/--exclude). Results are capped at 100 — if the output says 'TRUNCATED', narrow the search.",
       parameters: {
         type: "object",
         properties: {
@@ -187,6 +187,20 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           after: { type: "number", description: "Number of context lines AFTER each match (like grep -A)." },
           before: { type: "number", description: "Number of context lines BEFORE each match (like grep -B)." },
           context: { type: "number", description: "Number of context lines both before and after (like grep -C). Shortcut for setting both after and before." },
+          include: {
+            description: "Optional file-type filter: search only files whose path matches ANY of these glob patterns (e.g. '*.ts', '**/*.tsx'). May be a single pattern string or an array of patterns. Each glob is matched against the file's full path, its path relative to 'path', and its basename — so both 'src/**/*.ts' and '*.ts' work. Default: all files.",
+            oneOf: [
+              { type: "string" },
+              { type: "array", items: { type: "string" } },
+            ],
+          },
+          exclude: {
+            description: "Optional file-type filter: skip files whose path matches ANY of these glob patterns (e.g. '**/*.test.ts'). May be a single pattern string or an array. Same matching rules as include; applied after include. Default: exclude nothing.",
+            oneOf: [
+              { type: "string" },
+              { type: "array", items: { type: "string" } },
+            ],
+          },
         },
         required: ["pattern"],
       },

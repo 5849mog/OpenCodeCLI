@@ -703,10 +703,18 @@ export interface GrepMatch {
 
 export function grepSync(
   pattern: string,
-  opts: { path?: string; regex?: boolean; caseSensitive?: boolean; max?: number } = {},
+  opts: {
+    path?: string;
+    regex?: boolean;
+    caseSensitive?: boolean;
+    max?: number;
+    /** Per-file filter applied after the type/prefix checks, before scanning content. */
+    filter?: (path: string) => boolean;
+  } = {},
 ): GrepMatch[] {
   const root = opts.path ? normalizePath(opts.path) : "";
   const prefix = root ? root + "/" : "";
+  const { filter } = opts;
   const flags = opts.caseSensitive ? "g" : "gi";
   let re: RegExp;
   try {
@@ -720,6 +728,7 @@ export function grepSync(
   outer: for (const [p, node] of cache.entries()) {
     if (node.type !== "file") continue;
     if (root && p !== root && !p.startsWith(prefix)) continue;
+    if (filter && !filter(p)) continue;
     const content = node.content ?? "";
     const lines = content.split("\n");
     for (let i = 0; i < lines.length; i++) {

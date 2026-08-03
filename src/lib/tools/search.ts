@@ -1,4 +1,4 @@
-import { vfs, grepSync, type GrepMatch } from "../vfs";
+import { vfs, grepSync, normalizePath, type GrepMatch } from "../vfs";
 import type { ToolResult } from "./types";
 
 async function toolSearchFiles(
@@ -10,7 +10,19 @@ async function toolSearchFiles(
   const caseSensitive = Boolean(args.case_sensitive);
   const afterLines = args.after !== undefined ? parseInt(String(args.after), 10) : (args.context !== undefined ? parseInt(String(args.context), 10) : 0);
   const beforeLines = args.before !== undefined ? parseInt(String(args.before), 10) : (args.context !== undefined ? parseInt(String(args.context), 10) : 0);
-  const matches = grepSync(pattern, { path, regex, caseSensitive, max: 100 });
+  const root = path ? normalizePath(path) : "";
+  if (path && root && !vfs.statSync(path)) {
+    return {
+      ok: false,
+      output: `Path not found: ${path}. Check the path or pass '' to search the whole workspace.`,
+      tool: "search_files",
+      args,
+    };
+  }
+  const include = toGlobList(args.include);
+  const exclude = toGlobList(args.exclude);
+  const filter = buildFileFilter(include, exclude, caseSensitive, root);
+  const matches = grepSync(pattern, { path, regex, caseSensitive, max: 100, filter });
   const truncated = Boolean((matches as GrepMatch[] & { truncated?: boolean }).truncated);
   if (matches.length === 0) {
     return {
@@ -21,7 +33,7 @@ async function toolSearchFiles(
     };
   }
   const truncNote = truncated
-    ? `\n⚠️ Results TRUNCATED at 100 — there are MORE matches than shown. Narrow your search (add 'path', use a more specific pattern, or add 'regex: true') to see all of them.`
+    ? `\n⚠️ Results TRUNCATED at 100 — there are MORE matches than shown. Narrow your search (add 'path', add 'include' like '*.ts' to filter file types, use a more specific pattern, or add 'regex: true') to see all of them.`
     : "";
   if (afterLines > 0 || beforeLines > 0) {
     const byFile = new Map<string, typeof matches>();
@@ -172,11 +184,56 @@ function globToRegex(pattern: string): RegExp {
   return new RegExp("^" + re + "$");
 }
 
+/** Normalize an arg that may be a single string or an array of strings. */
+function toGlobList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((v): v is string => typeof v === "string" && v.trim() !== "");
+  }
+  if (typeof value === "string" && value.trim() !== "") return [value];
+  return [];
+}
+
+function compileFilterGlob(g: string, caseSensitive: boolean): RegExp {
+  const re = globToRegex(g);
+  return caseSensitive ? re : new RegExp(re.source, "i");
+}
+
+/** Predicate for include/exclude. Keep a file iff it matches ANY include
+ *  (or none given) AND no exclude. Each glob is tested against the path
+ *  relative to the search root, the full path, and the basename, so both
+ *  'src/**\/*.ts' and '*.ts' work (like grep --include matches basename). */
+function buildFileFilter(
+  include: string[],
+  exclude: string[],
+  caseSensitive: boolean,
+  root: string,
+): ((p: string) => boolean) | undefined {
+  if (include.length === 0 && exclude.length === 0) return undefined;
+  const inc = include.map((g) => compileFilterGlob(g, caseSensitive));
+  const exc = exclude.map((g) => compileFilterGlob(g, caseSensitive));
+  return (p: string) => {
+    const rel = root && p.startsWith(root + "/") ? p.slice(root.length + 1) : p;
+    const base = p.slice(p.lastIndexOf("/") + 1);
+    const candidates = [rel, p, base];
+    if (inc.length > 0 && !inc.some((re) => candidates.some((c) => re.test(c)))) return false;
+    if (exc.some((re) => candidates.some((c) => re.test(c)))) return false;
+    return true;
+  };
+}
+
 async function toolGlob(args: Record<string, unknown>): Promise<ToolResult> {
   const pattern = String(args.pattern ?? "");
   const basePath = String(args.path ?? "");
   const caseSensitive = Boolean(args.case_sensitive);
   const useRegex = Boolean(args.regex);
+  if (basePath && normalizePath(basePath) && !vfs.statSync(basePath)) {
+    return {
+      ok: false,
+      output: `Path not found: ${basePath}. Check the path or pass '' to glob the whole workspace.`,
+      tool: "glob",
+      args,
+    };
+  }
   if (!pattern) {
     return { ok: false, output: "No pattern provided.", tool: "glob", args };
   }
@@ -234,6 +291,14 @@ async function toolSearchSymbols(
   const pattern = String(args.pattern ?? "");
   const path = String(args.path ?? "");
   const caseSensitive = Boolean(args.case_sensitive);
+  if (path && normalizePath(path) && !vfs.statSync(path)) {
+    return {
+      ok: false,
+      output: `Path not found: ${path}. Check the path or pass '' to search the whole workspace.`,
+      tool: "search_symbols",
+      args,
+    };
+  }
   if (!pattern) {
     return {
       ok: false,

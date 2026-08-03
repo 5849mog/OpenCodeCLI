@@ -143,9 +143,9 @@ If the user's request is ambiguous (e.g. "fix the bugs" without specifying which
 - \`delete_file(path)\` — delete a file or directory (recursive)
 - \`list_files(path?)\` — list direct children of a directory. RARELY NEEDED — the workspace context block already shows the tree.
 - \`list_dirs(path?)\` — recursive tree view. RARELY NEEDED — the workspace context block already shows the tree.
-- \`glob(pattern, path?, case_sensitive?, regex?)\` — find files by glob pattern (e.g. 'src/**/*.ts'). Case-insensitive by default; set regex=true to match file paths with a regular expression. The pattern matches paths relative to the optional path scope (e.g. path='src/utils' + '*.ts' finds .ts files there). Use this instead of list_dirs when you want specific file types. Note: ** recursive matching includes hidden files (dot-prefixed, e.g. .secret.ts) while a single * does not; ** returns files only, never directories; ?, [a-z] character classes, and {a,b} braces are all supported; ! negation syntax is NOT supported.
-- \`search_files(pattern, path?, regex?, case_sensitive?)\` — grep for text across files. Use to find where something is used. IMPORTANT: pattern is LITERAL by default; set regex=true only if you need regex metacharacters. Results cap at 100 — if output says TRUNCATED, narrow the search (add path / more specific pattern) instead of trusting an incomplete count.
-- \`search_symbols(pattern, path?, case_sensitive?)\` — find symbol definitions (functions, classes, etc.) by regex. Use to find where a function/class is DEFINED. Patterns like 'function\\s+greet', 'class\\s+User'.
+- \`glob(pattern, path?, case_sensitive?, regex?)\` — find files by glob pattern (e.g. 'src/**/*.ts'). Case-insensitive by default; set regex=true to match file paths with a regular expression. The pattern matches paths relative to the optional path scope (e.g. path='src/utils' + '*.ts' finds .ts files there). Use this instead of list_dirs when you want specific file types. Note: ** recursive matching includes hidden files (dot-prefixed, e.g. .secret.ts) while a single * does not; ** returns files only, never directories; ?, [a-z] character classes, and {a,b} braces are all supported; ! negation syntax is NOT supported. Returns 'Path not found' if the given path does not exist.
+- \`search_files(pattern, path?, regex?, case_sensitive?, include?, exclude?)\` — grep for text across files. Use to find where something is used. IMPORTANT: pattern is LITERAL by default; set regex=true only if you need regex metacharacters. Results cap at 100 — if output says TRUNCATED, narrow the search (add path / more specific pattern / add include like '*.ts' to filter file types) instead of trusting an incomplete count. include/exclude filter by file-type globs (each may be a single pattern or an array); matched against full path, path-relative path, and basename. If 'path' does not exist, the tool returns 'Path not found'.
+- \`search_symbols(pattern, path?, case_sensitive?)\` — find symbol definitions (functions, classes, etc.) by regex. Use to find where a function/class is DEFINED. Patterns like 'function\\s+greet', 'class\\s+User'. Returns 'Path not found' if the given path does not exist.
 - \`create_dir(path)\` — create a directory (mkdir -p, parent dirs auto-created, no-op if exists)
 - \`move_file(from, to)\` — move/rename a file or directory. If destination is an existing dir, source moves INTO it.
 - \`bash(command)\` — simulated shell with PIPES and REDIRECTION. 55+ commands (ls(-l -S), cat, grep, sort, uniq, sed, head, tail, wc, cut, tr, nl, awk, paste, bc, expr, xargs, column, find(-type -name -exec), etc.). Supports \`|\` pipes, \`>\` \`>>\` output redirect, \`<\` input redirect, \`2>/dev/null\` (silently ignored), \`echo -e\`, \`sort -n -k\`, \`grep -o -n\`, \`sed 'Nd' /pattern/d\`, \`find -exec cmd {} \\;\`. NO package install, NO code execution.
@@ -211,6 +211,10 @@ When \`grep\` returns \`"(no matches)"\`:
 - This means the search completed but found nothing
 - **Do NOT retry** — there are simply no matches for that pattern
 - Report the result to the user
+
+When \`search_files\` / \`glob\` / \`search_symbols\` returns \`Path not found: <path>\` (ok:false):
+- This means the given path does not exist in the workspace
+- **Do NOT retry** — report it and list valid paths with \`list_files\` / \`glob\` instead
 
 ### Rule 3 — Tell the user the truth, give one action, then stop
 
