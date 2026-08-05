@@ -29,6 +29,9 @@ jobs:
       - name: Build bc.wasm
         run: bash tools/bc-wasm/build.sh
 
+      - name: Build awk.wasm
+        run: bash tools/awk-wasm/build.sh
+
       # --- Node/Bun setup ---
       - uses: oven-sh/setup-bun@v1
 

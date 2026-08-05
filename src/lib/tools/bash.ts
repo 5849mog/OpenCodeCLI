@@ -1,7 +1,8 @@
 import { vfs, grepSync } from "../vfs";
 import type { ToolResult } from "./types";
-import { runAwk, splitAwkActions } from "./awk";
+import { splitAwkActions } from "./awk";
 import * as bcWasm from "../wasm/bc-wasm";
+import * as awkWasm from "../wasm/awk-wasm";
 
 /** Split a command string on &&, ||, and ; while respecting quotes and \;
  *  e.g. `echo abc | sed 's/a/X/; s/b/Y/'` → one segment (the ; is inside quotes)
@@ -291,7 +292,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
 
   const expandedTokens: string[] = [tokens[0]];
   const cmdName = tokens[0]?.toLowerCase();
-  const selfPatternCmds = ["find", "grep", "sed"];
+  const selfPatternCmds = ["find", "grep", "sed", "awk"];
   const skipGlob = selfPatternCmds.includes(cmdName);
   if (skipGlob) {
     // These commands handle their own patterns with -name, regex args, etc.
@@ -1500,29 +1501,31 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       }
     }
     case "awk": {
-      let fieldSep: RegExp | string = /\s+/;
-      const fIdx = rest.indexOf("-F");
-      if (fIdx >= 0 && rest[fIdx + 1]) fieldSep = rest[fIdx + 1];
-
+      // 重建原生 awk 的 argv：旗标置于 script 之前；降级完全收敛在 awkWasm.evaluate 内部。
+      const awkArgs: string[] = [];
       const scriptArgs: string[] = [];
-      let skipNext = false;
-      for (let i = 0; i < rest.length; i++) {
-        if (skipNext) { skipNext = false; continue; }
-        if (rest[i] === "-F") { skipNext = true; continue; }
-        if (rest[i].startsWith("-")) continue;
-        scriptArgs.push(rest[i]);
+      let i = 0;
+      while (i < rest.length) {
+        const t = rest[i];
+        if (t === "-F" && rest[i + 1] !== undefined) { awkArgs.push(`-F${rest[i + 1]}`); i += 2; continue; } // "-F" "," → "-F,"
+        if (t.startsWith("-F") && t.length > 2)        { awkArgs.push(t); i += 1; continue; }                 // "-F," 附着（旧实现丢掉的写法）
+        if (t === "-v" && rest[i + 1] !== undefined)   { awkArgs.push(t, rest[i + 1]); i += 2; continue; }     // "-v var=val"
+        if (t.startsWith("-"))                         { awkArgs.push(t); i += 1; continue; }
+        scriptArgs.push(t); i += 1;
       }
+
       if (scriptArgs.length === 0) return { ok: false, output: "awk: missing script" };
       const script = scriptArgs[0];
       const file = scriptArgs[1];
-      const { content } = resolveInput(file);
-      // If no input but script has BEGIN block, pass empty string (BEGIN doesn't need input)
+      const { content, source } = resolveInput(file);
+      // 无输入：只有 BEGIN 块时传空 stdin（BEGIN 不需要输入），否则报错
       if (content === null) {
-        if (script.includes("BEGIN")) return { ok: true, output: runAwk(script, "", fieldSep) };
+        if (script.includes("BEGIN")) return await awkWasm.evaluate({ script, args: awkArgs, stdin: "" });
         return { ok: false, output: "awk: no input" };
       }
-
-      return { ok: true, output: runAwk(script, content, fieldSep) };
+      // 管道输入走 stdin 回调；文件参数写 MEMFS 同名文件（保 FILENAME/FNR）
+      if (source === "stdin") return await awkWasm.evaluate({ script, args: awkArgs, stdin: content });
+      return await awkWasm.evaluate({ script, args: awkArgs, files: { [file]: content } });
     }
     case "paste": {
       const sIdx = rest.indexOf("-s");
