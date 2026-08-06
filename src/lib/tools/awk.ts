@@ -55,6 +55,59 @@ export function sprintfAwk(fmt: string, args: string[]): string {
   let result = "";
   let ai = 0;
   for (let i = 0; i < fmt.length; i++) {
+    if (fmt[i] === "\\") {
+      // 解释标准 awk printf 转义（对齐 wasm/真实 awk）：\n \t \r \a \b \f \v \\ \nnn(八进制) \xhh
+      const c = fmt[i + 1];
+      switch (c) {
+        case "n": result += "\n"; i++; break;
+        case "t": result += "\t"; i++; break;
+        case "r": result += "\r"; i++; break;
+        case "a": result += "\x07"; i++; break;
+        case "b": result += "\b"; i++; break;
+        case "f": result += "\f"; i++; break;
+        case "v": result += "\v"; i++; break;
+        case "\\": result += "\\"; i++; break;
+        case "0":
+        case "1":
+        case "2":
+        case "3":
+        case "4":
+        case "5":
+        case "6":
+        case "7": {
+          // \nnn 八进制 1-3 位，结果 & 0xFF
+          let j = i + 1;
+          let val = 0;
+          let digits = 0;
+          while (j < fmt.length && digits < 3 && /[0-7]/.test(fmt[j])) {
+            val = val * 8 + (fmt.charCodeAt(j) - 48);
+            j++;
+            digits++;
+          }
+          result += String.fromCharCode(val & 0xff);
+          i = j - 1;
+          break;
+        }
+        case "x": {
+          // \xhh 十六进制 1-2 位，结果 & 0xFF；无十六进制位 → 原样 \x
+          let j = i + 2;
+          let val = 0;
+          let digits = 0;
+          while (j < fmt.length && digits < 2 && /[0-9a-fA-F]/.test(fmt[j])) {
+            val = val * 16 + parseInt(fmt[j], 16);
+            j++;
+            digits++;
+          }
+          if (digits === 0) { result += "\\x"; i++; }
+          else { result += String.fromCharCode(val & 0xff); i = j - 1; }
+          break;
+        }
+        default:
+          result += "\\" + (c ?? "");
+          if (c !== undefined) i++;
+      }
+      continue;
+    }
     if (fmt[i] === "%" && i + 1 < fmt.length) {
       i++;
       // Skip width/precision digits (e.g. %.4 → just the .4 part)

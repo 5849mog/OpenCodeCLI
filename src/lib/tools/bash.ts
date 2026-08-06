@@ -3,6 +3,7 @@ import type { ToolResult } from "./types";
 import { splitAwkActions } from "./awk";
 import * as bcWasm from "../wasm/bc-wasm";
 import * as awkWasm from "../wasm/awk-wasm";
+import { bashPrintf } from "./printf";
 
 /** Split a command string on &&, ||, and ; while respecting quotes and \;
  *  e.g. `echo abc | sed 's/a/X/; s/b/Y/'` → one segment (the ; is inside quotes)
@@ -292,7 +293,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
 
   const expandedTokens: string[] = [tokens[0]];
   const cmdName = tokens[0]?.toLowerCase();
-  const selfPatternCmds = ["find", "grep", "sed", "awk"];
+  const selfPatternCmds = ["find", "grep", "sed", "awk", "printf"];
   const skipGlob = selfPatternCmds.includes(cmdName);
   if (skipGlob) {
     // These commands handle their own patterns with -name, regex args, etc.
@@ -346,6 +347,31 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
           .replace(/\\\\/g, "\\");
       }
       return { ok: true, output: text };
+    }
+    case "printf": {
+      // 解析：跳过未知 - 选项；-v var 消费并忽略（本模拟 bash 无变量系统）；
+      // -- 后一个 token 无条件为格式；第一个非 - token 为格式串，其余为参数。
+      let ri = 0;
+      let fmt: string | undefined;
+      while (ri < rest.length) {
+        const t = rest[ri];
+        if (t === "-v" && rest[ri + 1] !== undefined) { ri += 2; continue; }
+        if (t === "--") {
+          if (rest[ri + 1] !== undefined) { fmt = rest[ri + 1]; ri += 2; }
+          break;
+        }
+        if (t.startsWith("-")) { ri++; continue; }
+        fmt = t;
+        ri++;
+        break;
+      }
+      // 无格式 token 时：stdin 整段当格式（剥一个尾换行），否则报错
+      if (fmt === undefined) {
+        if (stdin !== undefined) fmt = stdin.replace(/\n$/, "");
+        else return { ok: false, output: "printf: missing format" };
+      }
+      // 与真实 printf 一致：不自动追加尾换行，需显式 \n
+      return { ok: true, output: bashPrintf(fmt, rest.slice(ri)) };
     }
     case "ls": {
       const allFlags = rest.filter((t) => t.startsWith("-")).join("");
@@ -434,9 +460,22 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       return { ok: true, output: vfs.treeSync(dir) || "(empty)" };
     }
     case "cat": {
-      const fileArg = rest.find((t) => !t.startsWith("-"));
-      const { content } = resolveInput(fileArg);
-      if (content === null) return { ok: false, output: `cat: ${fileArg ?? "(no input)"}: not found` };
+      const fileArgs = rest.filter((t) => !t.startsWith("-"));
+      let content: string | null;
+      if (fileArgs.length > 0) {
+        // 与真实 cat 一致：按参数顺序拼接全部文件，且给出文件时忽略管道 stdin。
+        // 旧实现只用 rest.find() 取第一个文件，`cat a b | awk ...` 只会喂 a 的内容。
+        const parts: string[] = [];
+        for (const f of fileArgs) {
+          const c = vfs.readFileSync(f);
+          if (c === null) return { ok: false, output: `cat: ${f}: not found` };
+          parts.push(c);
+        }
+        content = parts.join("");
+      } else {
+        content = resolveInput(undefined).content;
+      }
+      if (content === null) return { ok: false, output: `cat: (no input)` };
       if (rest.includes("-n")) {
         // cat -n: number each line, 6-digit right-aligned (like nl)
         return { ok: true, output: splitLines(content).map((l, i) => `${String(i + 1).padStart(6)}  ${l}`).join("\n") };
@@ -1701,7 +1740,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
     case "whereis": {
       const cmd = rest.find((t) => !t.startsWith("-"));
       if (!cmd) return { ok: false, output: `${program}: missing command` };
-      const knownCmds = ["ls", "cat", "head", "tail", "wc", "mkdir", "rm", "rmdir", "touch", "echo", "cp", "mv", "find", "grep", "sed", "sort", "uniq", "cut", "tr", "awk", "xargs", "pwd", "cd", "tree", "nl", "paste", "bc", "expr", "file", "stat", "diff", "tee", "env", "hostname", "whoami", "id", "uname", "date", "uptime", "rev", "fold", "yes", "basename", "dirname", "realpath", "readlink", "seq", "shuf", "strings", "base64", "column", "comm", "join", "which", "whereis", "true", "false", "test"];
+      const knownCmds = ["ls", "cat", "head", "tail", "wc", "mkdir", "rm", "rmdir", "touch", "echo", "printf", "cp", "mv", "find", "grep", "sed", "sort", "uniq", "cut", "tr", "awk", "xargs", "pwd", "cd", "tree", "nl", "paste", "bc", "expr", "file", "stat", "diff", "tee", "env", "hostname", "whoami", "id", "uname", "date", "uptime", "rev", "fold", "yes", "basename", "dirname", "realpath", "readlink", "seq", "shuf", "strings", "base64", "column", "comm", "join", "which", "whereis", "true", "false", "test"];
       return { ok: true, output: knownCmds.includes(cmd) ? `/bin/${cmd}` : "" };
     }
     case "noh":
@@ -1739,7 +1778,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       return { ok: true, output: "" };
     }
     default: {
-      const known = ["ls", "cat", "head", "tail", "wc", "mkdir", "rm", "touch", "echo", "cp", "mv", "find", "grep", "sed", "sort", "uniq", "cut", "tr", "awk", "xargs", "pwd", "cd", "clear", "tree", "nl", "paste", "bc", "expr", "file", "stat", "diff", "tee", "env", "hostname", "whoami", "id", "uname", "date", "uptime", "rev", "fold", "yes", "basename", "dirname", "realpath", "readlink", "seq", "shuf", "shuffle", "head_dash", "strings", "base64", "column", "comm", "join", "which", "whereis", "noh", "true", "false", "test"];
+      const known = ["ls", "cat", "head", "tail", "wc", "mkdir", "rm", "touch", "echo", "printf", "cp", "mv", "find", "grep", "sed", "sort", "uniq", "cut", "tr", "awk", "xargs", "pwd", "cd", "clear", "tree", "nl", "paste", "bc", "expr", "file", "stat", "diff", "tee", "env", "hostname", "whoami", "id", "uname", "date", "uptime", "rev", "fold", "yes", "basename", "dirname", "realpath", "readlink", "seq", "shuf", "shuffle", "head_dash", "strings", "base64", "column", "comm", "join", "which", "whereis", "noh", "true", "false", "test"];
       return {
         ok: false,
         output: `bash: ${program}: command not supported in browser sandbox. Available: ${known.join(", ")}. Supports | > >> < 2>/dev/null 2>&1`,

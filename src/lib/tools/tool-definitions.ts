@@ -211,7 +211,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "bash",
       description:
-        "Run a SIMULATED shell command against the workspace. Supports PIPES (|), OUTPUT redirection (> >>), and INPUT redirection (<). 55+ commands: ls, cat, head, tail, wc, mkdir, rm, touch, echo(-e), cp, mv, find, grep(-o -n -i), tree, pwd, cd, sort(-n -r -k -t), uniq(-c), cut(-d -f -c), tr(\\t \\n), sed(s/// Nd /pat/d), nl, awk, paste, bc, expr, xargs, column, comm, join, file, stat, diff, tee, env, hostname, whoami, uname, date, seq, basename, dirname, test, etc. Examples: 'cat file | grep x', 'sort words.txt | uniq -c | sort -rn', 'awk '{print $2}' file', 'echo hello > out.txt', 'echo -e \"a\\nb\"'. NO package install, NO code execution, NO 2>/2>&1, NO heredoc.",
+        "Run a SIMULATED shell command against the workspace. Supports PIPES (|), OUTPUT redirection (> >>), and INPUT redirection (<). 55+ commands: ls, cat, head, tail, wc, mkdir, rm, touch, echo(-e), printf, cp, mv, find, grep(-o -n -i), tree, pwd, cd, sort(-n -r -k -t), uniq(-c), cut(-d -f -c), tr(\\t \\n), sed(s/// Nd /pat/d), nl, awk, paste, bc, expr, xargs, column, comm, join, file, stat, diff, tee, env, hostname, whoami, uname, date, seq, basename, dirname, test, etc. Examples: 'cat file | grep x', 'sort words.txt | uniq -c | sort -rn', 'awk '{print $2}' file', 'echo hello > out.txt', 'echo -e \"a\\nb\"', 'printf '%5.2f\\n' 3.14159'. NO package install, NO code execution, NO 2>/2>&1, NO heredoc.",
       parameters: {
         type: "object",
         properties: {
@@ -403,7 +403,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "dispatch_subagent",
       description:
-        "⭐ 推荐：当需要读多个文件做探索/研究、或想避免把大量文件内容灌进主上下文时，优先用它而非连续 read_file。Dispatch a subagent to work on an independent subtask. The subagent gets a CLEAN conversation context (it does NOT see the main conversation) and runs its own agent loop with full tool access. Use this for: (1) tasks that would pollute the main context with many tool calls, (2) parallel-ish independent subtasks, (3) deep exploration of a specific area. The subagent shares the same workspace — its file changes are visible to you immediately. Returns the subagent's final text summary. Use sparingly — each subagent call consumes its own token budget.",
+        "⭐ 推荐：当需要读多个文件做探索/研究、或想避免把大量文件内容灌进主上下文时，用它代替连续 read_file。Dispatch a subagent to work on ONE focused, self-contained subtask. It gets a CLEAN context (no main conversation) and runs its own agent loop with full tool access. Best for read-only exploration that spans several files, or any analysis whose raw tool output would pollute the main context. Give it a precise task: specific paths/glob, the exact question to answer, a return format, and a max_iterations cap. It shares the workspace — its edits are visible to you. Returns its final summary. Cost: each call spends its own token budget and tool iterations, so use it where it earns its keep — not as a default.",
       parameters: {
         type: "object",
         properties: {
@@ -425,7 +425,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "orchestrate_task",
       description:
-        "[PREFERRED for multi-file tasks] Decompose a complex task into independent subtasks, execute them with PARALLEL sub-agents, and synthesize the results. EACH sub-agent runs independently so the total wall-clock time is much FASTER than doing it yourself. Use this WHENEVER the request asks for multiple independent files, features, or components that don't depend on each other (e.g. creating 4 independent project files, building a frontend + backend + docs simultaneously). More efficient than dispatching sub-agents one-by-one. Do NOT treat this as a 'last resort' — it's the BEST tool for multi-component work.",
+        "Decompose a task into genuinely INDEPENDENT subtasks, run each in its own sub-agent, and synthesize the results. Use it ONLY when the subtasks have no ordering or data dependency between them — e.g. producing several unrelated files or features. If subtask B cannot be finished until it sees subtask A's output, they are NOT independent: do them yourself, in sequence. Each sub-agent runs its own bounded loop and spends its own token budget — you must review its output before accepting it. Boundary: for read-only exploration across many files, use dispatch_subagent instead; orchestrate_task is for producing independent work product, not for research.",
       parameters: {
         type: "object",
         properties: {
