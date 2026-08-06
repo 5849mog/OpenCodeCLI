@@ -611,6 +611,44 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "zip_archive",
+      description:
+        "把工作区里选定的文件/目录打包成一个真实 .zip 并触发浏览器下载（目录自动递归展开）。IMPORTANT: 本工具只返回短摘要（文件数/总字节/前若干文件名）——文件内容绝不进入对话，真正的 .zip 由浏览器下载。用户要『下载/导出』部分或全部工作区时使用。",
+      parameters: {
+        type: "object",
+        properties: {
+          paths: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "要包含的文件或目录路径（相对工作区根，无前导斜杠）。目录会递归展开。如 ['src/', 'README.md']。",
+          },
+          name: {
+            type: "string",
+            description:
+              "可选输出文件名（可带或不带 .zip）。默认 opencode-workspace-<时间戳>.zip。",
+          },
+        },
+        required: ["paths"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "unzip_archive",
+      description:
+        "请求用户从本机选择一个 .zip 文件，解压后把文本条目写进工作区（文件袋）。文本文件按内部路径写入；二进制/超大条目写成占位符；zip-slip 路径会被净化。IMPORTANT: 只返回短摘要（文件数/总字节/前若干文件名），文件内容绝不进入对话。用户要『导入/解压』一个 zip 时使用。",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
 ];
 
 export function getToolByName(name: string): ToolDefinition | undefined {

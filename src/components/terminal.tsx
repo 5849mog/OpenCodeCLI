@@ -57,6 +57,8 @@ import { useSession, type SessionEvent, type QuestionPanelData } from "@/store/s
 import { buildHelpText } from "@/lib/help-content";
 import { useVfsView } from "@/store/vfs-view";
 import { vfs } from "@/lib/vfs";
+import { toast } from "sonner";
+import { ZipDownloadBridge, ZipPickerModal } from "./zip-picker";
 import { cn } from "@/lib/utils";
 import { planStats } from "@/lib/plan-utils";
 
@@ -601,6 +603,10 @@ export function Terminal() {
               }}
             />
           )}
+
+          {/* Zip tool bridges — download (zip_archive) + file picker (unzip_archive) */}
+          <ZipDownloadBridge />
+          <ZipPickerModal />
       </div>
 
       {/* Input */}

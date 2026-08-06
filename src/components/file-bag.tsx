@@ -32,7 +32,8 @@ import {
   PanelLeft,
 } from "lucide-react";
 import JSZip from "jszip";
-import { vfs, normalizePath, basename, onVfsEvent, type VfsNode } from "@/lib/vfs";
+import { vfs, normalizePath, parentPath, basename, onVfsEvent, type VfsNode } from "@/lib/vfs";
+import { extractZipFile } from "@/lib/tools/zip";
 import { useVfsView } from "@/store/vfs-view";
 import { PlanPanel } from "@/components/plan-panel";
 import { cn } from "@/lib/utils";
@@ -77,10 +78,24 @@ function FileBagInner() {
   const handleFiles = async (files: FileList | null, prefix = "") => {
     if (!files || files.length === 0) return;
     const toImport: Array<{ path: string; content: string }> = [];
+    let zipImported = 0;
+    const zipNotes: string[] = [];
     for (const file of Array.from(files)) {
       // For folder uploads via webkitdirectory, file.webkitRelativePath is set
       const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
       const path = normalizePath(prefix + "/" + rel);
+      // 新增：.zip 文件自动解压进文件袋（此前会被 file.text() 读成乱码）
+      if (/\.zip$/i.test(file.name)) {
+        try {
+          const res = await extractZipFile(file, { prefix: parentPath(path) });
+          zipImported += res.written;
+          if (res.skipped > 0) zipNotes.push(`${file.name}: 跳过 ${res.skipped} 项`);
+          if (res.truncated) zipNotes.push(`${file.name}: 达到解压上限`);
+        } catch (e) {
+          zipNotes.push(`${file.name}: 解压失败 ${e instanceof Error ? e.message : String(e)}`);
+        }
+        continue;
+      }
       // Skip binary files > 5MB
       if (file.size > 5 * 1024 * 1024) {
         // Store as placeholder
@@ -102,7 +117,11 @@ function FileBagInner() {
     }
     const n = await vfs.importFiles(toImport);
     bump();
-    toast.success(`Imported ${n} file(s) into the 文件袋`);
+    toast.success(
+      zipImported > 0
+        ? `Imported ${n} file(s); 其中 zip 解压 ${zipImported} 个文件${zipNotes.length ? `（${zipNotes.slice(0, 3).join("; ")}）` : ""}`
+        : `Imported ${n} file(s) into the 文件袋`,
+    );
   };
 
   const handleDownloadZip = async () => {

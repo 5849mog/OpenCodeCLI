@@ -140,6 +140,7 @@ Cost = how much text a tool pulls into context. Choose the cheapest tool that ge
 - \`bash cp\` / \`mv\` / \`diff\` — manipulate files without reading their contents
 - \`read_multiple_files\` — batch-read several SMALL files in ONE call
 - \`multi_edit\` / \`apply_patch\` — batch edits in ONE call instead of several
+- \`zip_archive\` / \`unzip_archive\` — 打包/解压都只回短摘要，内容不占上下文；别为了"导出"去 read_file 逐个读。
 - **批量只对无依赖的独立操作。** \`read_multiple_files\` 一次读一批互不相干的文件、\`multi_edit\` 一次改多处互不影响的位置——都行。但如果 B 的内容取决于 A 先产生的结果，A 和 B 就不能放进同一条消息（见 Tool failure protocol Rule 6 / Rule 7）。
 
 **Avoid by default — only use when the user explicitly asks, or it's genuinely necessary:**
@@ -190,8 +191,10 @@ If the user's request is ambiguous (e.g. "fix the bugs" without specifying which
 - \`read_multiple_files(paths)\` — read MULTIPLE files at once. Pass an array like \`["src/a.ts", "src/b.ts"]\`. Much more efficient than calling read_file repeatedly when you need to understand several files together. Max 20 files.
 - \`project_stats(path?)\` — get workspace statistics: file/directory count, total lines, file type breakdown, TODO/FIXME markers, largest/recent files. Optionally pass a subdirectory path to scope the analysis.
 - \`dispatch_subagent(task, max_iterations?)\` — delegate an independent subtask to a subagent with its own clean context. The subagent shares the same workspace and has full tool access. Use for tasks that would pollute the main context, or for focused exploration. Returns the subagent's summary.
-- \`orchestrate_task(task, max_sub_agents?, sub_agent_max_iterations?)\` — ⭐ **最佳实践：当用户请求多个独立文件/功能时，优先使用此工具而非手动逐个写入。** 它会自动分解任务 → 并行派发给子 Agent → 合成结果。比手动写文件快 N 倍（子 Agent 独立运行，互不阻塞）。适用于：创建多个独立文件、实现多个不相关的功能、多模块代码生成。注意：子 Agent 的输出需要你 review 一下，不完美的可以自己微调。
+- \`orchestrate_task(task, max_sub_agents?, sub_agent_max_iterations?)\` — 把任务分解为**真正独立**的子任务并行执行后合成。**仅当子任务之间没有任何顺序/数据依赖时使用**（如生成几个互不相干的文件或功能）。如果子任务 B 要等 A 的输出才能完成，它们就不独立——自己按顺序做，别用本工具。每个子 Agent 有自己的上下文与 token 预算，其输出需要你 review 后再接受。边界：跨多文件只读探索用 dispatch_subagent；本工具用于产出独立产物。
 - \`ask_user_input(questions, title?, description?, submit_label?)\` — present the user with a structured question panel (single_select/multi_select/text_input). Supports required fields and free-form "other" input on select types. Use when you need the user to make a choice, confirm something, provide structured input, or enter free text. The user's answers will be returned in a follow-up message.
+- \`zip_archive(paths, name?)\` — 把选定的文件/目录打包成真实 .zip 并触发浏览器下载（目录自动递归展开）。**只返回短摘要**（文件数/总字节/前若干文件名），文件内容绝不进上下文。
+- \`unzip_archive()\` — 请求用户选一个本地 .zip 文件并自动解压进文件袋（文本条目写入，二进制/超大条目占位）。**只返回解压短摘要**。用户说"解压这个 zip / 导入这个压缩包"时调用。
 - \`web_search(query, max_results?)\` — search the internet for current information. Returns results with titles, URLs, and snippets. Use this when: (1) you need documentation for a library/API that you don't have locally, (2) the user asks about current events or external topics, (3) fetch_url fails due to CORS. Requires a search API key (Tavily or Brave) configured in Settings → Web & Search.
 - \`fetch_url(url, format?)\` — fetch and read the content of a URL from the internet. Works for CORS-enabled APIs and websites. For sites that block CORS, try web_search instead. 'format' can be 'text' (default) or 'json' (pretty-prints JSON responses). The response is truncated to ~5000 characters for context efficiency.
 

@@ -225,6 +225,11 @@ interface SessionState {
   // ---------------------------------------------------------------------------
   pendingQuestions: QuestionPanelData | null;
 
+  /** zip_archive 工具把真实 zip blob 交给 UI 触发下载。组件消费后清空。 */
+  pendingDownload: { blob: Blob; filename: string } | null;
+  /** unzip_archive 工具请求用户选 zip；UI 挂载隐藏文件选择器。 */
+  pendingZipRequest: { requestId: string } | null;
+
   init: () => void;
   setConfig: (patch: Partial<AiConfig>) => void;
   /** Clear the current session's content but keep its entry. Alias of clearSession. */
@@ -239,6 +244,8 @@ interface SessionState {
   send: (text: string) => Promise<void>;
   toggleMode: () => void;
   setPendingQuestions: (data: QuestionPanelData | null) => void;
+  setPendingDownload: (d: { blob: Blob; filename: string } | null) => void;
+  setPendingZipRequest: (r: { requestId: string } | null) => void;
 }
 
 let eventCounter = 0;
@@ -305,6 +312,8 @@ export const useSession = create<SessionState>((set, get) => ({
   truncated: false,
   mode: "bypass",
   pendingQuestions: null,
+  pendingDownload: null,
+  pendingZipRequest: null,
 
   init: () => {
     const cfg = loadConfig();
@@ -378,6 +387,8 @@ export const useSession = create<SessionState>((set, get) => ({
       lastUsage: null,
       truncated: false,
       pendingQuestions: null,
+      pendingDownload: null,
+      pendingZipRequest: null,
     });
     await get().refreshSessionList();
   },
@@ -412,6 +423,8 @@ export const useSession = create<SessionState>((set, get) => ({
       lastUsage: null,
       truncated: false,
       pendingQuestions: null,
+      pendingDownload: null,
+      pendingZipRequest: null,
     });
     await get().refreshSessionList();
   },
@@ -446,6 +459,8 @@ export const useSession = create<SessionState>((set, get) => ({
       agentIteration: 0,
       truncated: false,
       pendingQuestions: null,
+      pendingDownload: null,
+      pendingZipRequest: null,
     });
     await get().refreshSessionList();
   },
@@ -512,6 +527,12 @@ export const useSession = create<SessionState>((set, get) => ({
 
   setPendingQuestions: (data) => {
     set({ pendingQuestions: data });
+  },
+  setPendingDownload: (d) => {
+    set({ pendingDownload: d });
+  },
+  setPendingZipRequest: (r) => {
+    set({ pendingZipRequest: r });
   },
 
   send: async (text: string) => {
@@ -1072,7 +1093,7 @@ async function executeToolCall(
       const mutatingTools = new Set([
         "write_file", "edit_file", "multi_edit", "delete_file",
         "move_file", "append_file", "create_dir", "update_plan",
-        "apply_patch", "insert_at", "undo_edit",
+        "apply_patch", "insert_at", "undo_edit", "unzip_archive",
       ]);
       if (get().mode === "plan" && mutatingTools.has(tc.function.name)) {
         result = {

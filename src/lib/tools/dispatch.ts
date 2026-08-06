@@ -6,6 +6,7 @@ import { toolMultiEdit, toolApplyPatch } from "./patch";
 import { toolUpdatePlan } from "./plan";
 import { toolAskUserInput } from "./user-input";
 import { toolWebSearch, toolFetchUrl } from "./web";
+import { toolZipArchive, toolUnzipArchive } from "./zip";
 
 export async function dispatchTool(
   name: string,
@@ -53,6 +54,10 @@ export async function dispatchTool(
         return await toolInsertAt(args);
       case "ask_user_input":
         return await toolAskUserInput(args);
+      case "zip_archive":
+        return await toolZipArchive(args);
+      case "unzip_archive":
+        return await toolUnzipArchive(args);
       case "web_search":
         return await toolWebSearch(args);
       case "fetch_url":
