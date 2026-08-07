@@ -1110,7 +1110,7 @@ async function executeToolCall(
         if (!skipSnapshot && MUTATING_TOOLS.has(tc.function.name) && tc.function.name !== "undo_edit") {
           vfs.takeSnapshot(`${tc.function.name}(${formatToolArgsPreview(args)})`);
         }
-        result = await dispatchTool(tc.function.name, args);
+        result = await dispatchTool(tc.function.name, args, { readOnly: get().mode === "plan" });
         // Ensure the file bag UI refreshes after any mutating tool
         if (result.mutated) useVfsView.getState().bump();
       }

@@ -211,7 +211,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "bash",
       description:
-        "Run a SIMULATED shell command against the workspace. Supports PIPES (|), OUTPUT redirection (> >>), and INPUT redirection (<). 55+ commands: ls, cat, head, tail, wc, mkdir, rm, touch, echo(-e), printf, cp, mv, find, grep(-o -n -i), tree, pwd, cd, sort(-n -r -k -t), uniq(-c), cut(-d -f -c), tr(\\t \\n), sed(s/// Nd /pat/d), nl, awk, paste, bc, expr, xargs, column, comm, join, file, stat, diff, tee, env, hostname, whoami, uname, date, seq, basename, dirname, test, etc. Examples: 'cat file | grep x', 'sort words.txt | uniq -c | sort -rn', 'awk '{print $2}' file', 'echo hello > out.txt', 'echo -e \"a\\nb\"', 'printf '%5.2f\\n' 3.14159'. NO package install, NO code execution, NO 2>/2>&1, NO heredoc.",
+        "Run a SIMULATED shell command against the workspace. Supports PIPES (|), OUTPUT redirection (> >>), and INPUT redirection (<). 55+ commands: ls, cat, head, tail, wc, mkdir, rm, touch, echo(-e), printf, cp, mv, find(-name -iname -type -exec), grep(-o -n -i), tree, pwd, cd, sort(-n -r -k -t), uniq(-c), cut(-d -f -c), tr(\\t \\n), sed(s/// Nd /pat/d), nl, awk, paste, bc, expr, xargs, column, comm, join, file, stat, diff, tee, env, hostname, whoami, uname, date, seq, basename, dirname, test, etc. Examples: 'cat file | grep x', 'sort words.txt | uniq -c | sort -rn', 'awk '{print $2}' file', 'echo hello > out.txt', 'echo -e \"a\\nb\"', 'printf '%5.2f\\n' 3.14159'. In Plan mode bash runs READ-ONLY: writes (>, >>, mkdir, rm, rmdir, touch, cp, mv, sed -i, tee) are BLOCKED. NO package install, NO code execution, NO 2>/2>&1, NO heredoc.",
       parameters: {
         type: "object",
         properties: {

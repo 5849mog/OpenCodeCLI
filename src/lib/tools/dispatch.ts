@@ -11,6 +11,7 @@ import { toolZipArchive, toolUnzipArchive } from "./zip";
 export async function dispatchTool(
   name: string,
   args: Record<string, unknown>,
+  opts?: { readOnly?: boolean },
 ): Promise<ToolResult> {
   try {
     switch (name) {
@@ -33,7 +34,7 @@ export async function dispatchTool(
       case "search_files":
         return await toolSearchFiles(args);
       case "bash":
-        return await toolBash(args);
+        return await toolBash(args, opts?.readOnly);
       case "multi_edit":
         return await toolMultiEdit(args);
       case "glob":

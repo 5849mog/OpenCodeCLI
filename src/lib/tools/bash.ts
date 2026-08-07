@@ -4,6 +4,12 @@ import { splitAwkActions } from "./awk";
 import * as bcWasm from "../wasm/bc-wasm";
 import * as awkWasm from "../wasm/awk-wasm";
 import { bashPrintf } from "./printf";
+import { globToRegex } from "./glob";
+
+/** [Plan mode] block message for a bash command that would modify the filesystem. */
+function planReadOnlyMsg(cmd: string): string {
+  return `[Plan mode] bash is read-only in Plan mode: '${cmd}' would modify the filesystem and was blocked. In Plan mode you can only READ and ANALYZE — propose your plan in text, and the user will switch to Bypass mode to let you execute it.`;
+}
 
 /** Split a command string on &&, ||, and ; while respecting quotes and \;
  *  e.g. `echo abc | sed 's/a/X/; s/b/Y/'` → one segment (the ; is inside quotes)
@@ -76,7 +82,7 @@ function splitCommandSegments(cmd: string): Array<{ cmd: string; sep: "&&" | "||
   return segments;
 }
 
-async function toolBash(args: Record<string, unknown>): Promise<ToolResult> {
+async function toolBash(args: Record<string, unknown>, readOnly = false): Promise<ToolResult> {
   const command = String(args.command ?? "").trim();
   if (!command) {
     return { ok: false, output: "Empty command", tool: "bash", args };
@@ -94,7 +100,7 @@ async function toolBash(args: Record<string, unknown>): Promise<ToolResult> {
       case ";":    shouldRun = true; break;
     }
     if (!shouldRun) continue;
-    const out = await runPipeline(seg.cmd);
+    const out = await runPipeline(seg.cmd, readOnly);
     if (out.mutated) mutated = true;
     if (out.output) outputs.push(out.output);
     lastOk = out.ok;
@@ -111,7 +117,7 @@ async function toolBash(args: Record<string, unknown>): Promise<ToolResult> {
   };
 }
 
-async function runPipeline(cmdLine: string): Promise<{
+async function runPipeline(cmdLine: string, readOnly = false): Promise<{
   ok: boolean;
   output: string;
   mutated?: boolean;
@@ -164,13 +170,19 @@ async function runPipeline(cmdLine: string): Promise<{
       if (f === null) return { ok: false, output: `<: ${stage.inputRedirect}: not found` };
       stageStdin = f;
     }
-    const result = await runOneShellCommandFromTokens(stage.cmdTokens, stageStdin);
+    const result = await runOneShellCommandFromTokens(stage.cmdTokens, stageStdin, readOnly);
     if (result.mutated) mutated = true;
     if (!result.ok) {
       return { ok: false, output: result.output, mutated };
     }
     lastOutput = result.output;
     if (stage.outputRedirect) {
+      if (readOnly) {
+        return {
+          ok: false,
+          output: planReadOnlyMsg(`${stage.cmdTokens.join(" ")} ${stage.outputRedirect.append ? ">>" : ">"} ${stage.outputRedirect.file}`),
+        };
+      }
       const { file, append } = stage.outputRedirect;
       const existing = append ? (vfs.readFileSync(file) ?? "") : "";
       const newContent = existing + result.output + (result.output.endsWith("\n") ? "" : "\n");
@@ -284,7 +296,7 @@ function splitLines(s: string): string[] {
   return l;
 }
 
-async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): Promise<{
+async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, readOnly = false): Promise<{
   ok: boolean;
   output: string;
   mutated?: boolean;
@@ -293,6 +305,18 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
 
   const expandedTokens: string[] = [tokens[0]];
   const cmdName = tokens[0]?.toLowerCase();
+  // Plan mode: bash is READ-ONLY. Block every command that writes to the VFS
+  // (the redirect write is gated separately in runPipeline). Read-only filters
+  // like `sed` without -i, `sort`, `grep`, `cat`, `find` stay allowed.
+  if (readOnly) {
+    const writeCmds = ["mkdir", "rm", "rmdir", "touch", "cp", "mv", "tee"];
+    if (writeCmds.includes(cmdName)) {
+      return { ok: false, output: planReadOnlyMsg(tokens.join(" ")) };
+    }
+    if (cmdName === "sed" && tokens.some((t, idx) => idx > 0 && /^-i/.test(t))) {
+      return { ok: false, output: planReadOnlyMsg(tokens.join(" ")) };
+    }
+  }
   const selfPatternCmds = ["find", "grep", "sed", "awk", "printf"];
   const skipGlob = selfPatternCmds.includes(cmdName);
   if (skipGlob) {
@@ -639,7 +663,9 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       const typeIdx = rest.indexOf("-type");
       const typeFilter = typeIdx >= 0 ? rest[typeIdx + 1] : null;
       const nameIdx = rest.indexOf("-name");
-      const namePattern = nameIdx >= 0 ? rest[nameIdx + 1] : null;
+      const inameIdx = rest.indexOf("-iname");
+      const useIname = inameIdx >= 0;
+      const pattern = useIname ? rest[inameIdx + 1] : nameIdx >= 0 ? rest[nameIdx + 1] : null;
       const execIdx = rest.indexOf("-exec");
       const execTokens = execIdx >= 0 ? rest.slice(execIdx + 1) : [];
       let execCmd: string[] = [];
@@ -649,35 +675,42 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
           execCmd.push(t);
         }
       }
-      let files = vfs.listAllFilesSync(root);
-      const allNodes = vfs.allSync().filter((n) => {
-        if (root && !n.path.startsWith(root + "/") && n.path !== root) return false;
-        return true;
-      });
+      // Candidate nodes: -type d → dirs; otherwise files (default output keeps
+      // listing files only). Include the root itself so `find src -type d` shows src.
+      let nodes = vfs
+        .allSync()
+        .filter((n) => !root || n.path === root || n.path.startsWith(root + "/"))
+        .sort((a, b) => a.path.localeCompare(b.path));
       if (typeFilter === "d") {
-        const dirs = allNodes.filter((n) => n.type === "dir").map((n) => n);
-        return {
-          ok: true,
-          output: dirs.map((d) => "./" + d.path + "/").join("\n") || "(none)",
-        };
+        nodes = nodes.filter((n) => n.type === "dir");
+      } else {
+        nodes = nodes.filter((n) => n.type === "file");
       }
-      if (namePattern) {
-        const re = new RegExp(namePattern.replace(/\*/g, ".*").replace(/\?/g, "."));
-        files = files.filter((f) => re.test(f.path.split("/").pop() ?? f.path));
+      // -name / -iname: EXACT glob against the basename — anchored, so `*.ts`
+      // never substring-matches `mytsconfig.json`. matchDot:true mirrors real
+      // find (a bare `*` matches hidden basenames).
+      if (pattern) {
+        const re = globToRegex(pattern, { matchDot: true });
+        const nameRe = useIname ? new RegExp(re.source, "i") : re;
+        nodes = nodes.filter((n) => nameRe.test(n.path.split("/").pop() ?? n.path));
       }
       if (execCmd.length > 0) {
         const results: string[] = [];
-        for (const f of files) {
-          const fullPath = "./" + f.path;
+        let allOk = true;
+        for (const n of nodes) {
+          const fullPath = "./" + n.path;
           const cmdTokens = execCmd.map((t) => (t === "{}" ? fullPath : t));
-          const r = await runOneShellCommandFromTokens(cmdTokens);
+          const r = await runOneShellCommandFromTokens(cmdTokens, undefined, readOnly);
           if (r.output) results.push(r.output);
+          if (!r.ok) allOk = false;
         }
-        return { ok: true, output: results.join("\n") || "(command completed with no output)" };
+        // Propagate inner failures (incl. Plan-mode blocks) instead of always ok:true
+        return { ok: allOk, output: results.join("\n") || "(command completed with no output)" };
       }
+      const dirSuffix = typeFilter === "d" ? "/" : "";
       return {
         ok: true,
-        output: files.map((f) => "./" + f.path).join("\n") || "(none)",
+        output: nodes.map((n) => "./" + n.path + dirSuffix).join("\n") || "(none)",
       };
     }
     case "grep": {
@@ -1659,13 +1692,13 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string): P
       if (replaceStr) {
         for (const item of items) {
           const args = xargsCmdTokens.map((t) => t.replace(replaceStr, item));
-          const r = await runOneShellCommandFromTokens(args);
+          const r = await runOneShellCommandFromTokens(args, undefined, readOnly);
           if (r.output) results.push(r.output);
         }
       } else {
         for (let bi = 0; bi < items.length; bi += maxArgs) {
           const batch = items.slice(bi, bi + maxArgs);
-          const r = await runOneShellCommandFromTokens([...xargsCmdTokens, ...batch]);
+          const r = await runOneShellCommandFromTokens([...xargsCmdTokens, ...batch], undefined, readOnly);
           if (r.output) results.push(r.output);
         }
       }
