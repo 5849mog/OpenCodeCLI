@@ -4,6 +4,28 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "dispatch_subagent",
+      description:
+        "⭐ 探索与多文件研究的默认工具——先于 read_file/read_multiple_files 考虑。Dispatch a subagent with its OWN clean context (it does not see this conversation) to explore, read, and analyze files, then return only a conclusion. **Whenever the answer requires reading 2+ files to understand something (how does X work? where is Y? 梳理/探索项目), call THIS first** — it reads in its own context so the file contents never enter yours. Give a precise task: specific paths/glob, the exact question, a return format, a max_iterations cap. It shares the workspace — its edits are visible to you. Returns its final summary. Don't reach for it for a single small edit — but for ANY multi-file exploration it is the default, not the exception.",
+      parameters: {
+        type: "object",
+        properties: {
+          task: {
+            type: "string",
+            description: "A clear description of the subtask. The subagent sees ONLY this (not your conversation). Include specific paths/glob/search keywords, the exact question to answer, and the expected return format.",
+          },
+          max_iterations: {
+            type: "number",
+            description: "Max tool-call iterations for the subagent. Default 8. Pure read-only exploration needs 4-6. Increase for complex subtasks.",
+          },
+        },
+        required: ["task"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "read_file",
       description:
         "Read the content of a file from the workspace (文件袋). For files over 1500 lines, only the first 1500 lines are returned by default — use the offset and limit parameters to paginate. Returns the file content as text.",
@@ -401,28 +423,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: "function",
     function: {
-    name: "dispatch_subagent",
-    description:
-      "⭐ 推荐：多文件探索/研究、或想避免把大量文件内容灌进主上下文时，用它代替连续 read_file。Dispatch a subagent to work on ONE focused, self-contained subtask. It gets a CLEAN context (no main conversation) and runs its own agent loop with full tool access. Best for read-only exploration that spans several files, or any analysis whose raw tool output would pollute the main context. Give it a precise task: specific paths/glob, the exact question to answer, a return format, and a max_iterations cap. It shares the workspace — its edits are visible to you. Returns its final summary. Cost: each call spends its own token budget — that is the POINT: it keeps file contents OUT of your context, which saves tokens on every later round-trip. Use it for any multi-file research; don't reach for it for a single small edit.",
-      parameters: {
-        type: "object",
-        properties: {
-          task: {
-            type: "string",
-            description: "A clear description of the subtask. The subagent sees ONLY this (not your conversation). Include enough context for it to work independently.",
-          },
-          max_iterations: {
-            type: "number",
-            description: "Max tool-call iterations for the subagent. Default 8. Increase for complex subtasks.",
-          },
-        },
-        required: ["task"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
     name: "orchestrate_task",
     description:
       "Decompose a task into genuinely INDEPENDENT subtasks, run each in its own sub-agent in PARALLEL, and synthesize the results. Use it when subtasks have no ordering or data dependency between them — e.g. producing several unrelated files or features at once: this parallelizes work that would otherwise be sequential. If subtask B cannot be finished until it sees subtask A's output, they are NOT independent: do them yourself, in sequence. Each sub-agent runs its own bounded loop and spends its own token budget — you must review its output before accepting it. Boundary: for read-only exploration across many files, use dispatch_subagent instead; orchestrate_task is for producing independent work product, not for research.",
@@ -451,7 +451,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "read_multiple_files",
       description:
-        "Read MULTIPLE files at once. Takes an array of file paths and returns each file's content with a clear header separator. More efficient than calling read_file repeatedly when you need to understand several files together. Maximum 20 files per call. For individual files with pagination, use read_file instead. **COST WARNING: the full contents land in YOUR context and are re-sent on every later round-trip — for multi-file research (more than 1-2 files) dispatch_subagent is cheaper: it reads in its own context and returns only a summary.**",
+        "Read MULTIPLE files at once. Takes an array of file paths and returns each file's content with a clear header separator. More efficient than calling read_file repeatedly when you need to understand several files together. Maximum 20 files per call. **NOT for exploration.** If you are reading files to figure out how something works, use dispatch_subagent instead — it reads in its own context and returns a conclusion, keeping file contents out of your context. read_multiple_files is ONLY for when you are about to EDIT those files and need their exact content/line context, or the user explicitly asked to see the contents. **COST WARNING: the full contents land in YOUR context and are re-sent on every later round-trip.**",
       parameters: {
         type: "object",
         properties: {
