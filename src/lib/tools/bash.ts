@@ -5,6 +5,7 @@ import * as bcWasm from "../wasm/bc-wasm";
 import * as awkWasm from "../wasm/awk-wasm";
 import { bashPrintf } from "./printf";
 import { globToRegex } from "./glob";
+import { evalArithmetic } from "../math-eval";
 
 /** [Plan mode] block message for a bash command that would modify the filesystem. */
 function planReadOnlyMsg(cmd: string): string {
@@ -1651,15 +1652,13 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
         }
       }
 
-      // --- expr command: simple integer expression evaluator (kept as-is) ---
+      // --- expr command: simple integer expression evaluator ---
       const calcExpr = rest.join(" ").trim();
       if (!calcExpr) return { ok: false, output: "expr: missing expression" };
 
-      // Sanitize: allow only numbers, operators, parens, whitespace
-      const sanitized = calcExpr.replace(/[^0-9+\-*/%()\s]/g, "");
-      if (!sanitized.trim()) return { ok: false, output: "expr: missing expression" };
       try {
-        const result = Function(`"use strict"; return (${sanitized})`)();
+        // 安全解析器（无 eval）：只接受数字、+ - * / % ^、括号
+        const result = evalArithmetic(calcExpr);
         return { ok: true, output: String(result) };
       } catch {
         return { ok: false, output: "expr: expression evaluation failed" };

@@ -8,7 +8,7 @@
 
 import type { ToolResult } from "./types";
 import { apiKeyVault } from "@/lib/api-key-vault";
-import { fetchUrl, classifyNetworkError, searchWeb, DEFAULT_SEARCH_API_KEY } from "@/lib/web";
+import { fetchUrl, classifyNetworkError, searchWeb } from "@/lib/web";
 import { useSession } from "@/store/session";
 
 // ---------------------------------------------------------------------------
@@ -30,8 +30,19 @@ export async function toolWebSearch(
 
   const maxResults = Math.min(Math.max(Number(args.max_results) || 5, 1), 10);
 
-  // Get search API key — user-configured key takes precedence over built-in default
-  const searchKey = apiKeyVault.getSearchKey() || DEFAULT_SEARCH_API_KEY;
+  // Search API key — user-configured only (no built-in default).
+  // 未配置时诚实告知，而不是用无效 key 报出难懂的 401。
+  const searchKey = apiKeyVault.getSearchKey();
+  if (!searchKey) {
+    return {
+      ok: false,
+      output:
+        "web_search: 未配置搜索 API Key。请在 Settings → Web & Search 中填写你的 Tavily 或 Brave API Key " +
+        "（Tavily 免费注册：https://tavily.com）。配置前 web_search 不可用；可改用 fetch_url 直接抓取网页。",
+      tool: "web_search",
+      args,
+    };
+  }
 
   // Get the configured provider
   const config = useSession.getState().config;
@@ -152,7 +163,7 @@ export async function toolFetchUrl(
           `⚠️ **无法获取该网页** — 浏览器安全限制（CORS）\n\n` +
           `"${url}" 不允许跨域请求。\n\n` +
           `**建议：**\n` +
-          `1. 改用 \`web_search\` 搜索相关信息（内置搜索 Key，开箱即用）\n` +
+          `1. 改用 \`web_search\` 搜索相关信息（需先在 Settings → Web & Search 配置搜索 API Key）\n` +
           `2. 检查 Settings → Web & Search 中的 "Use Jina AI Reader" 是否已开启（默认开启，免费无需 Key）\n` +
           `3. 如果自己有 CORS 代理，可在 Settings → Web & Search 中配置`,
         tool: "fetch_url",

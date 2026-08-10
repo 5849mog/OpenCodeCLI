@@ -9,12 +9,11 @@
  */
 
 // ---------------------------------------------------------------------------
-// Default API key — built-in so web_search works out of the box.
-// This is a Tavily dev key with free-tier limits (~1000 queries/month).
-// Users can override it in Settings → Web & Search with their own key.
+// Search API key — no built-in default. Users configure their own key in
+// Settings → Web & Search (Tavily dev keys are free: https://tavily.com).
+// Without a configured key, web_search returns a clear "please configure"
+// message instead of failing cryptically.
 // ---------------------------------------------------------------------------
-
-export const DEFAULT_SEARCH_API_KEY = "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";
 
 // ---------------------------------------------------------------------------
 // Types

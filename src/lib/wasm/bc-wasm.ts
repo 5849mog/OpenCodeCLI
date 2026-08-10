@@ -5,8 +5,10 @@
  * 工厂函数注册到 window.BCModule，全程不经过打包器模块解析。
  *
  * 每次求值创建一个新的 wasm 实例（wasm Module 预编译缓存，仅实例化）。
- * 降级: wasm 不可用时自动回退到 JS 实现。
+ * 降级: wasm 不可用时自动回退到 JS 实现（evalArithmetic 安全解析器，无 eval）。
  */
+
+import { evalArithmetic } from "../math-eval";
 
 let wasmBinary: ArrayBuffer | null = null;
 let bcFactory: ((opts: Record<string, unknown>) => Promise<Record<string, unknown>>) | null = null;
@@ -142,22 +144,15 @@ function jsFallback(expr: string, stdin?: string): InstanceResult {
     calcExpr = calcExpr.replace(/\bscale\s*=\s*\d+\s*[;,]\s*/g, '');
   }
 
-  calcExpr = calcExpr
-    .replace(/\^/g, '**')
-    .replace(/\bsqrt\s*\(/g, 'Math.sqrt(')
-    .replace(/(?<!\w)s\s*\(/g, 'Math.sin(')
-    .replace(/(?<!\w)c\s*\(/g, 'Math.cos(')
-    .replace(/(?<!\w)a\s*\(/g, 'Math.atan(')
-    .replace(/(?<!\w)l\s*\(/g, 'Math.log(')
-    .replace(/(?<!\w)e\s*\(/g, 'Math.exp(')
-    .replace(/\bpi\b/gi, 'Math.PI')
-    .replace(/\b(length|ibase|obase)\s*[=\(\s]/gi, '');
-
-  const sanitized = calcExpr.replace(/[^0-9+\-*/().%\sa-zA-Z.]/g, '');
-  if (!sanitized.trim()) return { ok: false, output: 'bc: missing expression' };
-
   try {
-    const result = Function('"use strict"; return (' + sanitized + ')')();
+    // 安全解析器（无 eval）：数字 + 运算符 + 显式注册的数学函数/常量
+    const result = evalArithmetic(calcExpr, {
+      functions: {
+        sqrt: Math.sqrt, s: Math.sin, c: Math.cos, a: Math.atan,
+        l: Math.log, e: Math.exp, abs: Math.abs, floor: Math.floor, ceil: Math.ceil,
+      },
+      constants: { pi: Math.PI },
+    });
     if (calcScale > 0) {
       return { ok: true, output: (result as number).toFixed(calcScale) };
     }
