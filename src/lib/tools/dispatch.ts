@@ -106,23 +106,27 @@ async function toolRunLua(args: Record<string, unknown>, readOnly = false): Prom
     outputs: outputs.length > 0 ? outputs : undefined,
   });
 
-  // outputs 写回 VFS + 摘要（全文不进上下文，需要内容用 read_file）
-  if (result.written && Object.keys(result.written).length > 0) {
-    for (const [path, content] of Object.entries(result.written)) {
+  // outputs 写回 VFS + 摘要（全文不进上下文，需要内容用 read_file）。
+  // 声明了 outputs 就必走摘要格式：写回数 0 时也要列出「未产生」。
+  if (outputs.length > 0) {
+    const writtenEntries = result.written ?? {};
+    for (const [path, content] of Object.entries(writtenEntries)) {
       vfs.writeFileSync(path, content);
     }
-    const lines = Object.entries(result.written)
+    const lines = Object.entries(writtenEntries)
       .map(([p, c]) => `  - ${p} (${c.length.toLocaleString()} chars, ${c.split("\n").length} lines)`)
       .join("\n");
-    const missing = outputs.filter((p) => !(p in (result.written ?? {})));
+    const missing = outputs.filter((p) => !(p in writtenEntries));
     const missingNote = missing.length > 0 ? `\n  未产生: ${missing.join(", ")}` : "";
+    const count = Object.keys(writtenEntries).length;
     return {
       ok: true,
-      output:
-        `✓ 已写回 ${Object.keys(result.written).length} 个文件（全文未回传，需要内容用 read_file 读取）：\n${lines}${missingNote}`,
+      output: count > 0
+        ? `✓ 已写回 ${count} 个文件（全文未回传，需要内容用 read_file 读取）：\n${lines}${missingNote}`
+        : `⚠ 未写回任何文件（全文未回传）${missingNote}`,
       tool: "run_lua",
       args,
-      mutated: true,
+      mutated: count > 0,
     };
   }
   return { ok: result.ok, output: result.output, tool: "run_lua", args };

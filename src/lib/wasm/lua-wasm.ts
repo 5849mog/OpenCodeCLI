@@ -169,6 +169,13 @@ async function createInstance(script: string, opts: Omit<LuaOptions, "script">):
     FS.writeFile('input.txt', inputBuf);
   }
 
+  // outputs 预建父目录：Lua io.open(path,'w') → C fopen 需要父目录存在，
+  // MEMFS 里没有不会自动建（Lua 标准库无 mkdir）——否则写模式返回 nil
+  // （2026-08 部署实测：out/summary.csv 写失败，big.txt 根目录写成功）。
+  for (const outPath of opts.outputs ?? []) {
+    ensureParentDirs(FS, outPath);
+  }
+
   // script 作为 MEMFS 文件执行（lua script.lua）——不走 -e 选项（选项解析会
   // 碰脚本内容，'--' 开头的注释脚本会被误判为命令行选项）。最后写入，避免
   // 与 files/input.txt 同名时被覆盖。args 追加到 argv（脚本读 arg[1..]）。
