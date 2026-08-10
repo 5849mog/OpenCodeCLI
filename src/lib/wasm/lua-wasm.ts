@@ -9,16 +9,17 @@
  * 只报「原生引擎不可用」，不假意执行——半吊子解释器会静默产出错误结果）。
  *
  * 输入编排（匹配真实 lua 语义）：
- *   - script 经 `-e` 传入（如 lua -e 'print(6*7)'）
+ *   - script 写成 MEMFS 文件后以 `lua script.lua` 执行（位置参数，不走选项解析）：
+ *     若用 `-e`，选项解析器会碰脚本内容——'--' 开头的注释脚本会被误判为
+ *     命令行选项，报 `'-e' needs argument`（2026-08 实测踩坑）
  *   - stdin 提供两条路，但**绝不进 argv**：
  *     ① emscripten stdin 回调喂字节 → 脚本 `io.read("*a")` / `io.lines()` 可读
  *     ② 写入 MEMFS 的 input.txt → 脚本 `io.open("input.txt")` 可读
- *     注意：不能把 input.txt 放进 argv——lua -e 'code' input.txt 会把
- *     第一个非选项参数当脚本执行（2026-08 实测踩坑：input 内容被当 Lua 跑）
+ *     注意：不能把 input.txt 放进 argv——lua 会把第一个非选项参数当脚本执行
  *   - files 注入工作区文件只读副本（路径 → 内容，写 MEMFS 同名文件）：
  *     脚本 `io.open(path)` 读到的只是内存副本；写操作（io.open 'w' / os.remove）
  *     也只改 MEMFS 副本，摸不到真实 VFS。VFS 读取由调用方（dispatch 层）完成。
- *   - 无 stdin → 空 stdin，argv 只有 -e script
+ *   - 无 stdin → 空 stdin，argv 只有 script.lua
  *
  * 权限边界（严格，与 system-prompt 一致）：
  *   纯内存计算。不改 VFS、不访问网络、不持久化。
@@ -156,7 +157,12 @@ async function createInstance(script: string, opts: Omit<LuaOptions, "script">):
     // 绝不放进 argv——lua 会把第一个非选项参数当脚本执行（见文件头注释）。
     FS.writeFile('input.txt', inputBuf);
   }
-  callMain(['-e', script]);
+
+  // script 作为 MEMFS 文件执行（lua script.lua）——不走 -e 选项（选项解析会
+  // 碰脚本内容，'--' 开头的注释脚本会被误判为命令行选项）。最后写入，避免
+  // 与 files/input.txt 同名时被覆盖。
+  FS.writeFile('script.lua', new TextEncoder().encode(script));
+  callMain(['script.lua']);
 
   const errOutput = stderr.join('\n').trim();
   if (errOutput) return { ok: false, output: errOutput };
