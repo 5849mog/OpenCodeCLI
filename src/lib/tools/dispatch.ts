@@ -10,13 +10,66 @@ import { toolZipArchive, toolUnzipArchive } from "./zip";
 import * as luaWasm from "../wasm/lua-wasm";
 import { vfs } from "../vfs";
 
-/** run_lua 工具：纯内存 Lua 计算（不改 VFS、不联网、不持久化），任何模式都可用。
- *  files 参数：AI 显式指定要读取的工作区文件（只传路径不传内容），dispatch 层读 VFS，
- *  经桥接层注入 MEMFS 只读副本供脚本 io.open 读取——脚本碰不到真实工作区。 */
-async function toolRunLua(args: Record<string, unknown>): Promise<ToolResult> {
-  const script = String(args.script ?? "").trim();
-  if (!script) return { ok: false, output: "run_lua: missing script", tool: "run_lua", args };
+/** run_lua 工具：内存 Lua 计算 + 受限写回。
+ *  - files：AI 显式指定读取的工作区文件（只传路径），dispatch 层读 VFS，
+ *    经桥接层注入 MEMFS 只读副本供脚本 io.open 读取
+ *  - script_file：指定工作区 .lua 脚本文件直接运行（脚本资产化）
+ *  - outputs：写回白名单——脚本 io.open(path,'w') 写 MEMFS，求值后白名单内
+ *    路径同步回 VFS；回传摘要而非全文；mutated → undo 可撤销；
+ *    Plan 模式带 outputs 拦截（只读）
+ *  - args：传给脚本的 argv（脚本读 arg[1..]） */
+async function toolRunLua(args: Record<string, unknown>, readOnly = false): Promise<ToolResult> {
+  // script 内联文本 与 script_file 二选一
+  const scriptText = String(args.script ?? "");
+  const scriptFile = args.script_file !== undefined ? String(args.script_file) : undefined;
+  if (scriptText.trim() && scriptFile) {
+    return { ok: false, output: "run_lua: script 与 script_file 只能二选一", tool: "run_lua", args };
+  }
+  let script = scriptText.trim();
+  if (scriptFile) {
+    const sc = vfs.readFileSync(scriptFile);
+    if (sc === null) return { ok: false, output: `run_lua: 脚本文件不存在: ${scriptFile}`, tool: "run_lua", args };
+    script = sc;
+  }
+  if (!script.trim()) return { ok: false, output: "run_lua: missing script", tool: "run_lua", args };
   const stdin = args.input !== undefined ? String(args.input) : undefined;
+
+  // args：兼容 string 或 string[]
+  const luaArgs = args.args !== undefined
+    ? (Array.isArray(args.args) ? args.args.map((a) => String(a)) : [String(args.args)])
+    : undefined;
+
+  // outputs 白名单：去重、限数量、限工作区相对路径
+  const outputs: string[] = [];
+  const outputsArg = args.outputs;
+  if (outputsArg !== undefined) {
+    const list = Array.isArray(outputsArg) ? outputsArg.map((p) => String(p)) : [String(outputsArg)];
+    const seen = new Set<string>();
+    for (const p of list) {
+      if (seen.has(p)) continue;
+      seen.add(p);
+      if (outputs.length >= luaWasm.MAX_INJECTED_FILES) {
+        return { ok: false, output: `run_lua: outputs 超过上限 ${luaWasm.MAX_INJECTED_FILES}`, tool: "run_lua", args };
+      }
+      if (p.startsWith("/") || p.includes("..")) {
+        return { ok: false, output: `run_lua: outputs 必须是工作区相对路径: ${p}`, tool: "run_lua", args };
+      }
+      outputs.push(p);
+    }
+  }
+
+  // Plan 模式：带 outputs（写回）→ 拦截（run_lua 从纯计算变为可写工具）
+  if (readOnly && outputs.length > 0) {
+    return {
+      ok: false,
+      output:
+        "[Plan mode] run_lua with outputs (file writes) is blocked in Plan mode. " +
+        "In Plan mode you can only READ and ANALYZE — propose your plan in text, " +
+        "and the user will switch to Bypass mode to let you execute it.",
+      tool: "run_lua",
+      args,
+    };
+  }
 
   // files：兼容 string 或 string[]；缺失/超限 fail-fast，不静默跳过（免得脚本算出错误结果）
   const files: Record<string, string> = {};
@@ -45,7 +98,33 @@ async function toolRunLua(args: Record<string, unknown>): Promise<ToolResult> {
     }
   }
 
-  const result = await luaWasm.evaluate({ script, stdin, files });
+  const result = await luaWasm.evaluate({
+    script,
+    stdin,
+    files,
+    args: luaArgs,
+    outputs: outputs.length > 0 ? outputs : undefined,
+  });
+
+  // outputs 写回 VFS + 摘要（全文不进上下文，需要内容用 read_file）
+  if (result.written && Object.keys(result.written).length > 0) {
+    for (const [path, content] of Object.entries(result.written)) {
+      vfs.writeFileSync(path, content);
+    }
+    const lines = Object.entries(result.written)
+      .map(([p, c]) => `  - ${p} (${c.length.toLocaleString()} chars, ${c.split("\n").length} lines)`)
+      .join("\n");
+    const missing = outputs.filter((p) => !(p in (result.written ?? {})));
+    const missingNote = missing.length > 0 ? `\n  未产生: ${missing.join(", ")}` : "";
+    return {
+      ok: true,
+      output:
+        `✓ 已写回 ${Object.keys(result.written).length} 个文件（全文未回传，需要内容用 read_file 读取）：\n${lines}${missingNote}`,
+      tool: "run_lua",
+      args,
+      mutated: true,
+    };
+  }
   return { ok: result.ok, output: result.output, tool: "run_lua", args };
 }
 
@@ -101,7 +180,7 @@ export async function dispatchTool(
       case "unzip_archive":
         return await toolUnzipArchive(args);
       case "run_lua":
-        return await toolRunLua(args);
+        return await toolRunLua(args, opts?.readOnly ?? false);
       case "web_search":
         return await toolWebSearch(args);
       case "fetch_url":

@@ -108,11 +108,18 @@ export interface LuaOptions {
   /** 工作区文件只读副本：路径 → 内容，写入 MEMFS 同名文件，脚本 io.open(path) 读取。
    *  只读——脚本写这些路径只改内存副本，摸不到真实 VFS。 */
   files?: Record<string, string>;
+  /** 传给脚本的 argv（脚本读 arg[1..]），如 ["--mode=fast"] */
+  args?: string[];
+  /** 写回白名单：求值后把 MEMFS 中这些路径的内容同步回 VFS（写回由调用方完成）。
+   *  未声明的路径不同步（跑完即毁）；脚本未写的路径由调用方摘要注明「未产生」。 */
+  outputs?: string[];
 }
 
 export interface LuaResult {
   ok: boolean;
   output: string;
+  /** outputs 白名单内、脚本实际写出的文件（路径 → 内容），由调用方同步回 VFS */
+  written?: Record<string, string>;
 }
 
 /** mkdir -p 父目录，让 FS.writeFile 支持嵌套文件名（如 "src/util.ts"）。 */
@@ -142,7 +149,11 @@ async function createInstance(script: string, opts: Omit<LuaOptions, "script">):
     locateFile: (path: string) => wasmUrl(path),
   })) as Record<string, unknown>;
 
-  const FS = inst.FS as { writeFile(p: string, d: Uint8Array): void; mkdir(p: string): void };
+  const FS = inst.FS as {
+    writeFile(p: string, d: Uint8Array): void;
+    mkdir(p: string): void;
+    readFile(p: string): Uint8Array;
+  };
   const callMain = inst.callMain as (args: string[]) => void;
 
   // files → MEMFS 只读副本（先建父目录）。脚本对这些路径的写操作只改副本，
@@ -160,9 +171,26 @@ async function createInstance(script: string, opts: Omit<LuaOptions, "script">):
 
   // script 作为 MEMFS 文件执行（lua script.lua）——不走 -e 选项（选项解析会
   // 碰脚本内容，'--' 开头的注释脚本会被误判为命令行选项）。最后写入，避免
-  // 与 files/input.txt 同名时被覆盖。
+  // 与 files/input.txt 同名时被覆盖。args 追加到 argv（脚本读 arg[1..]）。
   FS.writeFile('script.lua', new TextEncoder().encode(script));
-  callMain(['script.lua']);
+  callMain(['script.lua', ...(opts.args ?? [])]);
+
+  // outputs 白名单：求值后读 MEMFS 内容回传（超限报错不静默截断；脚本未写
+  // 的路径跳过，由调用方摘要注明「未产生」）
+  const written: Record<string, string> = {};
+  for (const outPath of opts.outputs ?? []) {
+    let bytes: Uint8Array;
+    try {
+      bytes = FS.readFile(outPath) as Uint8Array;
+    } catch {
+      continue; // 脚本未写该路径
+    }
+    const content = new TextDecoder().decode(bytes);
+    if (content.length > MAX_FILE_BYTES) {
+      return { ok: false, output: `run_lua: 输出文件过大(>${MAX_FILE_BYTES.toLocaleString()} 字符): ${outPath}` };
+    }
+    written[outPath] = content;
+  }
 
   const errOutput = stderr.join('\n').trim();
   if (errOutput) return { ok: false, output: errOutput };
@@ -175,7 +203,7 @@ async function createInstance(script: string, opts: Omit<LuaOptions, "script">):
       `(${outOutput.split('\n').length} lines) — ` +
       `re-run with a more selective script for full result]`;
   }
-  return { ok: true, output: outOutput || '(no output)' };
+  return { ok: true, output: outOutput || '(no output)', written };
 }
 
 // ─── 公开 API ─────────────────────────────────────────────────────

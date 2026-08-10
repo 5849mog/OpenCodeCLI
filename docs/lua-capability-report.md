@@ -37,6 +37,16 @@
 | 27   | files 写入隔离 | 脚本 `io.open(path,'w')` 只改 MEMFS 副本，VFS 原文件不变 | 脚本写入 `HACKED` 后 read_file 读回原内容，VFS 未污染 | ✅ |
 | 28   | files 超限 | 文件数 >20 或单文件 >200KB → ok:false 列明原因 | `文件过大(>200,000 字符): big.txt`（233KB，脚本未执行） | ✅ |
 | 29   | 脚本以 `--` 开头 | `-- 注释` 开头的脚本正常运行（脚本作为 MEMFS 文件执行，不走 -e 选项解析） | `--`/前导空格/块注释/`-` 开头 4 种均正常（旧版全报 `'-e' needs argument`） | ✅ |
+| 30   | script_file 直接跑脚本 | `write_file` 写 tools/filter.lua → `run_lua({script_file:'tools/filter.lua'})` 直接执行 | 部署后实测 | ⏳ |
+| 31   | script_file 缺失 | `script_file:'nope.lua'` → ok:false「脚本文件不存在」 | 部署后实测 | ⏳ |
+| 32   | script 与 script_file 互斥 | 同时传 → ok:false「只能二选一」 | 部署后实测 | ⏳ |
+| 33   | args 参数化 | 脚本读 arg[1..]，同一脚本换参复用 | 部署后实测 | ⏳ |
+| 34   | outputs 写回 | outputs=['result.csv']，脚本 io.open 写 → VFS 出现该文件，回传摘要（路径/大小/行数）而非全文 | 部署后实测 | ⏳ |
+| 35   | outputs 白名单 | 脚本写未声明路径 → 不同步（VFS 无此文件） | 部署后实测 | ⏳ |
+| 36   | outputs 未产生 | 声明了但脚本没写 → 摘要注明「未产生」 | 部署后实测 | ⏳ |
+| 37   | outputs 超限 | 单文件 >200KB → ok:false「输出文件过大」 | 部署后实测 | ⏳ |
+| 38   | outputs Plan 拦截 | Plan 模式下带 outputs 的 run_lua → blocked | 代码层确认 + 部署实测 | ⏳ |
+| 39   | outputs undo | 写回后 undo_edit 可撤销 | 部署后实测 | ⏳ |
 
 ## BUG 记录（2026-08-10 实测发现并修复）
 
