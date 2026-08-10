@@ -27,10 +27,15 @@
 | 17   | 大输出截断 | 超 20k 字符给截断提示 | `truncated at 20,000 chars; original 48,892` | ✅ |
 | 18   | 空脚本 | `run_lua({script:""})` → 提示 missing script | `run_lua: missing script` | ✅ |
 | 19   | 无 input 时 io.read | `io.read('*a')` 返回空 | `EMPTY`（无 input 时空输入） | ✅ |
-| 20   | 权限边界：VFS 只读 | 脚本内访问文件/路径 → 无此能力 | `io.open("/etc/passwd")` → `open failed` | ✅ |
+| 20   | 权限边界：VFS 只读 | 未注入的 VFS 路径不可达（只能读 files 参数注入的副本） | `io.open("/etc/passwd")` → `open failed`；未列出的 `src/...` 同样不可达 | ✅ |
 | 21   | 权限边界：无网络 | 脚本内发起请求 → 无此能力 | `socket`/`http` 均 nil，`require` 报 not found | ✅ |
 | 22   | Plan 模式可用性 | run_lua 在 Plan 模式可调用（纯计算非变更） | 代码层确认：不在 Plan 模式 mutating 拦截集合 | ✅ |
 | 23   | 降级路径 | wasm 未加载时返回「原生引擎不可用」而非假执行 | 本地 dispatch 全链路测试产出该信息 | ✅ |
+| 24   | files 读取：`io.open(path)` | `files=['data.csv']`，脚本读到工作区文件真实内容 | 部署后实测 | ⏳ |
+| 25   | files 嵌套路径 | `files=['src/util.ts']`，io.open 可读（父目录自动创建） | 部署后实测 | ⏳ |
+| 26   | files 缺失文件 | `files=['nope.txt']` → ok:false 列明缺失，不运行脚本 | 部署后实测 | ⏳ |
+| 27   | files 写入隔离 | 脚本 `io.open(path,'w')` 只改 MEMFS 副本，VFS 原文件不变 | 部署后实测 | ⏳ |
+| 28   | files 超限 | 文件数 >20 或单文件 >200KB → ok:false 列明原因 | 部署后实测 | ⏳ |
 
 ## BUG 记录（2026-08-10 实测发现并修复）
 

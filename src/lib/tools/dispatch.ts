@@ -8,13 +8,44 @@ import { toolAskUserInput } from "./user-input";
 import { toolWebSearch, toolFetchUrl } from "./web";
 import { toolZipArchive, toolUnzipArchive } from "./zip";
 import * as luaWasm from "../wasm/lua-wasm";
+import { vfs } from "../vfs";
 
-/** run_lua 工具：纯内存 Lua 计算（不改 VFS、不联网、不持久化），任何模式都可用。 */
+/** run_lua 工具：纯内存 Lua 计算（不改 VFS、不联网、不持久化），任何模式都可用。
+ *  files 参数：AI 显式指定要读取的工作区文件（只传路径不传内容），dispatch 层读 VFS，
+ *  经桥接层注入 MEMFS 只读副本供脚本 io.open 读取——脚本碰不到真实工作区。 */
 async function toolRunLua(args: Record<string, unknown>): Promise<ToolResult> {
   const script = String(args.script ?? "").trim();
   if (!script) return { ok: false, output: "run_lua: missing script", tool: "run_lua", args };
   const stdin = args.input !== undefined ? String(args.input) : undefined;
-  const result = await luaWasm.evaluate({ script, stdin });
+
+  // files：兼容 string 或 string[]；缺失/超限 fail-fast，不静默跳过（免得脚本算出错误结果）
+  const files: Record<string, string> = {};
+  const filesArg = args.files;
+  if (filesArg !== undefined) {
+    const paths = Array.isArray(filesArg) ? filesArg.map((p) => String(p)) : [String(filesArg)];
+    const problems: string[] = [];
+    const seen = new Set<string>();
+    for (const p of paths) {
+      if (seen.has(p)) continue; // 去重
+      seen.add(p);
+      if (Object.keys(files).length >= luaWasm.MAX_INJECTED_FILES) {
+        problems.push(`文件数超过上限 ${luaWasm.MAX_INJECTED_FILES}`);
+        break;
+      }
+      const content = vfs.readFileSync(p);
+      if (content === null) { problems.push(`文件不存在: ${p}`); continue; }
+      if (content.length > luaWasm.MAX_FILE_BYTES) {
+        problems.push(`文件过大(>${luaWasm.MAX_FILE_BYTES.toLocaleString()} 字符): ${p}`);
+        continue;
+      }
+      files[p] = content;
+    }
+    if (problems.length > 0) {
+      return { ok: false, output: `run_lua: 无法读取指定文件 — ${problems.join("；")}`, tool: "run_lua", args };
+    }
+  }
+
+  const result = await luaWasm.evaluate({ script, stdin, files });
   return { ok: result.ok, output: result.output, tool: "run_lua", args };
 }
 

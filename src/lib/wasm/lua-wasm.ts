@@ -15,6 +15,9 @@
  *     ② 写入 MEMFS 的 input.txt → 脚本 `io.open("input.txt")` 可读
  *     注意：不能把 input.txt 放进 argv——lua -e 'code' input.txt 会把
  *     第一个非选项参数当脚本执行（2026-08 实测踩坑：input 内容被当 Lua 跑）
+ *   - files 注入工作区文件只读副本（路径 → 内容，写 MEMFS 同名文件）：
+ *     脚本 `io.open(path)` 读到的只是内存副本；写操作（io.open 'w' / os.remove）
+ *     也只改 MEMFS 副本，摸不到真实 VFS。VFS 读取由调用方（dispatch 层）完成。
  *   - 无 stdin → 空 stdin，argv 只有 -e script
  *
  * 权限边界（严格，与 system-prompt 一致）：
@@ -30,6 +33,11 @@ let initPromise: Promise<boolean> | null = null;
 
 /** Max chars allowed from a single lua evaluation. Prevents AI context overflow. */
 const MAX_LUA_OUTPUT_LENGTH = 20_000;
+
+/** files 注入防护：最多 20 个文件、单文件 ≤200KB（超限直接报错，不静默截断——
+ *  截断数据会让脚本算出错误结果，不如明说）。dispatch 层复用同一组常量。 */
+export const MAX_INJECTED_FILES = 20;
+export const MAX_FILE_BYTES = 200_000;
 
 // ─── 路径解析 ────────────────────────────────────────────────────
 
@@ -96,11 +104,24 @@ export interface LuaOptions {
   script: string;
   /** 管道输入（stdin）：脚本可用 io.read("*a") / io.lines() 读，或 io.open("input.txt") 读 */
   stdin?: string;
+  /** 工作区文件只读副本：路径 → 内容，写入 MEMFS 同名文件，脚本 io.open(path) 读取。
+   *  只读——脚本写这些路径只改内存副本，摸不到真实 VFS。 */
+  files?: Record<string, string>;
 }
 
 export interface LuaResult {
   ok: boolean;
   output: string;
+}
+
+/** mkdir -p 父目录，让 FS.writeFile 支持嵌套文件名（如 "src/util.ts"）。 */
+function ensureParentDirs(fs: { mkdir(p: string): void }, path: string): void {
+  const parts = path.split('/').filter(Boolean);
+  let cur = '';
+  for (let k = 0; k < parts.length - 1; k++) {
+    cur += '/' + parts[k];
+    try { fs.mkdir(cur); } catch { /* 已存在 */ }
+  }
 }
 
 async function createInstance(script: string, opts: Omit<LuaOptions, "script">): Promise<LuaResult> {
@@ -120,8 +141,15 @@ async function createInstance(script: string, opts: Omit<LuaOptions, "script">):
     locateFile: (path: string) => wasmUrl(path),
   })) as Record<string, unknown>;
 
-  const FS = inst.FS as { writeFile(p: string, d: Uint8Array): void };
+  const FS = inst.FS as { writeFile(p: string, d: Uint8Array): void; mkdir(p: string): void };
   const callMain = inst.callMain as (args: string[]) => void;
+
+  // files → MEMFS 只读副本（先建父目录）。脚本对这些路径的写操作只改副本，
+  // 摸不到真实 VFS。
+  for (const [path, content] of Object.entries(opts.files ?? {})) {
+    ensureParentDirs(FS, path);
+    FS.writeFile(path, new TextEncoder().encode(content));
+  }
 
   if (inputBuf !== null) {
     // stdin 走 io.read('*a')/io.lines()；同时写 MEMFS input.txt 供 io.open("input.txt")。
