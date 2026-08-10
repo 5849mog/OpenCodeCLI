@@ -344,13 +344,13 @@ export function SettingsDialog({
                   {showSearchKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              {config.hasSearchKey && !searchKeyDirty ? (
+              {apiKeyVault.hasSearchKey() && !searchKeyDirty ? (
                 <div className="mt-1 text-[11px] text-[#D97757]">
                   ✓ 已配置自定义 Key（加密存储在 sessionStorage）
                 </div>
-              ) : !config.hasSearchKey && !searchKeyDirty && !searchKeyInput ? (
+              ) : !apiKeyVault.hasSearchKey() && !searchKeyDirty && !searchKeyInput ? (
                 <div className="mt-1 text-[11px] text-[#8B8884]">
-                  ℹ️ 内置 Tavily 开发密钥已生效（每月约 1000 次查询）
+                  未配置搜索 API Key — web_search 暂不可用。填入上方的 Tavily 或 Brave Key 后即可开启（两者都有免费额度）。
                 </div>
               ) : null}
             </Field>
@@ -429,7 +429,7 @@ export function SettingsDialog({
             {config.hasSearchKey ? (
               <span className="text-[#D97757]">● Search configured</span>
             ) : (
-              <span className="text-[#8B8884]">● Built-in search key</span>
+              <span className="text-[#8B8884]">● No search key</span>
             )}
           </div>
           <button
