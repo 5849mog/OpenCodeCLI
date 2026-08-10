@@ -73,19 +73,30 @@ BROWSER_FLAGS=(
 echo "[1/4] Fetching GNU sed ${SED_VERSION}..."
 tarball="$BUILD_DIR/sed-${SED_VERSION}.tar.xz"
 if [ ! -f "$tarball" ]; then
-  curl -fsSL "$SED_TARBALL_URL" -o "$tarball" || curl -fsSL "$SED_TARBALL_MIRROR" -o "$tarball"
+  # 每个镜像限时 180s：ftp.gnu.org 偶发慢/断，快速失败换镜像，不无限等
+  timeout 180 curl -fsSL --max-time 170 "$SED_TARBALL_URL" -o "$tarball" || \
+    timeout 180 curl -fsSL --max-time 170 "$SED_TARBALL_MIRROR" -o "$tarball" || \
+    { echo "ERROR: sed tarball download failed (both URLs)"; exit 1; }
 fi
 rm -rf "$SOURCE_DIR"
 mkdir -p "$SOURCE_DIR"
 tar xf "$tarball" -C "$SOURCE_DIR" --strip-components=1
 
-echo "[2/4] Configuring GNU sed (emconfigure, cross-compile mode)..."
+echo "[2/4] Configuring GNU sed (emconfigure, cross-compile mode, timeout 900s)..."
 cd "$SOURCE_DIR"
-emconfigure ./configure \
+# 不 --quiet：configure 卡住时日志能看到最后一条 "checking for ..." 精确定位。
+# timeout 900：configure 病态卡死时 15 分钟快速失败（exit 124），不再无限等。
+timeout 900 emconfigure ./configure \
   --host=wasm32-unknown-emscripten \
+  --build=x86_64-pc-linux-gnu \
   --disable-nls --disable-i18n --disable-acl --without-selinux \
-  --disable-dependency-tracking --quiet \
-  CFLAGS="-O2"
+  --disable-dependency-tracking \
+  CFLAGS="-O2" || {
+    echo ""
+    echo "ERROR: configure failed or timed out (exit $?)."
+    echo "  Log 的最后一条 'checking for ...' 就是卡点，贴回仓库迭代。"
+    exit 1
+  }
 
 echo "[3/4] Compiling (emmake make, timeout=${GNU_PATH_TIMEOUT}s)..."
 timeout "$GNU_PATH_TIMEOUT" emmake make -j"$(nproc 2>/dev/null || echo 4)" >/dev/null
