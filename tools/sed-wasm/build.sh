@@ -103,10 +103,18 @@ timeout "$GNU_PATH_TIMEOUT" emmake make -j"$(nproc 2>/dev/null || echo 4)" >/dev
 
 echo "[4/4] Linking + smoke..."
 SED_OBJS="$(find sed -maxdepth 1 -name '*.o' | tr '\n' ' ') lib/libgnu.a"
-if [ -z "$SED_OBJS" ]; then echo "ERROR: no sed objects found"; exit 1; fi
+echo "  objects: $SED_OBJS"
+if [ -z "$SED_OBJS" ] || [ ! -f "lib/libgnu.a" ]; then
+  echo "ERROR: sed objects or lib/libgnu.a not found (make 产物缺失)"
+  find sed -maxdepth 1 -name '*.o' 2>/dev/null
+  exit 1
+fi
 
-# node 冒烟（硬门槛）
-emcc $SED_OBJS -lm -s ENVIRONMENT=node -s EXIT_RUNTIME=1 -o "$BUILD_DIR/sed-smoke.js" 2>/dev/null
+# node 冒烟（硬门槛）——emcc 报错必须可见（此前 2>/dev/null 吞掉了链接错误）
+if ! emcc $SED_OBJS -lm -s ENVIRONMENT=node -s EXIT_RUNTIME=1 -o "$BUILD_DIR/sed-smoke.js"; then
+  echo "ERROR: sed smoke link failed (see emcc output above — 多半是 undefined symbol)"
+  exit 1
+fi
 
 smoke() {
   local pipe="$1" expect="$2"
@@ -123,8 +131,11 @@ smoke "hi"     "bye"    's/hi/bye/'
 smoke "abc123" "abcNUM" -E 's/([0-9]+)/NUM/'
 smoke "abc"    "xyz"    'y/abc/xyz/'
 
-# 浏览器产物
-emcc $SED_OBJS "${BROWSER_FLAGS[@]}" -o "$OUT_DIR/sed.js"
+# 浏览器产物（报错同样可见）
+if ! emcc $SED_OBJS "${BROWSER_FLAGS[@]}" -o "$OUT_DIR/sed.js"; then
+  echo "ERROR: sed browser link failed (see emcc output above)"
+  exit 1
+fi
 
 echo ""
 echo "=== Build complete ==="
