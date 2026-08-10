@@ -46,9 +46,11 @@ export function estimateConversationTokens(msgs: ChatMessage[]): number {
 }
 
 /**
- * Compress a tool result message: keep only the first line + a "[truncated]"
- * marker if it was longer. This drastically reduces tokens for old tool
- * results that the AI doesn't need verbatim anymore.
+ * Compress a tool result message: keep the tool name + success/fail status +
+ * the first line, with a "[truncated]" marker if it was longer. This drastically
+ * reduces tokens for old tool results that the AI doesn't need verbatim anymore,
+ * while retaining enough signal (which tool, did it work, first line of output)
+ * to be useful as summary input and for the AI to recall the flow.
  */
 export function compressToolResult(msg: ChatMessage): ChatMessage {
   if (msg.role !== "tool" || typeof msg.content !== "string") return msg;
@@ -56,9 +58,10 @@ export function compressToolResult(msg: ChatMessage): ChatMessage {
   if (content.length <= 200) return msg;
   const firstLine = content.split("\n")[0];
   const lineCount = content.split("\n").length;
+  const name = msg.name ? ` (${msg.name})` : "";
   return {
     ...msg,
-    content: `${firstLine}\n[... ${lineCount} lines truncated, ${content.length} chars total]`,
+    content: `[tool result${name} truncated]\n${firstLine}\n[... ${lineCount} lines truncated, ${content.length} chars total]`,
   };
 }
 

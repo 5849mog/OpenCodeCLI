@@ -122,7 +122,7 @@ npm run build
 | `/undo` | 撤销上一次 AI 文件编辑 |
 | `/diff` | 显示所有文件变更 |
 | `/run <command>` | 直接执行 Bash（不经过 AI） |
-| `/compact` | 压缩对话历史，释放上下文 |
+| `/compact` | 用 LLM 把旧对话压缩为摘要，释放上下文（保留当前任务消息） |
 
 ---
 

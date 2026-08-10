@@ -13,7 +13,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { cmd: "/clear", desc: "Clear the session (keep workspace)" },
   { cmd: "/reset", desc: "Same as /clear" },
   { cmd: "/model <name>", desc: "Switch AI model without opening Settings" },
-  { cmd: "/compact", desc: "Compress conversation history to save tokens" },
+  { cmd: "/compact", desc: "LLM-summarize old conversation to free context (keeps current task)" },
   { cmd: "/export", desc: "Download the conversation as a Markdown file" },
   { cmd: "/cost", desc: "Estimate cumulative API cost" },
   { cmd: "/tokens", desc: "Show real token usage from the API" },

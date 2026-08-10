@@ -29,6 +29,7 @@ import {
 import { buildWorkspaceContext } from "@/lib/tools/system-prompt";
 import { vfs } from "@/lib/vfs";
 import { useVfsView } from "@/store/vfs-view";
+import { compactConversation } from "@/lib/compact";
 import {
   truncateConversation,
   DEFAULT_TOKEN_BUDGET,
@@ -242,6 +243,8 @@ interface SessionState {
   refreshSessionList: () => Promise<void>;
   abort: () => void;
   send: (text: string) => Promise<void>;
+  /** 真正的上下文压缩：LLM 摘要旧对话并写回 store（/compact 命令调用）。 */
+  compact: () => Promise<void>;
   toggleMode: () => void;
   setPendingQuestions: (data: QuestionPanelData | null) => void;
   setPendingDownload: (d: { blob: Blob; filename: string } | null) => void;
@@ -495,6 +498,83 @@ export const useSession = create<SessionState>((set, get) => ({
       streamingReasoning: null,
         agentIteration: 0,
       });
+    }
+  },
+
+  compact: async () => {
+    const { messages } = get();
+    if (messages.length < 4) {
+      useSession.setState((s) => ({
+        events: [
+          ...s.events,
+          {
+            id: nextId(),
+            kind: "system",
+            text: "对话太短，无需压缩（至少需要 4 条消息）。",
+            ts: Date.now(),
+          },
+        ],
+      }));
+      return;
+    }
+    if (!apiKeyVault.hasKey()) {
+      useSession.setState((s) => ({
+        events: [
+          ...s.events,
+          {
+            id: nextId(),
+            kind: "error",
+            text: "无法压缩：未配置 API Key。压缩需要调用模型生成摘要。",
+            ts: Date.now(),
+          },
+        ],
+      }));
+      return;
+    }
+    const config = get().config;
+    const aiConfig: AiClientConfig = {
+      baseUrl: config.baseUrl,
+      apiKey: apiKeyVault.getKey() ?? "",
+      model: config.model,
+      temperature: config.temperature,
+      maxTokens: config.maxTokens,
+      thinkingEnabled: config.thinkingEnabled,
+      reasoningEffort: config.reasoningEffort,
+    };
+    set({ agentStatus: "Compacting conversation…" });
+    try {
+      const result = await compactConversation(messages, aiConfig);
+      // 真写回 store——后续每一轮请求都发送压缩后的历史
+      set({
+        messages: result.messages,
+        truncated: false,
+        agentStatus: "",
+      });
+      const modeLabel = result.mode === "llm" ? "LLM 摘要" : "启发式压缩（摘要调用失败，已降级）";
+      useSession.setState((s) => ({
+        events: [
+          ...s.events,
+          {
+            id: nextId(),
+            kind: "system",
+            text: `已压缩对话历史（${modeLabel}）：${messages.length} 条消息 → ${result.messages.length} 条，释放约 ${((result.tokensBefore - result.tokensAfter) / 1000).toFixed(1)}K token（${result.tokensBefore.toLocaleString()} → ${result.tokensAfter.toLocaleString()}）。旧对话已浓缩为摘要。`,
+            ts: Date.now(),
+          },
+        ],
+      }));
+    } catch (e) {
+      set({ agentStatus: "" });
+      useSession.setState((s) => ({
+        events: [
+          ...s.events,
+          {
+            id: nextId(),
+            kind: "error",
+            text: `压缩失败：${e instanceof Error ? e.message : String(e)}。对话历史保持不变。`,
+            ts: Date.now(),
+          },
+        ],
+      }));
     }
   },
 

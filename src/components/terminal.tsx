@@ -243,20 +243,12 @@ export function Terminal() {
       case "compact": {
         const beforeMsgs = useSession.getState().messages.length;
         if (beforeMsgs < 4) {
-          pushSystem("Not enough conversation to compact (need at least 4 messages).");
+          pushSystem("对话太短，无需压缩（至少需要 4 条消息）。");
           break;
         }
-        // Force truncation by setting a tiny budget temporarily, then restore.
-        // The truncateConversation function keeps system + last 10 messages,
-        // compresses tool results, drops oldest. We just trigger it via the
-        // normal send path, but since we're not sending, we do it inline.
-        pushSystem(
-          `Compacting conversation (${beforeMsgs} messages, ~${totalTokens.toLocaleString()} tokens). ` +
-            `Older messages and tool results will be summarized on the next AI request. ` +
-            `This happens automatically when you exceed 60K tokens — /compact just forces it now.`,
-        );
-        // Mark truncated so the next send knows to surface the notice.
-        useSession.setState({ truncated: true });
+        // 真正的压缩：LLM 摘要旧对话并写回 store。进度与结果由
+        // compact() 以 system 事件反馈（含压缩前后对比）。
+        void useSession.getState().compact();
         break;
       }
 
