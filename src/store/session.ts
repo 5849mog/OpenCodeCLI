@@ -1025,27 +1025,47 @@ async function executeToolCall(
               lastUsage: usage,
             }));
           },
+          onStatus: (status) => {
+            set({ agentStatus: `Subagent · ${status}` });
+          },
+          // 继承主循环模式：Plan 模式下子代理也只读（堵住绕过只读的漏洞）
+          mode: get().mode,
           signal,
         });
+        // 撞迭代上限也是正常结果（部分完成），不标记失败——主代理从
+        // summary 文本知道完成度；失败协议只对真正的失败生效。
         result = {
-          ok: subResult.completed,
+          ok: true,
           output: `Subagent ${subResult.completed ? "completed" : "stopped (hit iteration limit)"} after ${subResult.iterations} iterations, ${subResult.toolCallCount} tool calls.\n\n--- Subagent summary ---\n${subResult.summary}`,
           tool: "dispatch_subagent",
           args,
         };
       }
     } else if (tc.function.name === "orchestrate_task") {
-      const task = String(args.task ?? "");
-      const maxSub = Math.min(Number(args.max_sub_agents) || 3, 5);
-      const subMaxIter = Number(args.sub_agent_max_iterations) || 8;
-      if (!task) {
+      // Plan 模式拦截（special-case 在 Plan 检查之前，必须在此处理）：
+      // orchestrate_task 产出工作产物，Plan 模式下不允许。
+      if (get().mode === "plan") {
         result = {
           ok: false,
-          output: "orchestrate_task requires a 'task' argument.",
+          output:
+            "[Plan mode] orchestrate_task (produces work product) is blocked. " +
+            "In Plan mode you can only READ and ANALYZE — propose your plan in text, " +
+            "and the user will switch to Bypass mode to let you execute it.",
           tool: "orchestrate_task",
           args,
         };
       } else {
+        const task = String(args.task ?? "");
+        const maxSub = Math.min(Number(args.max_sub_agents) || 3, 5);
+        const subMaxIter = Number(args.sub_agent_max_iterations) || 8;
+        if (!task) {
+          result = {
+            ok: false,
+            output: "orchestrate_task requires a 'task' argument.",
+            tool: "orchestrate_task",
+            args,
+          };
+        } else {
         const config = get().config;
         const aiConfig: AiClientConfig = {
           baseUrl: config.baseUrl,
@@ -1087,12 +1107,18 @@ async function executeToolCall(
             args,
           };
         }
+        }
       }
     } else {
       // Plan mode: block all mutating tools — AI can only read/analyze.
+      // update_plan is EXEMPT: the plan is the planning artifact itself, so
+      // maintaining it in Plan mode is allowed (aligned with modern agents).
+      // dispatch_subagent stays allowed (read-only exploration is legal; the
+      // subagent inherits the mode and runs read-only too). orchestrate_task
+      // produces work product → blocked in Plan mode (in its special-case).
       const mutatingTools = new Set([
         "write_file", "edit_file", "multi_edit", "delete_file",
-        "move_file", "append_file", "create_dir", "update_plan",
+        "move_file", "append_file", "create_dir",
         "apply_patch", "insert_at", "undo_edit", "unzip_archive",
       ]);
       if (get().mode === "plan" && mutatingTools.has(tc.function.name)) {

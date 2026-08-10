@@ -146,17 +146,15 @@ Cost = how much text a tool pulls into context. Choose the cheapest tool that ge
 **Avoid by default — only use when the user explicitly asks, or it's genuinely necessary:**
 - \`read_file\` without offset/limit on files > 500 lines — the whole file lands in context; paginate or use a cheaper tool first
 - \`list_dirs\` / repeated \`list_files\` — the file tree is ALREADY in your context; don't re-explore
-- \`dispatch_subagent\` / \`orchestrate_task\` — each subagent spends its OWN token budget; overkill for SMALL tasks
 - \`web_search\` / \`fetch_url\` — external content is long; if snippets suffice, don't fetch pages
 - \`write_file\` overwriting a large file — prefer surgical \`edit_file\` / \`apply_patch\` instead
 
-**Delegation exception — multi-file exploration only (supplements Rule 3b):**
-- **批量读取 / 探索性研究 → 委派子代理，而不是在主会话里连续 read_file。**（Rule 3b 的"别滥用子代理"针对小任务；这里只针对"读一批文件 → 总结"型研究，两者不冲突。）
-  连续 read_file / read_multiple_files 会把文件原文原样灌进主会话上下文，而主会话的每一轮后续请求都会重发全部历史——token 开销成倍增长。\`dispatch_subagent\` 的子代理拥有干净独立上下文，它的 read/grep 及其结果只留在子代理侧，主会话只收到精简 summary。
-  - **应该委派**：需要读超过 1-2 个文件才能理解一个功能；探索性问题（"这个项目怎么处理登录？""这些状态在哪里被修改？"）；对比多个实现、梳理模块边界；任何"读一批文件 → 总结"型研究。
-  - **应该直接 read（不要委派）**：你马上要编辑的那 1-2 个文件（需要精确上下文写 edit_file）；文件很小且用户明确要求看全文；需要精确行号做手术式修改。
-  - **委派时 task 参数务必包含**：具体路径或 glob / 搜索关键字（不要只说"看一下项目"）；明确要回答的问题（如"找出 src/auth 里登录流程涉及的文件和函数，逐个报告职责"）；规定返回格式（要点式、含文件路径与行号、函数签名，总长 ≤200 词）；明确边界（只做只读探索与报告，禁止写文件/改代码）；用 max_iterations 控制成本（纯只读探索 4-6 足够，不必用默认 8）。
-  - 让子代理内部也优先用 view_outline / grep / head / read_file(offset, limit)，而不是整文件读取。
+**Delegation — use it when the task matches (NOT "avoid by default"):**
+委派子代理（\`dispatch_subagent\` / \`orchestrate_task\`）不是 overkill——它是**避免主上下文被污染的正规手段**。主会话每一轮都会重发全部历史，任何灌进主上下文的文件原文都会成倍烧 token；子代理有干净独立上下文，它的 read/grep/分析只留在子代理侧，主会话只收到精简 summary。**任务匹配时就该委派**：
+- **应该委派（dispatch_subagent）**：需要读超过 1-2 个文件才能理解一个功能；探索性问题（"这个项目怎么处理登录？""这些状态在哪里被修改？"）；对比多个实现、梳理模块边界；任何"读一批文件 → 总结"型研究；独立可并行完成的工作产物（orchestrate_task）。
+- **应该直接做（不要委派）**：你马上要编辑的那 1-2 个文件（需要精确上下文写 edit_file）；文件很小且用户明确要求看全文；需要精确行号做手术式修改；一两步就能完成的小事。
+- **委派时 task 参数务必包含**：具体路径或 glob / 搜索关键字（不要只说"看一下项目"）；明确要回答的问题（如"找出 src/auth 里登录流程涉及的文件和函数，逐个报告职责"）；规定返回格式（要点式、含文件路径与行号、函数签名，总长 ≤200 词）；明确边界（只做只读探索与报告，禁止写文件/改代码）；用 max_iterations 控制成本（纯只读探索 4-6 足够，不必用默认 8）。
+- 让子代理内部也优先用 view_outline / grep / head / read_file(offset, limit)，而不是整文件读取。
 
 ### Rule 4 — When in doubt, ask
 

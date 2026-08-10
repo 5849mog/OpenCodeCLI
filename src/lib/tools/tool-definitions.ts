@@ -401,9 +401,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: "function",
     function: {
-      name: "dispatch_subagent",
-      description:
-        "⭐ 推荐：当需要读多个文件做探索/研究、或想避免把大量文件内容灌进主上下文时，用它代替连续 read_file。Dispatch a subagent to work on ONE focused, self-contained subtask. It gets a CLEAN context (no main conversation) and runs its own agent loop with full tool access. Best for read-only exploration that spans several files, or any analysis whose raw tool output would pollute the main context. Give it a precise task: specific paths/glob, the exact question to answer, a return format, and a max_iterations cap. It shares the workspace — its edits are visible to you. Returns its final summary. Cost: each call spends its own token budget and tool iterations, so use it where it earns its keep — not as a default.",
+    name: "dispatch_subagent",
+    description:
+      "⭐ 推荐：多文件探索/研究、或想避免把大量文件内容灌进主上下文时，用它代替连续 read_file。Dispatch a subagent to work on ONE focused, self-contained subtask. It gets a CLEAN context (no main conversation) and runs its own agent loop with full tool access. Best for read-only exploration that spans several files, or any analysis whose raw tool output would pollute the main context. Give it a precise task: specific paths/glob, the exact question to answer, a return format, and a max_iterations cap. It shares the workspace — its edits are visible to you. Returns its final summary. Cost: each call spends its own token budget — that is the POINT: it keeps file contents OUT of your context, which saves tokens on every later round-trip. Use it for any multi-file research; don't reach for it for a single small edit.",
       parameters: {
         type: "object",
         properties: {
@@ -423,9 +423,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: "function",
     function: {
-      name: "orchestrate_task",
-      description:
-        "Decompose a task into genuinely INDEPENDENT subtasks, run each in its own sub-agent, and synthesize the results. Use it ONLY when the subtasks have no ordering or data dependency between them — e.g. producing several unrelated files or features. If subtask B cannot be finished until it sees subtask A's output, they are NOT independent: do them yourself, in sequence. Each sub-agent runs its own bounded loop and spends its own token budget — you must review its output before accepting it. Boundary: for read-only exploration across many files, use dispatch_subagent instead; orchestrate_task is for producing independent work product, not for research.",
+    name: "orchestrate_task",
+    description:
+      "Decompose a task into genuinely INDEPENDENT subtasks, run each in its own sub-agent in PARALLEL, and synthesize the results. Use it when subtasks have no ordering or data dependency between them — e.g. producing several unrelated files or features at once: this parallelizes work that would otherwise be sequential. If subtask B cannot be finished until it sees subtask A's output, they are NOT independent: do them yourself, in sequence. Each sub-agent runs its own bounded loop and spends its own token budget — you must review its output before accepting it. Boundary: for read-only exploration across many files, use dispatch_subagent instead; orchestrate_task is for producing independent work product, not for research.",
       parameters: {
         type: "object",
         properties: {

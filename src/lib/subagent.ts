@@ -27,6 +27,16 @@ import {
 } from "./tools/index";
 import { buildWorkspaceContext } from "./tools/system-prompt";
 import { truncateConversation, DEFAULT_TOKEN_BUDGET } from "./context";
+
+/** 子代理不允许再委派子代理（dispatch.ts 无 dispatch_subagent/orchestrate_task
+ *  分支，调用必失败）——工具集直接剔除，避免诱导模型调用后吃到 "Unknown tool"。 */
+const SUBAGENT_TOOLS = TOOL_DEFINITIONS.filter(
+  (t) => t.function.name !== "dispatch_subagent" && t.function.name !== "orchestrate_task",
+);
+
+/** 每请求超时（与主循环 PER_REQUEST_TIMEOUT_MS 一致）——子代理卡死不能无声无息。 */
+const PER_REQUEST_TIMEOUT_MS = 300_000;
+
 export interface SubagentOptions {
   /** The task description for the subagent. */
   task: string;
@@ -40,6 +50,9 @@ export interface SubagentOptions {
   onStatus?: (status: string) => void;
   /** AbortSignal to cancel the subagent. */
   signal?: AbortSignal;
+  /** 继承主循环模式："plan" 时子代理只读（workspace context 与 dispatchTool readOnly
+   *  都按此 mode）——堵住「Plan 模式派子代理绕过只读」的漏洞。 */
+  mode?: "plan" | "bypass";
 }
 
 export interface SubagentResult {
@@ -73,9 +86,10 @@ export async function runSubagent(
   };
 
   // Build the subagent's conversation: static system prompt + workspace
-  // context (cache-friendly) + task description.
+  // context (cache-friendly) + task description. mode 继承主循环：
+  // Plan 模式下子代理也只读。
   const systemPrompt = buildSystemPrompt({});
-  const contextBlock = buildWorkspaceContext({ mode: "bypass" });
+  const contextBlock = buildWorkspaceContext({ mode: opts.mode ?? "bypass" });
   // NOTE: index 0 = system prompt, index 1 = workspace context block.
   // truncateConversation below protects both by index — keep this order.
   let messages: ChatMessage[] = [
@@ -88,6 +102,7 @@ export async function runSubagent(
 - You do NOT see the main conversation history. Work only from the task description below.
 - When you are done, write a concise summary of what you did and stop calling tools. Your final text response will be returned to the main agent.
 - If you cannot complete the task, explain why in your final response and stop.
+- You CANNOT delegate to other subagents — you have no delegation tools. Do everything yourself.
 
 ## Your task
 ${opts.task}
@@ -103,6 +118,9 @@ Begin. Use tools as needed, then summarize your work in your final response.` },
     iterations++;
     if (opts.signal?.aborted) break;
     opts.onStatus?.(`Subagent iteration ${iter + 1}/${maxIter}`);
+    // summary 只取「最终轮」的文本：每轮开头重置，避免跨轮累积把每轮
+    // 工具调用前的分析也拼进 summary（污染主上下文的确定性 bug）。
+    lastText = "";
 
     // Safety net: keep the subagent's own context under budget. Only triggers
     // when a big tool result blows the budget — do NOT shrink tokenBudget to
@@ -114,20 +132,31 @@ Begin. Use tools as needed, then summarize your work in your final response.` },
     );
     if (truncated.length < messages.length) messages = truncated;
 
-    const result = await streamChatCompletionWithRetry(
-      aiConfig,
-      messages,
-      TOOL_DEFINITIONS,
-      {
-        onText: (delta) => {
-          lastText += delta;
+    // 每请求超时：组合用户 signal 与 300s 超时（与主循环一致）
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), PER_REQUEST_TIMEOUT_MS);
+    const reqSignal = opts.signal
+      ? AbortSignal.any([opts.signal, timeoutController.signal])
+      : timeoutController.signal;
+    let result: Awaited<ReturnType<typeof streamChatCompletionWithRetry>>;
+    try {
+      result = await streamChatCompletionWithRetry(
+        aiConfig,
+        messages,
+        SUBAGENT_TOOLS,
+        {
+          onText: (delta) => {
+            lastText += delta;
+          },
+          onUsage: (usage) => {
+            opts.onUsage?.(usage);
+          },
         },
-        onUsage: (usage) => {
-          opts.onUsage?.(usage);
-        },
-      },
-      opts.signal,
-    );
+        reqSignal,
+      );
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     messages.push(result.message);
 
@@ -155,13 +184,15 @@ Begin. Use tools as needed, then summarize your work in your final response.` },
       const mutatingTools = new Set([
         "write_file", "edit_file", "multi_edit", "delete_file",
         "move_file", "append_file", "create_dir", "update_plan",
-        "apply_patch", "insert_at",
+        "apply_patch", "insert_at", "run_lua",
       ]);
       if (mutatingTools.has(tc.function.name)) {
         const preview = (typeof args.path === "string") ? args.path : (typeof args.from === "string") ? args.from : "";
         vfs.takeSnapshot(`subagent:${tc.function.name}(${preview})`);
       }
-      const toolResult: ToolResult = await dispatchTool(tc.function.name, args);
+      const toolResult: ToolResult = await dispatchTool(tc.function.name, args, {
+        readOnly: opts.mode === "plan",
+      });
       toolCallCount++;
       messages.push({
         role: "tool",
