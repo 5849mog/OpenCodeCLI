@@ -1,0 +1,169 @@
+/**
+ * lua-wasm.ts — WebAssembly Lua 引擎（run_lua 工具直连）
+ *
+ * 用 <script> 标签加载 emscripten 的输出（经典脚本），
+ * 工厂函数注册到 window.LUAModule，全程不经过打包器模块解析。
+ *
+ * 每次求值创建一个新的 wasm 实例（wasm Module 预编译缓存，仅实例化）。
+ * 降级: wasm 不可用时回退到 JS 降级实现（src/lib/tools/lua.ts 的 runLuaJs，
+ * 只报「原生引擎不可用」，不假意执行——半吊子解释器会静默产出错误结果）。
+ *
+ * 输入编排（匹配真实 lua 语义）：
+ *   - script 经 `-e` 传入（如 lua -e 'print(6*7)'）
+ *   - stdin 同时提供两条路：
+ *     ① emscripten stdin 回调喂字节 → 脚本 `io.read("*a")` / `io.lines()` 可读
+ *     ② 写入 MEMFS 的 input.txt 并置于 argv[1] → 脚本 `io.open(arg[1])` 可读
+ *   - 无 stdin → 空 stdin，argv 只有 -e script
+ *
+ * 权限边界（严格，与 system-prompt 一致）：
+ *   纯内存计算。不改 VFS、不访问网络、不持久化。
+ */
+
+import { runLuaJs } from "../tools/lua";
+
+let wasmBinary: ArrayBuffer | null = null;
+let luaFactory: ((opts: Record<string, unknown>) => Promise<Record<string, unknown>>) | null = null;
+let wasmReady = false;
+let initPromise: Promise<boolean> | null = null;
+
+/** Max chars allowed from a single lua evaluation. Prevents AI context overflow. */
+const MAX_LUA_OUTPUT_LENGTH = 20_000;
+
+// ─── 路径解析 ────────────────────────────────────────────────────
+
+function wasmUrl(file: string): string {
+  const { hostname, pathname } = window.location;
+  if (hostname.includes('github.io')) {
+    const seg = pathname.split('/').filter(Boolean);
+    if (seg.length > 0 && seg[0] !== '_next') return `/${seg[0]}/wasm/${file}`;
+  }
+  return `/wasm/${file}`;
+}
+
+// ─── <script> 加载器（绕过打包器） ───────────────────────────────
+
+function loadScript(url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`loadScript failed: ${url}`));
+    document.head.appendChild(s);
+  });
+}
+
+// ─── 初始化 ───────────────────────────────────────────────────────
+
+async function init(): Promise<boolean> {
+  if (wasmReady) return true;
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    try {
+      // 1. 加载 <script> 标签（emscripten 粘合剂）→ window.LUAModule
+      await loadScript(wasmUrl('lua.js'));
+      const factory = (window as any).LUAModule;
+      if (typeof factory !== 'function') throw new Error('LUAModule not found');
+      luaFactory = factory;
+
+      // 2. 获取 wasm 二进制（预缓存，避免每次 fetch）
+      const wasmResp = await fetch(wasmUrl('lua.wasm'));
+      if (!wasmResp.ok) throw new Error(`lua.wasm HTTP ${wasmResp.status}`);
+      wasmBinary = await wasmResp.arrayBuffer();
+
+      // 3. 暖机测试（验证 wasm 端到端可用）
+      const test = await createInstance('print(6*7)', {});
+      if (!test.ok || test.output !== '42') throw new Error(`warm-up failed: ${test.output}`);
+
+      wasmReady = true;
+      return true;
+    } catch (err) {
+      console.warn('[lua-wasm] init failed, using JS fallback:', err);
+      wasmReady = false;
+      return false;
+    }
+  })();
+
+  return initPromise;
+}
+
+// ─── 创建实例 ─────────────────────────────────────────────────────
+
+export interface LuaOptions {
+  /** Lua 程序文本，如 'print(6*7)' 或 'for i=1,3 do print(i) end' */
+  script: string;
+  /** 管道输入（stdin）：脚本可用 io.read("*a") 读，或 io.open(arg[1]) 读 input.txt */
+  stdin?: string;
+}
+
+export interface LuaResult {
+  ok: boolean;
+  output: string;
+}
+
+async function createInstance(script: string, opts: Omit<LuaOptions, "script">): Promise<LuaResult> {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  // stdin → emscripten stdin 回调喂字节（null=EOF），与 awk/bc 相同机制。
+  const inputBuf = opts.stdin !== undefined ? new TextEncoder().encode(opts.stdin) : null;
+  let inputPos = 0;
+
+  const inst = (await luaFactory!({
+    print: (t: unknown) => stdout.push(String(t)),
+    printErr: (t: unknown) => stderr.push(String(t)),
+    stdin: () => (inputBuf !== null && inputPos < inputBuf.length ? inputBuf[inputPos++] : null),
+    // 提供 wasm 二进制 + locateFile，让 emscripten 内部处理实例化
+    wasmBinary: wasmBinary,
+    locateFile: (path: string) => wasmUrl(path),
+  })) as Record<string, unknown>;
+
+  const FS = inst.FS as { writeFile(p: string, d: Uint8Array): void };
+  const callMain = inst.callMain as (args: string[]) => void;
+
+  if (inputBuf !== null) {
+    // stdin 走 io.read；同时写 MEMFS input.txt 并置于 argv[1] → io.open(arg[1]) 也可读
+    FS.writeFile('input.txt', inputBuf);
+    callMain(['-e', script, 'input.txt']);
+  } else {
+    callMain(['-e', script]);
+  }
+
+  const errOutput = stderr.join('\n').trim();
+  if (errOutput) return { ok: false, output: errOutput };
+
+  let outOutput = stdout.join('\n').trim();
+  if (outOutput.length > MAX_LUA_OUTPUT_LENGTH) {
+    outOutput = outOutput.slice(0, MAX_LUA_OUTPUT_LENGTH) +
+      `\n\n[... lua output truncated at ${MAX_LUA_OUTPUT_LENGTH.toLocaleString()} chars; ` +
+      `original output was ${outOutput.length.toLocaleString()} chars ` +
+      `(${outOutput.split('\n').length} lines) — ` +
+      `re-run with a more selective script for full result]`;
+  }
+  return { ok: true, output: outOutput || '(no output)' };
+}
+
+// ─── 公开 API ─────────────────────────────────────────────────────
+
+export async function evaluate(opts: LuaOptions): Promise<LuaResult> {
+  if (!wasmReady && !initPromise) {
+    await init();
+  } else if (!wasmReady && initPromise) {
+    await initPromise;
+  }
+
+  if (wasmReady && luaFactory && wasmBinary) {
+    try {
+      return await createInstance(opts.script, opts); // wasm 结果为准（含 stderr 报错）
+    } catch (err) {
+      console.warn('[lua-wasm] evaluate error, falling back:', err);
+    }
+  }
+
+  return runLuaJs(opts.script, opts.stdin);
+}
+
+export async function isAvailable(): Promise<boolean> {
+  if (wasmReady) return true;
+  return init();
+}

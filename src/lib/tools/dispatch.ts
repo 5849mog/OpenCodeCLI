@@ -7,6 +7,16 @@ import { toolUpdatePlan } from "./plan";
 import { toolAskUserInput } from "./user-input";
 import { toolWebSearch, toolFetchUrl } from "./web";
 import { toolZipArchive, toolUnzipArchive } from "./zip";
+import * as luaWasm from "../wasm/lua-wasm";
+
+/** run_lua 工具：纯内存 Lua 计算（不改 VFS、不联网、不持久化），任何模式都可用。 */
+async function toolRunLua(args: Record<string, unknown>): Promise<ToolResult> {
+  const script = String(args.script ?? "").trim();
+  if (!script) return { ok: false, output: "run_lua: missing script", tool: "run_lua", args };
+  const stdin = args.input !== undefined ? String(args.input) : undefined;
+  const result = await luaWasm.evaluate({ script, stdin });
+  return { ok: result.ok, output: result.output, tool: "run_lua", args };
+}
 
 export async function dispatchTool(
   name: string,
@@ -59,6 +69,8 @@ export async function dispatchTool(
         return await toolZipArchive(args);
       case "unzip_archive":
         return await toolUnzipArchive(args);
+      case "run_lua":
+        return await toolRunLua(args);
       case "web_search":
         return await toolWebSearch(args);
       case "fetch_url":
