@@ -25,7 +25,7 @@ fi
 
 # 策略 1: 源码编译（emcc 可用）
 if command -v emcc &>/dev/null; then
-  echo "→ emcc 已安装，从源码编译（GNU sed 优先，失败自动回退 BusyBox）..."
+  echo "→ emcc 已安装，从源码编译（GNU sed）..."
   bash "$SCRIPT_DIR/build.sh"
   exit $?
 fi

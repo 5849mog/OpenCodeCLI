@@ -1,26 +1,30 @@
 #!/bin/bash
-# build.sh — Compile sed to WebAssembly via Emscripten（GNU 优先 + BusyBox 回退）
+# build.sh — Compile GNU sed to WebAssembly via Emscripten
 #
 # Usage:
 #   ./build.sh
 #
 # Prerequisites:
 #   - Emscripten SDK (emsdk) in PATH: emcc, emconfigure, emmake
-#   - curl, tar, xz（GNU 路径拉 release tarball）
+#   - curl, tar, xz（拉取 GNU sed release tarball）
 #
 # Output (relative to project root):
 #   public/wasm/sed.wasm  — WebAssembly binary
 #   public/wasm/sed.js    — Emscripten JS module loader (classic script, window.SedModule)
+#   tools/sed-wasm/source/  — 解包后的 sed 源码（缓存）
+#   tools/sed-wasm/build/   — 中间产物 (tarball, smoke.js)
 #
-# 构建策略：
-#   1. GNU sed（build-gnu.sh）：完整功能。emconfigure 交叉编译 + 冒烟硬门槛。
-#      用 timeout 限时（GNU_PATH_TIMEOUT，默认 1500s=25min）——configure/make
-#      若卡死（如 gnulib 测试挂起）不会无限等，而是触发回退。
-#   2. BusyBox sed（本文件内）：GNU 失败/超时后自动回退——allnoconfig + CONFIG_SED
-#      只编 sed applet，shim main 直连 sed_main（绕开 busybox 的 argv[0] 分发，
-#      浏览器里 argv[0] 恒为 this.program）。功能为 GNU 主流子集。
-#   3. 两条路径都有 node 冒烟硬门槛（s///、-E、y/// 三用例）。
-#   4. 浏览器产物链接旗标镜像 awk/bc/lua（EXPORT_NAME="SedModule"）。
+# 构建要点：
+#   1. GNU sed 4.9 release tarball 自带 configure（无需 autotools 引导）。
+#   2. --host=wasm32-unknown-emscripten 让 configure 进入交叉编译模式，
+#      跳过所有「运行测试程序」的探测——emscripten 产物无法在宿主运行，
+#      个别 gnulib 测试会挂起而不是快速失败（2026-08 CI 实测卡 38 分钟）。
+#   3. --disable-nls --disable-i18n --disable-acl --without-selinux 避开
+#      gettext/locale/acl/selinux 依赖；CFLAGS="-O2" 去 -g 提速。
+#   4. 冒烟测试是硬门槛（node）：s///、-E、y/// 三个用例，全过才算绿。
+#   5. timeout 限时（GNU_PATH_TIMEOUT，默认 1800s=30min）：若 configure/make
+#      病态卡死，CI 快速失败（exit 124）暴露问题，而不是无限等待。
+#   6. 浏览器产物链接旗标镜像 awk/bc/lua（EXPORT_NAME="SedModule"）。
 
 set -euo pipefail
 
@@ -28,11 +32,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 OUT_DIR="$PROJECT_ROOT/public/wasm"
 BUILD_DIR="$SCRIPT_DIR/build"
+SOURCE_DIR="$SCRIPT_DIR/source"
 
-# GNU 路径时限（秒）。GH Actions 免费 runner 2 核，gnulib 全量编译 10-25 分钟。
-GNU_PATH_TIMEOUT="${GNU_PATH_TIMEOUT:-1500}"
-
-BUSYBOX_REPO="https://github.com/mirror/busybox.git"
+# --- Config ---
+SED_VERSION="4.9"
+SED_TARBALL_URL="https://ftp.gnu.org/gnu/sed/sed-${SED_VERSION}.tar.xz"
+SED_TARBALL_MIRROR="https://ftpmirror.gnu.org/sed/sed-${SED_VERSION}.tar.xz"
+GNU_PATH_TIMEOUT="${GNU_PATH_TIMEOUT:-1800}"
 
 # --- Preflight ---
 command -v emcc >/dev/null 2>&1 || {
@@ -64,76 +70,50 @@ BROWSER_FLAGS=(
   -s "EXPORTED_RUNTIME_METHODS=['FS','callMain']"
 )
 
-# ─── 冒烟测试（硬门槛） ───────────────────────────────────────────
-smoke_test() {
-  local smoke_js="$1" expect="$2" pipe="$3"
-  shift 3
+echo "[1/4] Fetching GNU sed ${SED_VERSION}..."
+tarball="$BUILD_DIR/sed-${SED_VERSION}.tar.xz"
+if [ ! -f "$tarball" ]; then
+  curl -fsSL "$SED_TARBALL_URL" -o "$tarball" || curl -fsSL "$SED_TARBALL_MIRROR" -o "$tarball"
+fi
+rm -rf "$SOURCE_DIR"
+mkdir -p "$SOURCE_DIR"
+tar xf "$tarball" -C "$SOURCE_DIR" --strip-components=1
+
+echo "[2/4] Configuring GNU sed (emconfigure, cross-compile mode)..."
+cd "$SOURCE_DIR"
+emconfigure ./configure \
+  --host=wasm32-unknown-emscripten \
+  --disable-nls --disable-i18n --disable-acl --without-selinux \
+  --disable-dependency-tracking --quiet \
+  CFLAGS="-O2"
+
+echo "[3/4] Compiling (emmake make, timeout=${GNU_PATH_TIMEOUT}s)..."
+timeout "$GNU_PATH_TIMEOUT" emmake make -j"$(nproc 2>/dev/null || echo 4)" >/dev/null
+
+echo "[4/4] Linking + smoke..."
+SED_OBJS="$(find sed -maxdepth 1 -name '*.o' | tr '\n' ' ') lib/libgnu.a"
+if [ -z "$SED_OBJS" ]; then echo "ERROR: no sed objects found"; exit 1; fi
+
+# node 冒烟（硬门槛）
+emcc $SED_OBJS -lm -s ENVIRONMENT=node -s EXIT_RUNTIME=1 -o "$BUILD_DIR/sed-smoke.js" 2>/dev/null
+
+smoke() {
+  local pipe="$1" expect="$2"
+  shift 2
   local out
-  out="$(printf '%s' "$pipe" | node "$smoke_js" "$@" 2>&1 | tr -d '\r' | sed '/^$/d' | head -1)"
+  out="$(printf '%s' "$pipe" | node "$BUILD_DIR/sed-smoke.js" "$@" 2>&1 | tr -d '\r' | sed '/^$/d' | head -1)"
   if [ "$out" != "$expect" ]; then
     echo "ERROR: sed smoke failed: $* (got '$out', expected '$expect')"
-    return 1
+    exit 1
   fi
   echo "  smoke OK: $* => $expect"
 }
+smoke "hi"     "bye"    's/hi/bye/'
+smoke "abc123" "abcNUM" -E 's/([0-9]+)/NUM/'
+smoke "abc"    "xyz"    'y/abc/xyz/'
 
-run_smokes() {
-  local smoke_js="$1"
-  smoke_test "$smoke_js" "bye"    "hi"     's/hi/bye/' || return 1
-  smoke_test "$smoke_js" "abcNUM" "abc123" -E 's/([0-9]+)/NUM/' || return 1
-  smoke_test "$smoke_js" "xyz"    "abc"    'y/abc/xyz/' || return 1
-}
-
-# ─── 回退路径：BusyBox sed ────────────────────────────────────────
-build_busybox_sed() {
-  echo ""
-  echo "=== GNU sed build failed or timed out; falling back to BusyBox sed ==="
-  echo "[1/3] Cloning BusyBox..."
-  if [ ! -d "$BUILD_DIR/busybox-src/.git" ]; then
-    git clone --depth 1 "$BUSYBOX_REPO" "$BUILD_DIR/busybox-src" 2>/dev/null || \
-      git clone --depth 1 "$BUSYBOX_REPO" "$BUILD_DIR/busybox-src"
-  fi
-  cd "$BUILD_DIR/busybox-src"
-
-  echo "[2/3] Configuring BusyBox (allnoconfig + sed applet)..."
-  make allnoconfig >/dev/null 2>&1
-  scripts/config -e CONFIG_SED
-  make olddefconfig >/dev/null 2>&1
-
-  echo "[3/3] Compiling + linking sed applet..."
-  emmake make -j"$(nproc 2>/dev/null || echo 4)" >/dev/null
-
-  # shim main：直接调 sed_main，绕开 busybox 的 argv[0] applet 分发
-  cat > "$BUILD_DIR/sed-busybox-shim.c" <<'EOF'
-extern int sed_main(int argc, char **argv);
-int main(int argc, char **argv) { return sed_main(argc, argv); }
-EOF
-  emcc -O2 -c "$BUILD_DIR/sed-busybox-shim.c" -o "$BUILD_DIR/sed-busybox-shim.o"
-
-  BB_OBJS="$(find . -name '*.o' ! -name 'main.o' | tr '\n' ' ')"
-  if [ -z "$BB_OBJS" ]; then echo "ERROR: no busybox objects found"; return 1; fi
-
-  if ! emcc "$BUILD_DIR/sed-busybox-shim.o" $BB_OBJS -lm \
-      -s ENVIRONMENT=node -s EXIT_RUNTIME=1 -o "$BUILD_DIR/sed-smoke.js" 2>/dev/null; then
-    echo "ERROR: busybox smoke link failed"; return 1
-  fi
-  run_smokes "$BUILD_DIR/sed-smoke.js" || return 1
-
-  emcc "$BUILD_DIR/sed-busybox-shim.o" $BB_OBJS "${BROWSER_FLAGS[@]}" -o "$OUT_DIR/sed.js"
-  echo "  BusyBox sed → $OUT_DIR/sed.js"
-}
-
-# ─── 主流程：GNU 优先（限时），失败/超时自动回退 BusyBox ─────────
-echo "=== [GNU sed path] timeout=${GNU_PATH_TIMEOUT}s ==="
-if timeout "$GNU_PATH_TIMEOUT" bash "$SCRIPT_DIR/build-gnu.sh"; then
-  echo "  GNU sed → $OUT_DIR/sed.js"
-else
-  if ! build_busybox_sed; then
-    echo ""
-    echo "ERROR: both GNU sed and BusyBox sed builds failed. Check logs above."
-    exit 1
-  fi
-fi
+# 浏览器产物
+emcc $SED_OBJS "${BROWSER_FLAGS[@]}" -o "$OUT_DIR/sed.js"
 
 echo ""
 echo "=== Build complete ==="

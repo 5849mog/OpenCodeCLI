@@ -21,9 +21,9 @@
 
 ## 编译流程
 
-1. **主路径（GNU sed 4.9）**：release tarball（自带 configure）→ `emconfigure ./configure --disable-nls --disable-i18n --disable-acl --without-selinux` → `emmake make`
-2. **硬门槛冒烟测试**（node，三个用例全过才算绿）：`s/hi/bye/`、`-E` 扩展正则、`y/abc/xyz/`
-3. **回退路径（BusyBox sed）**：GNU 构建任一步失败（CI 上 autotools/gnulib 偶发报错）自动切换——`allnoconfig + CONFIG_SED` 只编 sed applet，shim main 直连 `sed_main`（绕开 busybox 的 argv[0] applet 分发——浏览器里 argv[0] 恒为 `this.program`）
+1. **GNU sed 4.9**：release tarball（自带 configure）→ `emconfigure ./configure --host=wasm32-unknown-emscripten --disable-nls --disable-i18n --disable-acl --without-selinux` → `emmake make`
+2. `--host` 交叉编译模式是**关键**：configure 跳过所有「运行测试程序」的探测（emscripten 产物无法在宿主运行，个别 gnulib 测试会挂起不失败——CI 实测卡 38 分钟）
+3. **硬门槛冒烟测试**（node，三个用例全过才算绿）：`s/hi/bye/`、`-E` 扩展正则、`y/abc/xyz/`
 4. 浏览器产物用 awk/bc/lua 同款 emcc 旗标链接成 `window.SedModule`
 
 ## 输出
@@ -49,9 +49,9 @@ sed 的 `-f` 脚本文件与数据文件都在 files 里，若像 awk 那样把 
 
 本地**不编译、不装 emsdk**。push 后在 GitHub Actions 的 `Build sed.wasm` 步骤看日志：
 要么看到三行 `smoke OK`，要么看到具体报错（configure / make / 链接 / undefined symbol）。
-GNU 失败会自动回退 BusyBox（日志有 `=== GNU sed build failed; falling back` 标记）。
-这是 bc/awk/lua 当初调通的同一路径。
+configure 卡死（超过 30 分钟无输出）时，`timeout` 会让 CI 以 exit 124 快速失败，
+把日志贴回按报错迭代即可。这是 bc/awk/lua 当初调通的同一路径。
 
 ## 许可
 
-GNU sed 基于 GPL-3.0；BusyBox 基于 GPL-2.0。本工具链脚本遵循项目主体许可。
+GNU sed 基于 GPL-3.0。本工具链脚本遵循项目主体许可。

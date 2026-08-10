@@ -48,4 +48,3 @@
   （Plan 模式只读拦截不变，`mutated: true` 走既有快照/UI 刷新）。
 - 本地 `bun dev`（未装 emsdk）时 sed 走 JS 降级实现（`runSed`，与旧版行为一致），
   以上矩阵反映的是 **部署版（CI 构建的 wasm）** 的行为。
-- GNU sed 构建失败时 CI 自动回退 BusyBox sed 单 applet（功能为 GNU 主流子集）。
