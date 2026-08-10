@@ -67,13 +67,17 @@ fi
 cd "$SOURCE_DIR"
 mkdir -p "$BUILD_DIR"
 
-# --- Compile Lua via `make generic` ---
-echo "[2/4] Compiling Lua (emcc via make generic)..."
-# generic target: 用 CC/AR/RANLIB 覆盖编译工具，CFLAGS 控制不引用宿主系统依赖。
-# -DLUA_USE_POSIX 提供 clock/localtime 等；-DMY_LIBS 里不拉 readline。
+# 官方发行版布局：真正的 Makefile 与全部 .c 在 src/ 子目录
+# （顶层 Makefile 只是转发器，没有 generic/all 的直接规则——CI 2026-08 已踩坑）
+cd src
+
+# --- Compile Lua via `make all` ---
+echo "[2/4] Compiling Lua (emcc via make all, in src/)..."
+# CC/AR/RANLIB 覆盖编译工具；MYCFLAGS 控制不引用宿主系统依赖。
+# -DLUA_USE_POSIX 提供 clock/localtime 等；不拉 readline（LUA_USE_READLINE 默认关）。
 make clean >/dev/null 2>&1 || true
 # 先编译 lua (interpretor + lua.o + liblua.a)，用 emcc 产出 WebAssembly 目标文件。
-make generic \
+make all \
   CC=emcc \
   AR="emar rcus" \
   RANLIB=emranlib \
@@ -84,12 +88,10 @@ make generic \
 # --- Smoke test (hard gate) ---
 echo "[3/4] Smoke test (node)..."
 mkdir -p "$OUT_DIR" "$BUILD_DIR"
-# 用 emcc 编译 lua 可执行到 node（NODERAWFS 走宿主 stdio），验证 `print(6*7) => 42`
-# `make generic` 已产生 luac 顶层，但 lua 可执行目标是 emcc 不直接产 wasm 的宿主二进制。
-# → 简单起见直接用编译产物里的核心目标重链一个 node 冒烟版本，等价于 awk 的做法。
-LUA_OBJS="$(find . -name 'lua.o' -o -name 'liblua.a' | tr '\n' ' ')"
-if emcc lua.c $LUA_OBJS \
-    -O2 -DLUA_USE_POSIX \
+# make all 已产出 lua.o + liblua.a（emcc 编译）→ 直接链成 node 可执行冒烟。
+# 不再重编 lua.c（否则与 lua.o 里的 main 重复）。
+if emcc lua.o liblua.a \
+    -lm \
     -s ENVIRONMENT=node -s EXIT_RUNTIME=1 -s NODERAWFS=1 \
     -o "$BUILD_DIR/lua-smoke.js" 2>/dev/null; then
   SMOKE_OUT="$(node "$BUILD_DIR/lua-smoke.js" -e "print(6*7)" 2>&1 | tr -d '\r' | sed '/^$/d' | head -1)"
@@ -125,6 +127,7 @@ emcc -O2 -DLUA_USE_POSIX -c lua.c -o "$BUILD_DIR/objects/lua.o" 2>/dev/null || {
 
 emcc "$BUILD_DIR/objects/lua.o" $OBJS \
   -O2 \
+  -lm \
   -s WASM=1 \
   -s MODULARIZE=1 \
   -s EXPORT_NAME="LUAModule" \
