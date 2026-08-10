@@ -42,19 +42,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} antialiased bg-[#FAF9F7] text-[#2D2B27]`}
+        className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} antialiased bg-background text-foreground`}
       >
         {children}
         <Toaster
           position="bottom-right"
-          theme="light"
+          theme="dark"
           toastOptions={{
             style: {
-              background: "#FFFFFF",
-              border: "1px solid #E5E2D9",
-              color: "#2D2B27",
+              background: "#1c1a17",
+              border: "1px solid #3a3731",
+              color: "#e7e5e4",
               borderRadius: "8px",
             },
           }}

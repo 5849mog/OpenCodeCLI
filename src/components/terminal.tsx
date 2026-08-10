@@ -506,12 +506,12 @@ export function Terminal() {
   }, [input]);
 
   return (
-    <div className="flex h-full flex-col bg-[#FAF9F7] text-[#2D2B27] font-mono text-[length:var(--font-size-base)] leading-relaxed">
+    <div className="flex h-full flex-col bg-background text-foreground font-mono text-[length:var(--font-size-base)] leading-relaxed">
       {/* Header bar — model name centered, mode toggle right */}
-      <div className="flex items-center justify-between border-b border-[#E5E2D9] px-4 py-2.5 text-xs">
-        <div className="flex items-center gap-2 text-[#6B6862]">
+      <div className="flex items-center justify-between border-b border-[#E5E2D9] px-4 py-2.5 text-xs dark:border-[#3a3731]">
+        <div className="flex items-center gap-2 text-[#6B6862] dark:text-zinc-400">
           {config.hasApiKey && (
-            <span className="flex items-center gap-1.5 rounded-md bg-[#F5F3EE] px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium text-[#8B7355]">
+            <span className="flex items-center gap-1.5 rounded-md bg-[#F5F3EE] px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium text-[#8B7355] dark:bg-[#262320] dark:text-[#E8A87C]">
               <span className="h-1.5 w-1.5 rounded-full bg-[#D97757]" />
               {config.model}
             </span>
@@ -525,7 +525,7 @@ export function Terminal() {
               "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium transition-colors",
               mode === "plan"
                 ? "border-[#D97757]/30 bg-[#D97757]/10 text-[#D97757]"
-                : "border-[#E5E2D9] bg-[#F5F3EE] text-[#8B8884] hover:text-[#2D2B27]",
+                : "border-[#E5E2D9] bg-[#F5F3EE] text-[#8B8884] hover:text-[#2D2B27] dark:border-[#3a3731] dark:bg-[#262320] dark:text-zinc-500 dark:hover:text-zinc-200",
             )}
             title="Shift+Tab to toggle"
           >
@@ -535,14 +535,14 @@ export function Terminal() {
           <PlanHeaderBadge />
           <button
             onClick={() => handleSlashCommand("/export json")}
-            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
+            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
             title="Export session as JSON"
           >
             <Download className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={reset}
-            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27]"
+            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
             title="Clear session"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -618,11 +618,11 @@ export function Terminal() {
 
       {/* Input */}
       {/* Input area — clean, minimal */}
-      <div className="border-t border-[#E5E2D9] bg-[#FFFFFF] px-4 py-3">
-        <div className="relative flex items-end gap-2.5 rounded-xl border border-[#E5E2D9] bg-[#FAF9F7] px-4 py-3 transition-colors focus-within:border-[#D97757]/40">
+      <div className="border-t border-[#E5E2D9] bg-[#FFFFFF] px-4 py-3 dark:border-[#3a3731] dark:bg-[#161512]">
+        <div className="relative flex items-end gap-2.5 rounded-xl border border-[#E5E2D9] bg-[#FAF9F7] px-4 py-3 transition-colors focus-within:border-[#D97757]/40 dark:border-[#3a3731] dark:bg-[#1c1a17]">
           {/* @mention autocomplete dropdown */}
           {mentionQuery !== null && mentionFiles.length > 0 && (
-            <div className="absolute bottom-full left-0 mb-2 w-72 overflow-hidden rounded-lg border border-[#E5E2D9] bg-white shadow-lg">
+            <div className="absolute bottom-full left-0 mb-2 w-72 overflow-hidden rounded-lg border border-[#E5E2D9] bg-white shadow-lg dark:border-[#3a3731] dark:bg-[#1c1a17]">
               {mentionFiles.map((f, i) => (
                 <button
                   key={f.path}
@@ -630,10 +630,10 @@ export function Terminal() {
                   onMouseEnter={() => setMentionIndex(i)}
                   className={cn(
                     "flex w-full items-center gap-2 px-3 py-2 text-left text-xs",
-                    i === mentionIndex ? "bg-[#D97757]/8 text-[#D97757]" : "text-[#3D3B37] hover:bg-[#F5F3EE]",
+                    i === mentionIndex ? "bg-[#D97757]/8 text-[#D97757]" : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
                   )}
                 >
-                  <FileText className="h-3 w-3 shrink-0 text-[#8B7355]" />
+                  <FileText className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
                   <span className="truncate">{f.path}</span>
                 </button>
               ))}
@@ -651,7 +651,7 @@ export function Terminal() {
                 : "输入消息…  (@ 提及文件)"
             }
             disabled={isStreaming}
-            className="max-h-[200px] flex-1 resize-none bg-transparent text-[length:var(--font-size-base)] text-[#1A1815] placeholder:text-[#A8A29E] focus:outline-none disabled:opacity-50"
+            className="max-h-[200px] flex-1 resize-none bg-transparent text-[length:var(--font-size-base)] text-[#1A1815] placeholder:text-[#A8A29E] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
           />
           <button
             onClick={submit}
@@ -715,7 +715,7 @@ function QuestionModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-[#E5E2D9] bg-[#FFFFFF] shadow-2xl">
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-[#E5E2D9] bg-[#FFFFFF] shadow-2xl dark:border-[#3a3731] dark:bg-[#1c1a17]">
         <QuestionPanel panel={panel} onSubmit={onSubmit} />
       </div>
     </div>
@@ -788,13 +788,13 @@ function QuestionPanel({
   };
 
   return (
-    <div className="rounded-lg border border-[#D97757]/30 bg-[#FFFFFF] shadow-sm">
+    <div className="rounded-lg border border-[#D97757]/30 bg-[#FFFFFF] shadow-sm dark:bg-[#1c1a17]">
       {/* Header */}
       {panel.title && (
-        <div className="border-b border-[#E5E2D9] px-5 py-3">
-          <h3 className="text-sm font-semibold text-[#2D2B27]">{panel.title}</h3>
+        <div className="border-b border-[#E5E2D9] px-5 py-3 dark:border-[#3a3731]">
+          <h3 className="text-sm font-semibold text-[#2D2B27] dark:text-zinc-100">{panel.title}</h3>
           {panel.description && (
-            <p className="mt-0.5 text-xs text-[#8B8884]">{panel.description}</p>
+            <p className="mt-0.5 text-xs text-[#8B8884] dark:text-zinc-400">{panel.description}</p>
           )}
         </div>
       )}
@@ -803,7 +803,7 @@ function QuestionPanel({
       <div className="space-y-4 px-5 py-4">
         {panel.questions.map((q, qi) => (
           <div key={q.id}>
-            <div className="mb-2 text-sm font-medium text-[#2D2B27]">
+            <div className="mb-2 text-sm font-medium text-[#2D2B27] dark:text-zinc-200">
               <span>{qi + 1}. {q.question}</span>
               {q.required && <span className="ml-1 text-[#E54D2E]">*</span>}
             </div>
@@ -818,7 +818,7 @@ function QuestionPanel({
                       className={`flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors ${
                         selected
                           ? "border-[#D97757] bg-[#D97757]/8"
-                          : "border-[#E5E2D9] bg-[#FAF9F7] hover:border-[#D6D3CE]"
+                          : "border-[#E5E2D9] bg-[#FAF9F7] hover:border-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-[#52504b]"
                       }`}
                     >
                       <input
@@ -830,9 +830,9 @@ function QuestionPanel({
                         className="mt-0.5 h-3.5 w-3.5 accent-[#D97757]"
                       />
                       <div>
-                        <div className="text-[#2D2B27]">{opt.label}</div>
+                        <div className="text-[#2D2B27] dark:text-zinc-200">{opt.label}</div>
                         {opt.description && (
-                          <div className="mt-0.5 text-[length:var(--font-size-ui-sm)] text-[#8B8884]">{opt.description}</div>
+                          <div className="mt-0.5 text-[length:var(--font-size-ui-sm)] text-[#8B8884] dark:text-zinc-400">{opt.description}</div>
                         )}
                       </div>
                     </label>
@@ -844,7 +844,7 @@ function QuestionPanel({
                       className={`flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors ${
                         answers[q.id] === "__other__"
                           ? "border-[#D97757] bg-[#D97757]/8"
-                          : "border-[#E5E2D9] bg-[#FAF9F7] hover:border-[#D6D3CE]"
+                          : "border-[#E5E2D9] bg-[#FAF9F7] hover:border-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-[#52504b]"
                       }`}
                     >
                       <input
@@ -855,7 +855,7 @@ function QuestionPanel({
                         onChange={() => setAnswer(q.id, "__other__")}
                         className="mt-0.5 h-3.5 w-3.5 accent-[#D97757]"
                       />
-                      <span className="text-[#2D2B27]">其他</span>
+                      <span className="text-[#2D2B27] dark:text-zinc-200">其他</span>
                     </label>
                     {answers[q.id] === "__other__" && (
                       <input
@@ -863,7 +863,7 @@ function QuestionPanel({
                         value={otherInputs[q.id] ?? ""}
                         onChange={(e) => setOther(q.id, e.target.value)}
                         placeholder="请输入…"
-                        className="mt-1.5 ml-7 w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-1.5 text-sm focus:border-[#D97757] focus:outline-none"
+                        className="mt-1.5 ml-7 w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-1.5 text-sm focus:border-[#D97757] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
                         autoFocus
                       />
                     )}
@@ -881,7 +881,7 @@ function QuestionPanel({
                       className={`flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors ${
                         selected
                           ? "border-[#D97757] bg-[#D97757]/8"
-                          : "border-[#E5E2D9] bg-[#FAF9F7] hover:border-[#D6D3CE]"
+                          : "border-[#E5E2D9] bg-[#FAF9F7] hover:border-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-[#52504b]"
                       }`}
                     >
                       <input
@@ -891,9 +891,9 @@ function QuestionPanel({
                         className="mt-0.5 h-3.5 w-3.5 accent-[#D97757]"
                       />
                       <div>
-                        <div className="text-[#2D2B27]">{opt.label}</div>
+                        <div className="text-[#2D2B27] dark:text-zinc-200">{opt.label}</div>
                         {opt.description && (
-                          <div className="mt-0.5 text-[length:var(--font-size-ui-sm)] text-[#8B8884]">{opt.description}</div>
+                          <div className="mt-0.5 text-[length:var(--font-size-ui-sm)] text-[#8B8884] dark:text-zinc-400">{opt.description}</div>
                         )}
                       </div>
                     </label>
@@ -901,14 +901,14 @@ function QuestionPanel({
                 })}
                 {q.allow_other && (
                   <div>
-                    <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-sm hover:border-[#D6D3CE]">
+                    <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-sm hover:border-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-[#52504b]">
                       <input
                         type="checkbox"
                         checked={((answers[q.id] as string[]) ?? []).includes("__other__")}
                         onChange={() => toggleOption(q.id, "__other__")}
                         className="mt-0.5 h-3.5 w-3.5 accent-[#D97757]"
                       />
-                      <span className="text-[#2D2B27]">其他</span>
+                      <span className="text-[#2D2B27] dark:text-zinc-200">其他</span>
                     </label>
                     {((answers[q.id] as string[]) ?? []).includes("__other__") && (
                       <input
@@ -916,7 +916,7 @@ function QuestionPanel({
                         value={otherInputs[q.id] ?? ""}
                         onChange={(e) => setOther(q.id, e.target.value)}
                         placeholder="请输入…"
-                        className="mt-1.5 ml-7 w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-1.5 text-sm focus:border-[#D97757] focus:outline-none"
+                        className="mt-1.5 ml-7 w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-1.5 text-sm focus:border-[#D97757] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
                         autoFocus
                       />
                     )}
@@ -931,7 +931,7 @@ function QuestionPanel({
                   onChange={(e) => setAnswer(q.id, e.target.value)}
                   placeholder="请输入…"
                   rows={3}
-                  className="w-full resize-none rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-sm focus:border-[#D97757] focus:outline-none"
+                  className="w-full resize-none rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-sm focus:border-[#D97757] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
                 />
               </div>
             )}
@@ -945,7 +945,7 @@ function QuestionPanel({
       </div>
 
       {/* Submit */}
-      <div className="border-t border-[#E5E2D9] px-5 py-3">
+      <div className="border-t border-[#E5E2D9] px-5 py-3 dark:border-[#3a3731]">
         <button
           onClick={handleSubmit}
           className="rounded-lg bg-[#D97757] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#C66B4A]"
@@ -962,7 +962,7 @@ function QuestionPanel({
 function EmptyState() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 py-12 text-center text-[#8B8884]">
-      <div className="rounded-full border border-[#E5E2D9] bg-zinc-900/50 p-4">
+      <div className="rounded-full border border-[#E5E2D9] bg-zinc-900/50 p-4 dark:border-[#3a3731] dark:bg-[#262320]">
         <TerminalIcon className="h-7 w-7 text-[#D97757]" />
       </div>
       <div>
@@ -992,14 +992,14 @@ function AgentStatusRow({ status }: { status: string }) {
     <motion.div
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-center gap-2.5 rounded-md border border-[#D97757]/20 bg-gradient-to-r from-emerald-950/20 to-zinc-900/40 px-3 py-2 text-xs"
+      className="flex items-center gap-2.5 rounded-md border border-[#D97757]/20 bg-gradient-to-r from-emerald-950/20 to-zinc-900/40 px-3 py-2 text-xs dark:border-[#D97757]/25 dark:from-emerald-950/40 dark:to-zinc-900/60"
     >
       <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 dark:bg-[#34d399]" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-[#D97757]" />
       </span>
       <Sparkles className="h-3 w-3 text-[#D97757]/70" />
-      <span className="text-[#2D2B27]">{status || "agent is working…"}</span>
+      <span className="text-[#2D2B27] dark:text-zinc-200">{status || "agent is working…"}</span>
     </motion.div>
   );
 }
@@ -1181,9 +1181,9 @@ function StreamingBubble({ text, reasoning }: { text: string; reasoning: string 
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="overflow-hidden rounded-md border border-[#D97757]/20 bg-[#D97757]/5 px-2.5 py-1.5 text-xs"
+      className="overflow-hidden rounded-md border border-[#D97757]/20 bg-[#D97757]/5 px-2.5 py-1.5 text-xs dark:border-[#D97757]/25"
     >
-      <div className="flex items-center gap-1.5 text-[#8B7355]">
+      <div className="flex items-center gap-1.5 text-[#8B7355] dark:text-[#E8A87C]">
         <Sparkles className="h-3 w-3 text-[#D97757]/70" />
         <span className="font-medium">正在分析…</span>
         <span className="flex gap-0.5 pl-1">
@@ -1217,18 +1217,18 @@ function TurnBlock({ turn }: { turn: TurnGroup }) {
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="overflow-hidden rounded-md border border-[#E5E2D9] bg-[#FAF9F7]/60"
+      className="overflow-hidden rounded-md border border-[#E5E2D9] bg-[#FAF9F7]/60 dark:border-[#3a3731] dark:bg-[#1c1a17]/60"
     >
       <button
         onClick={() => setCollapsed((c) => !c)}
         className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-xs"
       >
         <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform", !collapsed && "rotate-90")} />
-        <Wrench className="h-3 w-3 shrink-0 text-[#B87B5A]" />
-        <span className="shrink-0 font-medium text-[#6B6862]">思考与操作</span>
-        <span className="shrink-0 text-[#A8A29E]">· {toolCount} 个工具调用</span>
+        <Wrench className="h-3 w-3 shrink-0 text-[#B87B5A] dark:text-[#E8A87C]" />
+        <span className="shrink-0 font-medium text-[#6B6862] dark:text-zinc-400">思考与操作</span>
+        <span className="shrink-0 text-[#A8A29E] dark:text-zinc-500">· {toolCount} 个工具调用</span>
         {collapsed && preview && (
-          <span className="ml-1 min-w-0 flex-1 truncate text-[#A8A29E]">{preview}</span>
+          <span className="ml-1 min-w-0 flex-1 truncate text-[#A8A29E] dark:text-zinc-500">{preview}</span>
         )}
       </button>
       {!collapsed && (
@@ -1272,10 +1272,10 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={copy}
-      className="shrink-0 self-start pt-0.5 text-[#A8A29E] transition-opacity hover:text-[#3D3B37]"
+      className="shrink-0 self-start pt-0.5 text-[#A8A29E] transition-opacity hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:text-zinc-300"
       title={copied ? "Copied" : "Copy message"}
     >
-      {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+      {copied ? <Check size={14} className="text-emerald-500 dark:text-[#34d399]" /> : <Copy size={14} />}
     </button>
   );
 }
@@ -1284,8 +1284,8 @@ function UserRow({ text }: { text: string }) {
   return (
     <div className="group flex gap-2">
       <span className="shrink-0 pt-0.5 text-[#D97757]">&gt;</span>
-      <div className="flex-1 min-w-0 text-[#1A1815]">
-        <CollapsibleText text={text} />
+      <div className="flex-1 min-w-0 text-[#1A1815] dark:text-zinc-100">
+        <CollapsibleText text={text} render={(t) => <MarkdownRenderer text={t} />} />
       </div>
       <CopyButton text={text} />
     </div>
@@ -1311,12 +1311,12 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
       initial={{ opacity: 0, y: 2 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="mb-1.5 overflow-hidden rounded-md border border-[#D97757]/20 bg-[#D97757]/5"
+      className="mb-1.5 overflow-hidden rounded-md border border-[#D97757]/20 bg-[#D97757]/5 dark:border-[#D97757]/25"
     >
       <button
         onClick={() => setCollapsed((c) => !c)}
         disabled={streaming}
-        className="flex w-full items-center gap-1.5 px-2.5 py-1 text-left text-xs text-[#8B7355] disabled:cursor-default"
+        className="flex w-full items-center gap-1.5 px-2.5 py-1 text-left text-xs text-[#8B7355] disabled:cursor-default dark:text-[#E8A87C]"
       >
         <ChevronRight className={cn("h-3 w-3 transition-transform", !collapsed && "rotate-90")} />
         <Sparkles className="h-3 w-3 text-[#D97757]/70" />
@@ -1358,17 +1358,12 @@ function AssistantRow({
   if (!text && !showReasoning) return null;
   return (
     <div className="group flex gap-2">
-      <span className="shrink-0 pt-0.5 text-[#8B7355]">⟫</span>
-      <div className="flex-1 min-w-0 break-words text-[#2D2B27]" style={{ opacity: isStale ? 0.95 : 1 }}>
+      <span className="shrink-0 pt-0.5 text-[#8B7355] dark:text-[#E8A87C]">⟫</span>
+      <div className="flex-1 min-w-0 break-words text-[#2D2B27] dark:text-zinc-100" style={{ opacity: isStale ? 0.95 : 1 }}>
         {showReasoning && <ThinkingBlock text={reasoning!} streaming={streaming} />}
-        {text && (
-          <CollapsibleText
-            text={streaming ? deferredText : text}
-            render={(t) => <MarkdownRenderer text={t} />}
-          />
-        )}
+        {text && <MarkdownRenderer text={streaming ? deferredText : text} />}
         {streaming && (
-          <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-emerald-400 align-middle" />
+          <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-emerald-400 align-middle dark:bg-[#34d399]" />
         )}
       </div>
       <CopyButton text={text || reasoning || ""} />
@@ -1457,24 +1452,24 @@ function ToolCallRow({
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="rounded-md border border-[#E5E2D9] bg-gradient-to-r from-amber-950/15 to-zinc-900/30 px-3 py-2 text-xs"
+      className="rounded-md border border-[#E5E2D9] bg-gradient-to-r from-amber-950/15 to-zinc-900/30 px-3 py-2 text-xs dark:border-[#3a3731] dark:from-amber-950/25 dark:to-zinc-900/50"
       style={{ borderLeft: "3px solid rgba(217, 119, 6, 0.5)" }}
     >
-      <div className="flex items-center gap-2 text-[#B87B5A]">
+      <div className="flex items-center gap-2 text-[#B87B5A] dark:text-[#E8A87C]">
         <Wrench className="h-3.5 w-3.5" />
         <span className="font-semibold tracking-wide">tool · {name}</span>
       </div>
-      <div className="mt-1.5 space-y-0.5 pl-5 text-[#6B6862]">
+      <div className="mt-1.5 space-y-0.5 pl-5 text-[#6B6862] dark:text-zinc-400">
         {Object.entries(args).slice(0, 6).map(([k, v]) => (
           <div key={k} className="flex gap-2">
-            <span className="text-[#8B8884]">{k}:</span>
-            <span className="flex-1 break-all text-[#3D3B37]">
+            <span className="text-[#8B8884] dark:text-zinc-500">{k}:</span>
+            <span className="flex-1 break-all text-[#3D3B37] dark:text-zinc-300">
               {formatArgValue(v)}
             </span>
           </div>
         ))}
         {Object.keys(args).length > 6 && (
-          <div className="text-[#A8A29E]">… {Object.keys(args).length - 6} more</div>
+          <div className="text-[#A8A29E] dark:text-zinc-500">… {Object.keys(args).length - 6} more</div>
         )}
       </div>
     </motion.div>
@@ -1516,12 +1511,12 @@ function ToolGroupRow({
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="overflow-hidden rounded-md border border-[#E5E2D9] bg-[#FFFFFF] text-xs shadow-sm"
+      className="overflow-hidden rounded-md border border-[#E5E2D9] bg-[#FFFFFF] text-xs shadow-sm dark:border-[#3a3731] dark:bg-[#1c1a17]"
     >
       {/* Header — tool name + status */}
-      <div className="flex items-center gap-2 bg-gradient-to-r from-amber-950/15 to-zinc-900/30 px-3 py-2">
-        <Wrench className="h-3.5 w-3.5 text-[#B87B5A]" />
-        <span className="font-semibold tracking-wide text-[#B87B5A]">
+      <div className="flex items-center gap-2 bg-gradient-to-r from-amber-950/15 to-zinc-900/30 px-3 py-2 dark:from-amber-950/25 dark:to-zinc-900/50">
+        <Wrench className="h-3.5 w-3.5 text-[#B87B5A] dark:text-[#E8A87C]" />
+        <span className="font-semibold tracking-wide text-[#B87B5A] dark:text-[#E8A87C]">
           tool · {name}
         </span>
         <span className="ml-auto flex items-center gap-1">
@@ -1535,17 +1530,17 @@ function ToolGroupRow({
 
       {/* Args — compact key-value pairs */}
       {Object.keys(args).length > 0 && (
-        <div className="border-b border-[#E5E2D9] px-3 py-1.5 text-[#6B6862]">
+        <div className="border-b border-[#E5E2D9] px-3 py-1.5 text-[#6B6862] dark:border-[#3a3731] dark:text-zinc-400">
           {Object.entries(args).slice(0, 6).map(([k, v]) => (
             <div key={k} className="flex gap-2">
-              <span className="shrink-0 text-[#8B8884]">{k}:</span>
-              <span className="break-all text-[#3D3B37]">
+              <span className="shrink-0 text-[#8B8884] dark:text-zinc-500">{k}:</span>
+              <span className="break-all text-[#3D3B37] dark:text-zinc-300">
                 {formatArgValue(v)}
               </span>
             </div>
           ))}
           {Object.keys(args).length > 6 && (
-            <div className="text-[#A8A29E]">
+            <div className="text-[#A8A29E] dark:text-zinc-500">
               … {Object.keys(args).length - 6} more
             </div>
           )}
@@ -1558,7 +1553,7 @@ function ToolGroupRow({
           {showPath && !isPlan && (
             <button
               onClick={() => select(showPath)}
-              className="flex items-center gap-1 truncate rounded px-1 text-[#8B7355] hover:bg-[#F0EDE5]"
+              className="flex items-center gap-1 truncate rounded px-1 text-[#8B7355] hover:bg-[#F0EDE5] dark:text-[#E8A87C] dark:hover:bg-[#2a2723]"
               title="Open in editor"
             >
               <FileText className="h-3 w-3" />
@@ -1566,14 +1561,14 @@ function ToolGroupRow({
             </button>
           )}
           {!result.diff && !isPlan && output && (
-            <span className="text-[length:var(--font-size-ui-sm)] text-[#A8A29E]">
+            <span className="text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
               {outputLineCount} line{outputLineCount !== 1 ? "s" : ""}
             </span>
           )}
           {!isPlan && (
             <button
               onClick={() => setCollapsed((c) => !c)}
-              className="ml-auto text-[#8B8884] hover:text-[#3D3B37]"
+              className="ml-auto text-[#8B8884] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:text-zinc-200"
             >
               {collapsed ? "show" : "hide"}
             </button>
@@ -1583,7 +1578,7 @@ function ToolGroupRow({
         {isPlan ? (
           <div className="mt-2 flex items-center gap-2 text-xs">
             <span className="text-[#D97757]">📋</span>
-            <span className="text-[#6B6862]">Plan updated. </span>
+            <span className="text-[#6B6862] dark:text-zinc-400">Plan updated. </span>
             <button
               onClick={() => useVfsView.getState().setRightPanelTab("plan")}
               className="text-[#D97757] underline hover:no-underline"
@@ -1600,7 +1595,7 @@ function ToolGroupRow({
           </div>
         ) : (
           !collapsed && output && (
-            <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-[#6B6862] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
+            <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-[#6B6862] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:text-zinc-400 dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
               {output}
             </pre>
           )
@@ -1650,7 +1645,7 @@ function ToolResultRow({
       className={cn(
         "rounded-md border px-3 py-2 text-xs",
         ok
-          ? "border-[#E5E2D9] bg-[#F5F3EE]"
+          ? "border-[#E5E2D9] bg-[#F5F3EE] dark:border-[#3a3731] dark:bg-[#1c1a17]"
           : "border-[#E54D2E]/20 bg-[#E54D2E]/5",
       )}
     >
@@ -1660,13 +1655,13 @@ function ToolResultRow({
         ) : (
           <XCircle className="h-3.5 w-3.5 shrink-0 text-[#E54D2E]" />
         )}
-        <span className="font-semibold text-[#3D3B37]">
+        <span className="font-semibold text-[#3D3B37] dark:text-zinc-200">
           {ok ? "result" : "failed"} · {name}
         </span>
         {showPath && !isPlan && (
           <button
             onClick={() => select(showPath)}
-            className="ml-1 flex items-center gap-1 truncate rounded px-1 text-[#8B7355] hover:bg-[#F0EDE5]"
+            className="ml-1 flex items-center gap-1 truncate rounded px-1 text-[#8B7355] hover:bg-[#F0EDE5] dark:text-[#E8A87C] dark:hover:bg-[#2a2723]"
             title="Open in editor"
           >
             <FileText className="h-3 w-3" />
@@ -1674,14 +1669,14 @@ function ToolResultRow({
           </button>
         )}
         {!diff && !isPlan && output && (
-          <span className="text-[10px] text-[#A8A29E]">
+          <span className="text-[10px] text-[#A8A29E] dark:text-zinc-500">
             {outputLineCount} line{outputLineCount !== 1 ? "s" : ""}
           </span>
         )}
         {!isPlan && (
           <button
             onClick={() => setCollapsed((c) => !c)}
-            className="ml-auto text-[#8B8884] hover:text-[#3D3B37]"
+            className="ml-auto text-[#8B8884] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:text-zinc-200"
           >
             {collapsed ? "show" : "hide"}
           </button>
@@ -1691,7 +1686,7 @@ function ToolResultRow({
       {isPlan ? (
         <div className="mt-2 flex items-center gap-2 pl-5 text-xs">
           <span className="text-[#D97757]">📋</span>
-          <span className="text-[#6B6862]">Plan updated. </span>
+          <span className="text-[#6B6862] dark:text-zinc-400">Plan updated. </span>
           <button
             onClick={() => useVfsView.getState().setRightPanelTab("plan")}
             className="text-[#D97757] underline hover:no-underline"
@@ -1705,7 +1700,7 @@ function ToolResultRow({
         </div>
       ) : (
         !collapsed && output && (
-          <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words pl-5 text-[#6B6862] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
+          <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words pl-5 text-[#6B6862] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:text-zinc-400 dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
             {output}
           </pre>
         )
@@ -1764,8 +1759,8 @@ function ErrorRow({ text }: { text: string }) {
 
 function SystemRow({ text }: { text: string }) {
   return (
-    <div className="rounded-md border border-[#E5E2D9] bg-[#F5F3EE] px-3 py-2 text-xs text-[#6B6862]">
-      <span className="text-[#8B8884]">[system]</span> {text}
+    <div className="rounded-md border border-[#E5E2D9] bg-[#F5F3EE] px-3 py-2 text-xs text-[#6B6862] dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-400">
+      <span className="text-[#8B8884] dark:text-zinc-500">[system]</span> {text}
     </div>
   );
 }
@@ -1780,7 +1775,7 @@ function DiffView({ before, after }: { before: string; after: string }) {
   const diff = lineDiff(beforeLines, afterLines);
 
   return (
-    <div className="overflow-x-auto rounded border border-[#E5E2D9] bg-[#FFFFFF] text-[length:var(--font-size-code)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
+    <div className="overflow-x-auto rounded border border-[#E5E2D9] bg-[#FFFFFF] text-[length:var(--font-size-code)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#0d0d0b] dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
       <table className="min-w-full border-collapse font-mono">
         <tbody>
           {diff.map((row, i) => (
@@ -1791,18 +1786,18 @@ function DiffView({ before, after }: { before: string; after: string }) {
                 row.type === "del" && "bg-red-950/30",
               )}
             >
-              <td className="w-8 select-none border-r border-[#E5E2D9] px-1 text-right text-[#A8A29E]">
+              <td className="w-8 select-none border-r border-[#E5E2D9] px-1 text-right text-[#A8A29E] dark:border-[#3a3731] dark:text-zinc-500">
                 {row.leftNum ?? ""}
               </td>
-              <td className="w-8 select-none border-r border-[#E5E2D9] px-1 text-right text-[#A8A29E]">
+              <td className="w-8 select-none border-r border-[#E5E2D9] px-1 text-right text-[#A8A29E] dark:border-[#3a3731] dark:text-zinc-500">
                 {row.rightNum ?? ""}
               </td>
               <td
                 className={cn(
                   "whitespace-pre-wrap break-all px-2",
-                  row.type === "add" && "text-emerald-300",
+                  row.type === "add" && "text-emerald-300 dark:text-[#6ee7b7]",
                   row.type === "del" && "text-[#E54D2E]",
-                  row.type === "ctx" && "text-[#6B6862]",
+                  row.type === "ctx" && "text-[#6B6862] dark:text-zinc-400",
                 )}
               >
                 <span className="select-none mr-1">
@@ -1963,31 +1958,31 @@ function MermaidBlock({ code }: { code: string }) {
 
 const markdownComponents: Components = {
   h1: ({ children }) => (
-    <h1 className="mt-3 mb-2 text-lg font-bold text-[#1A1815]">{children}</h1>
+    <h1 className="mt-3 mb-2 text-xl font-extrabold tracking-tight text-[#1A1815] dark:text-white">{children}</h1>
   ),
   h2: ({ children }) => (
-    <h2 className="mt-3 mb-2 text-base font-semibold text-[#1A1815]">{children}</h2>
+    <h2 className="mt-3 mb-2 text-lg font-bold tracking-tight text-[#1A1815] dark:text-white">{children}</h2>
   ),
   h3: ({ children }) => (
-    <h3 className="mt-2 mb-1 text-sm font-semibold text-[#2D2B27]">{children}</h3>
+    <h3 className="mt-2 mb-1 text-base font-semibold text-[#2D2B27] dark:text-zinc-100">{children}</h3>
   ),
   h4: ({ children }) => (
-    <h4 className="mt-2 mb-1 text-sm font-semibold text-[#3D3B37]">{children}</h4>
+    <h4 className="mt-2 mb-1 text-sm font-semibold text-[#3D3B37] dark:text-zinc-200">{children}</h4>
   ),
   p: ({ children }) => (
-    <p className="my-1.5 leading-relaxed text-[#2D2B27]">{children}</p>
+    <p className="my-1.5 leading-relaxed text-[#2D2B27] dark:text-zinc-300">{children}</p>
   ),
   ul: ({ children, ...props }) => {
     // task list?
     const items = Array.isArray(children) ? children : [children];
     return (
-      <ul className="my-1.5 ml-4 list-disc space-y-0.5 text-[#2D2B27]" {...props}>
+      <ul className="my-1.5 ml-4 list-disc space-y-0.5 text-[#2D2B27] dark:text-zinc-300" {...props}>
         {children}
       </ul>
     );
   },
   ol: ({ children, ...props }) => (
-    <ol className="my-1.5 ml-4 list-decimal space-y-0.5 text-[#2D2B27]" {...props}>
+    <ol className="my-1.5 ml-4 list-decimal space-y-0.5 text-[#2D2B27] dark:text-zinc-300" {...props}>
       {children}
     </ol>
   ),
@@ -2000,24 +1995,24 @@ const markdownComponents: Components = {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-[#8B7355] underline decoration-sky-700 hover:decoration-sky-400"
+      className="text-[#8B7355] underline decoration-sky-700 hover:decoration-sky-400 dark:text-[#7dd3fc] dark:decoration-[#0369a1] dark:hover:decoration-[#38bdf8]"
     >
       {children}
     </a>
   ),
   strong: ({ children }) => (
-    <strong className="font-semibold text-[#1A1815]">{children}</strong>
+    <strong className="font-bold text-[#1A1815] dark:text-white">{children}</strong>
   ),
-  em: ({ children }) => <em className="italic text-[#3D3B37]">{children}</em>,
+  em: ({ children }) => <em className="italic text-[#3D3B37] dark:text-zinc-200">{children}</em>,
   del: ({ children }) => (
-    <del className="text-[#8B8884] line-through">{children}</del>
+    <del className="text-[#8B8884] line-through dark:text-zinc-500">{children}</del>
   ),
   blockquote: ({ children }) => (
-    <blockquote className="my-2 border-l-2 border-[#E5E2D9] pl-3 text-[#6B6862] italic">
+    <blockquote className="my-2 border-l-2 border-[#E5E2D9] pl-3 text-[#6B6862] italic dark:border-[#52504b] dark:text-zinc-400">
       {children}
     </blockquote>
   ),
-  hr: () => <hr className="my-3 border-[#E5E2D9]" />,
+  hr: () => <hr className="my-3 border-[#E5E2D9] dark:border-[#3a3731]" />,
   table: ({ children }) => (
     <div className="my-2 overflow-x-auto">
       <table className="min-w-full border-collapse text-xs">
@@ -2026,22 +2021,23 @@ const markdownComponents: Components = {
     </div>
   ),
   thead: ({ children }) => (
-    <thead className="border-b border-[#E5E2D9]">{children}</thead>
+    <thead className="border-b border-[#E5E2D9] dark:border-[#3a3731]">{children}</thead>
   ),
   th: ({ children }) => (
-    <th className="px-2 py-1 text-left font-semibold text-[#2D2B27]">{children}</th>
+    <th className="px-2 py-1 text-left font-semibold text-[#2D2B27] dark:text-zinc-100">{children}</th>
   ),
   td: ({ children }) => (
-    <td className="px-2 py-1 border-t border-[#E5E2D9] text-[#3D3B37]">{children}</td>
+    <td className="px-2 py-1 border-t border-[#E5E2D9] text-[#3D3B37] dark:border-[#3a3731] dark:text-zinc-300">{children}</td>
   ),
-  // Inline code
+  // Inline code — the "微白框" look: soft light box with readable text,
+  // never the harsh emerald. In dark mode: brighter box, near-white text.
   code: ({ className, children, ...props }) => {
-    const match = /language-(\w+)/.exec(className || "");
-    const isInline = !match && !String(children).includes("\n");
+    const langMatch = className ? className.match(/language-(\w+)/) : null;
+    const isInline = !langMatch && !String(children).includes("\n");
     if (isInline) {
       return (
         <code
-          className="rounded bg-[#F0EDE5] px-1 py-0.5 text-[length:var(--font-size-code)] text-emerald-300 font-mono"
+          className="rounded-md border border-[#E5E2D9] bg-[#F5F3EE] px-1.5 py-0.5 text-[length:var(--font-size-code)] font-medium text-[#3D3B37] dark:border-[#52504b] dark:bg-[#262320] dark:text-zinc-100"
           {...props}
         >
           {children}
@@ -2049,7 +2045,7 @@ const markdownComponents: Components = {
       );
     }
     // Fenced code block — render with Prism
-    const lang = match?.[1] ?? "text";
+    const lang = langMatch?.[1] ?? "text";
     const codeText = String(children).replace(/\n$/, "");
     const highlighted = highlightCode(codeText, lang);
     return (
@@ -2077,20 +2073,20 @@ const markdownComponents: Components = {
       return <MermaidBlock code={codeText} />;
     }
     return (
-      <div className="my-2 overflow-hidden rounded-md border border-[#E5E2D9] bg-[#FFFFFF]">
-        <div className="flex items-center justify-between border-b border-[#E5E2D9] px-3 py-1 text-[length:var(--font-size-ui-sm)] uppercase tracking-wider text-[#8B8884]">
+      <div className="my-2 overflow-hidden rounded-md border border-[#E5E2D9] bg-[#FFFFFF] dark:border-[#3a3731] dark:bg-[#0f0e0b]">
+        <div className="flex items-center justify-between border-b border-[#E5E2D9] px-3 py-1 text-[length:var(--font-size-ui-sm)] uppercase tracking-wider text-[#8B8884] dark:border-[#3a3731] dark:text-zinc-500">
           <span>{lang}</span>
           <button
             onClick={() => {
               if (codeText) navigator.clipboard?.writeText(codeText);
             }}
-            className="text-[#A8A29E] hover:text-[#3D3B37]"
+            className="text-[#A8A29E] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:text-zinc-200"
             title="Copy"
           >
             copy
           </button>
         </div>
-        <pre className="overflow-x-auto px-4 py-3 text-[length:var(--font-size-code)] leading-relaxed [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
+        <pre className="overflow-x-auto px-4 py-3 text-[length:var(--font-size-code)] leading-relaxed [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
           {children}
         </pre>
       </div>

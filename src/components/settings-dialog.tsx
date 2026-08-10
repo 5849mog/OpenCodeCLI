@@ -115,23 +115,23 @@ export function SettingsDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-[#E5E2D9] bg-[#FFFFFF] text-[#2D2B27] shadow-2xl">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-[#E5E2D9] bg-[#FFFFFF] text-[#2D2B27] dark:text-zinc-200 shadow-2xl dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-100">
         {/* Header */}
-        <div className="flex items-center gap-2 border-b border-[#E5E2D9] px-5 py-4">
+        <div className="flex items-center gap-2 border-b border-[#E5E2D9] px-5 py-4 dark:border-[#3a3731]">
           <Settings className="h-5 w-5 text-[#D97757]" />
           <h2 className="text-lg font-semibold">Settings · AI Provider</h2>
           <button
             onClick={onClose}
-            className="ml-auto rounded p-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#3D3B37]"
+            className="ml-auto rounded p-1.5 text-[#8B8884] dark:text-zinc-500 hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:text-zinc-300 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
+        <div className="flex-1 overflow-y-auto px-5 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
           {/* Presets */}
           <div className="mb-5">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#8B8884]">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#8B8884] dark:text-zinc-500 dark:text-zinc-500">
               Quick presets
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -146,12 +146,12 @@ export function SettingsDialog({
                   }
                   className={`rounded border px-3 py-2 text-left text-xs transition ${
                     config.baseUrl === p.baseUrl
-                      ? "border-[#D97757] bg-emerald-950/30"
-                      : "border-[#E5E2D9] bg-[#FFFFFF] hover:border-zinc-600"
+                      ? "border-[#D97757] bg-emerald-950/30 dark:bg-emerald-950/40"
+                      : "border-[#E5E2D9] bg-[#FFFFFF] hover:border-zinc-600 dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-zinc-500"
                   }`}
                 >
-                  <div className="font-semibold text-[#2D2B27]">{p.name}</div>
-                  <div className="mt-0.5 text-[10px] text-[#8B8884]">
+                  <div className="font-semibold text-[#2D2B27] dark:text-zinc-200 dark:text-zinc-200">{p.name}</div>
+                  <div className="mt-0.5 text-[10px] text-[#8B8884] dark:text-zinc-500 dark:text-zinc-500">
                     {p.hint}
                   </div>
                 </button>
@@ -165,7 +165,7 @@ export function SettingsDialog({
               value={config.baseUrl}
               onChange={(e) => setConfig({ baseUrl: e.target.value })}
               placeholder="https://api.openai.com/v1"
-              className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
+              className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none dark:text-zinc-100"
             />
           </Field>
 
@@ -180,11 +180,11 @@ export function SettingsDialog({
                   setKeyDirty(true);
                 }}
                 placeholder={config.hasApiKey && !keyDirty ? "•••••••• (key is set, type to change)" : "sk-…"}
-                className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
+                className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
               />
               <button
                 onClick={() => setShowKey(!showKey)}
-                className="rounded border border-[#E5E2D9] px-3 text-[#6B6862] hover:bg-[#F0EDE5]"
+                className="rounded border border-[#E5E2D9] px-3 text-[#6B6862] dark:text-zinc-400 hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:hover:bg-[#2a2723]"
               >
                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -204,7 +204,7 @@ export function SettingsDialog({
                 onChange={(e) => setConfig({ model: e.target.value })}
                 placeholder="gpt-4o"
                 list="model-suggestions"
-                className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
+                className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
               />
               <datalist id="model-suggestions">
                 {PRESETS.find((p) => p.baseUrl === config.baseUrl)?.models.map(
@@ -214,7 +214,7 @@ export function SettingsDialog({
               <button
                 onClick={testConnection}
                 disabled={testing || !keyInput}
-                className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-3 text-sm text-[#3D3B37] hover:bg-[#F0EDE5] disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-3 text-sm text-[#3D3B37] dark:text-zinc-300 hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:hover:bg-[#2a2723] disabled:opacity-40"
               >
                 <Zap className="h-3.5 w-3.5" />
                 {testing ? "Testing…" : "Test"}
@@ -234,7 +234,7 @@ export function SettingsDialog({
                 onChange={(e) =>
                   setConfig({ temperature: parseFloat(e.target.value) || 0 })
                 }
-                className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
+                className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
               />
             </Field>
             <Field label="Max tokens">
@@ -247,14 +247,14 @@ export function SettingsDialog({
                 onChange={(e) =>
                   setConfig({ maxTokens: parseInt(e.target.value, 10) || 1024 })
                 }
-                className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
+                className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
               />
             </Field>
           </div>
 
           {/* DeepSeek V4: thinking + reasoning */}
-          <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] px-4 py-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6862]">
+          <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
               DeepSeek V4 · Thinking / Reasoning
             </div>
             <div className="flex flex-wrap gap-4">
@@ -266,15 +266,15 @@ export function SettingsDialog({
                   onChange={(e) => setConfig({ thinkingEnabled: e.target.checked })}
                   className="h-4 w-4 accent-[#D97757]"
                 />
-                <span className="text-sm text-[#3D3B37]">Thinking mode</span>
+                <span className="text-sm text-[#3D3B37] dark:text-zinc-300">Thinking mode</span>
               </label>
               {/* Reasoning effort */}
               <label className="flex items-center gap-2">
-                <span className="text-xs text-[#8B8884]">Effort:</span>
+                <span className="text-xs text-[#8B8884] dark:text-zinc-500">Effort:</span>
                 <select
                   value={config.reasoningEffort}
                   onChange={(e) => setConfig({ reasoningEffort: e.target.value })}
-                  className="rounded border border-[#E5E2D9] bg-white px-2 py-1 text-sm font-mono focus:border-[#D97757] focus:outline-none"
+                  className="rounded border border-[#E5E2D9] bg-white dark:bg-[#161512] dark:text-zinc-100 px-2 py-1 text-sm font-mono focus:border-[#D97757] focus:outline-none"
                 >
                   <option value="low">low</option>
                   <option value="high">high</option>
@@ -283,15 +283,15 @@ export function SettingsDialog({
                 </select>
               </label>
             </div>
-            <div className="mt-1.5 text-[11px] text-[#A8A29E]">
+            <div className="mt-1.5 text-[11px] text-[#A8A29E] dark:text-zinc-500">
               For DeepSeek V4 models. On sends <code className="text-[#D97757]">thinking=enabled</code> + <code className="text-[#D97757]">reasoning_effort</code>; off sends <code className="text-[#D97757]">thinking=disabled</code>. Valid efforts: low/high/xhigh/max. Note: thinking &amp; answer share the Max tokens budget.
             </div>
           </div>
 
           {/* ── Web & Search ── */}
-          <div className="mb-4 border-t border-[#E5E2D9] pt-5">
+          <div className="mb-4 border-t border-[#E5E2D9] pt-5 dark:border-[#3a3731]">
             <div className="flex items-center gap-1.5 mb-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#6B6862]">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
                 Web &amp; Search
               </span>
             </div>
@@ -305,14 +305,14 @@ export function SettingsDialog({
                     onClick={() => setConfig({ searchProvider: p })}
                     className={`flex-1 rounded border px-3 py-2 text-xs transition ${
                       config.searchProvider === p
-                        ? "border-[#D97757] bg-emerald-950/30"
-                        : "border-[#E5E2D9] bg-[#FFFFFF] hover:border-zinc-600"
+                        ? "border-[#D97757] bg-emerald-950/30 dark:bg-emerald-950/40"
+                        : "border-[#E5E2D9] bg-[#FFFFFF] hover:border-zinc-600 dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-zinc-500"
                     }`}
                   >
-                    <div className="font-semibold text-[#2D2B27]">
+                    <div className="font-semibold text-[#2D2B27] dark:text-zinc-200">
                       {p === "tavily" ? "Tavily" : "Brave Search"}
                     </div>
-                    <div className="mt-0.5 text-[10px] text-[#8B8884]">
+                    <div className="mt-0.5 text-[10px] text-[#8B8884] dark:text-zinc-500">
                       {p === "tavily" ? "Recommended · 1k/mo free" : "2k/mo free"}
                     </div>
                   </button>
@@ -335,11 +335,11 @@ export function SettingsDialog({
                       ? "•••••••• (key is set, type to change)"
                       : `Enter your ${config.searchProvider} API key…`
                   }
-                  className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
+                  className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
                 />
                 <button
                   onClick={() => setShowSearchKey(!showSearchKey)}
-                  className="rounded border border-[#E5E2D9] px-3 text-[#6B6862] hover:bg-[#F0EDE5]"
+                  className="rounded border border-[#E5E2D9] px-3 text-[#6B6862] dark:text-zinc-400 hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:hover:bg-[#2a2723]"
                 >
                   {showSearchKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -349,15 +349,15 @@ export function SettingsDialog({
                   ✓ 已配置自定义 Key（加密存储在 sessionStorage）
                 </div>
               ) : !apiKeyVault.hasSearchKey() && !searchKeyDirty && !searchKeyInput ? (
-                <div className="mt-1 text-[11px] text-[#8B8884]">
+                <div className="mt-1 text-[11px] text-[#8B8884] dark:text-zinc-500">
                   未配置搜索 API Key — web_search 暂不可用。填入上方的 Tavily 或 Brave Key 后即可开启（两者都有免费额度）。
                 </div>
               ) : null}
             </Field>
 
             {/* URL Fetch options */}
-            <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] px-4 py-3">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6862]">
+            <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
                 URL Fetch options
               </div>
 
@@ -369,27 +369,27 @@ export function SettingsDialog({
                   onChange={(e) => setConfig({ useJinaReader: e.target.checked })}
                   className="h-4 w-4 accent-[#D97757]"
                 />
-                <span className="text-sm text-[#3D3B37]">
-                  Use Jina AI Reader <span className="text-[#A8A29E]">(r.jina.ai)</span>
+                <span className="text-sm text-[#3D3B37] dark:text-zinc-300">
+                  Use Jina AI Reader <span className="text-[#A8A29E] dark:text-zinc-500">(r.jina.ai)</span>
                 </span>
               </label>
-              <div className="mt-1 text-[11px] text-[#A8A29E]">
+              <div className="mt-1 text-[11px] text-[#A8A29E] dark:text-zinc-500">
                 Free CORS proxy that converts web pages to LLM-friendly markdown. No API key needed.
                 Disable if you want to use a custom CORS proxy instead.
               </div>
 
               {/* Custom CORS proxy */}
               <div className="mt-3">
-                <label className="mb-1.5 block text-xs text-[#8B8884]">
-                  Custom CORS proxy URL <span className="text-[#A8A29E]">(optional)</span>
+                <label className="mb-1.5 block text-xs text-[#8B8884] dark:text-zinc-500">
+                  Custom CORS proxy URL <span className="text-[#A8A29E] dark:text-zinc-500">(optional)</span>
                 </label>
                 <input
                   value={config.corsProxyUrl}
                   onChange={(e) => setConfig({ corsProxyUrl: e.target.value })}
                   placeholder="http://localhost:81/cors-proxy/"
-                  className="w-full rounded border border-[#E5E2D9] bg-white px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
+                  className="w-full rounded border border-[#E5E2D9] bg-white dark:bg-[#161512] dark:text-zinc-100 px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
                 />
-                <div className="mt-0.5 text-[11px] text-[#A8A29E]">
+                <div className="mt-0.5 text-[11px] text-[#A8A29E] dark:text-zinc-500">
                   Only needed if Jina Reader is disabled and the target site blocks CORS.
                 </div>
               </div>
@@ -403,13 +403,13 @@ export function SettingsDialog({
               onChange={(e) => setConfig({ customInstructions: e.target.value })}
               rows={3}
               placeholder="e.g. Always use TypeScript. Prefer functional components. Use Tailwind for styling."
-              className="w-full resize-none rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-sm focus:border-[#D97757] focus:outline-none"
+              className="w-full resize-none rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 text-sm focus:border-[#D97757] focus:outline-none"
             />
           </Field>
 
           {/* Privacy note */}
-          <div className="mt-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-[11px] text-[#8B8884]">
-            <span className="font-semibold text-[#6B6862]">Security:</span> Your
+          <div className="mt-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 text-[11px] text-[#8B8884] dark:text-zinc-500">
+            <span className="font-semibold text-[#6B6862] dark:text-zinc-400">Security:</span> Your
             API key is encrypted with AES-GCM (Web Crypto API) and stored in
             sessionStorage — it is NEVER in localStorage, NEVER in React state,
             and NEVER in the Zustand store. The encrypted blob is cleared when
@@ -420,7 +420,7 @@ export function SettingsDialog({
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-[#E5E2D9] px-5 py-3">
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#8B8884]">
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#8B8884] dark:text-zinc-500">
             {config.hasApiKey ? (
               <span className="text-[#D97757]">● Key configured</span>
             ) : (
@@ -429,7 +429,7 @@ export function SettingsDialog({
             {config.hasSearchKey ? (
               <span className="text-[#D97757]">● Search configured</span>
             ) : (
-              <span className="text-[#8B8884]">● No search key</span>
+              <span className="text-[#8B8884] dark:text-zinc-500">● No search key</span>
             )}
           </div>
           <button
@@ -477,11 +477,11 @@ function Field({
 }) {
   return (
     <div className="mb-4">
-      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#6B6862]">
+      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
         {label}
       </label>
       {children}
-      {hint && <div className="mt-1 text-[11px] text-[#A8A29E]">{hint}</div>}
+      {hint && <div className="mt-1 text-[11px] text-[#A8A29E] dark:text-zinc-500">{hint}</div>}
     </div>
   );
 }

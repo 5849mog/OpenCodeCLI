@@ -83,9 +83,9 @@ function PlanNodeRow({ node, depth, currentPath }: { node: PlanNode; depth: numb
     <>
       <li
         className={cn(
-          "flex items-start gap-2.5 rounded-md border-l-2 border-transparent px-2 py-1.5 transition-colors hover:bg-[#F5F3EE]",
-          node.status === "done" ? "text-[#8B8884]" : "text-[#2D2B27]",
-          isCurrent && "border-l-[#D97757] bg-[#D97757]/5",
+          "flex items-start gap-2.5 rounded-md border-l-2 border-transparent px-2 py-1.5 transition-colors hover:bg-[#F5F3EE] dark:hover:bg-[#262320]",
+          node.status === "done" ? "text-[#8B8884] dark:text-zinc-500" : "text-[#2D2B27] dark:text-zinc-200",
+          isCurrent && "border-l-[#D97757] bg-[#D97757]/5 dark:bg-[#D97757]/10",
         )}
         style={{ paddingLeft: `${12 + padLeft}px` }}
       >
@@ -120,7 +120,7 @@ function PlanNodeRow({ node, depth, currentPath }: { node: PlanNode; depth: numb
           </span>
         )}
         {hasChildren && (
-          <span className="shrink-0 text-[11px] text-[#A8A29E] tabular-nums">
+          <span className="shrink-0 text-[11px] text-[#A8A29E] tabular-nums dark:text-zinc-500">
             {done}/{total}
           </span>
         )}
@@ -147,15 +147,15 @@ export function PlanPanel({ eventsLen }: { eventsLen: number }) {
   if (!parsed) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-        <div className="rounded-full border border-[#E5E2D9] bg-[#FAF9F7] p-4">
+        <div className="rounded-full border border-[#E5E2D9] bg-[#FAF9F7] p-4 dark:border-[#3a3731] dark:bg-[#262320]">
           <ClipboardList className="h-8 w-8 text-[#D97757]" />
         </div>
-        <div className="text-sm text-[#3D3B37]">No plan yet</div>
-        <div className="max-w-xs text-xs text-[#8B8884]">
+        <div className="text-sm text-[#3D3B37] dark:text-zinc-200">No plan yet</div>
+        <div className="max-w-xs text-xs text-[#8B8884] dark:text-zinc-500">
           Ask the AI to create a plan. It will use <code className="text-[#D97757]">update_plan</code> to build a structured checklist here.
         </div>
         {mode === "bypass" && (
-          <div className="max-w-xs text-xs text-[#8B8884]">
+          <div className="max-w-xs text-xs text-[#8B8884] dark:text-zinc-500">
             当前为 Bypass 模式，可直接让 AI 先用 <code className="text-[#D97757]">update_plan</code> 规划再执行。
           </div>
         )}
@@ -172,11 +172,11 @@ export function PlanPanel({ eventsLen }: { eventsLen: number }) {
   if (total === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-        <div className="rounded-full border border-[#E5E2D9] bg-[#FAF9F7] p-4">
+        <div className="rounded-full border border-[#E5E2D9] bg-[#FAF9F7] p-4 dark:border-[#3a3731] dark:bg-[#262320]">
           <ClipboardList className="h-8 w-8 text-[#D97757]" />
         </div>
-        <div className="text-sm text-[#3D3B37]">Plan is empty</div>
-        <div className="max-w-xs text-xs text-[#8B8884]">
+        <div className="text-sm text-[#3D3B37] dark:text-zinc-200">Plan is empty</div>
+        <div className="max-w-xs text-xs text-[#8B8884] dark:text-zinc-500">
           PLAN.md exists but has no checklist items. Use <code className="text-[#D97757]">- [ ]</code> syntax in Markdown.
         </div>
       </div>
@@ -186,17 +186,17 @@ export function PlanPanel({ eventsLen }: { eventsLen: number }) {
   return (
     <div className="flex h-full flex-col">
       {/* Sticky header */}
-      <div className="border-b border-[#E5E2D9] bg-[#FFFFFF] px-5 py-4">
+      <div className="border-b border-[#E5E2D9] bg-[#FFFFFF] px-5 py-4 dark:border-[#3a3731] dark:bg-[#161512]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ClipboardList className="h-5 w-5 text-[#D97757]" />
-            <h2 className="text-sm font-semibold text-[#2D2B27]">{title}</h2>
+            <h2 className="text-sm font-semibold text-[#2D2B27] dark:text-zinc-100">{title}</h2>
           </div>
-          <span className="font-mono text-xs text-[#8B8884] tabular-nums">
+          <span className="font-mono text-xs text-[#8B8884] tabular-nums dark:text-zinc-500">
             {done}/{total} · {pct}%
           </span>
         </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#F0EDE5]">
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#F0EDE5] dark:bg-[#2a2723]">
           {/* key flips when plan completes → replays the emerald fade-in once */}
           <motion.div
             key={pct === 100 ? "done" : "running"}
@@ -205,7 +205,7 @@ export function PlanPanel({ eventsLen }: { eventsLen: number }) {
             className={cn(
               "h-full rounded-full transition-all duration-500 ease-out",
               pct === 100
-                ? "bg-gradient-to-r from-emerald-500 to-emerald-400"
+                ? "bg-gradient-to-r from-emerald-500 to-emerald-400 dark:from-[#34d399] dark:to-[#2dd4bf]"
                 : "bg-gradient-to-r from-[#D97757] to-[#C66B4A]",
             )}
             style={{ width: `${pct}%` }}
@@ -214,7 +214,7 @@ export function PlanPanel({ eventsLen }: { eventsLen: number }) {
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]">
+      <div className="flex-1 overflow-y-auto px-4 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
         {sections.map((section, si) => {
           const st = computeTotals(section.nodes);
           const sectionPct = st.total > 0 ? Math.round((st.done / st.total) * 100) : 0;
@@ -223,18 +223,18 @@ export function PlanPanel({ eventsLen }: { eventsLen: number }) {
               {section.title && (
                 <div className="mb-2">
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-[#6B6862]">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
                       {section.title}
                     </span>
-                    <span className="h-px flex-1 bg-[#E5E2D9]" />
+                    <span className="h-px flex-1 bg-[#E5E2D9] dark:bg-[#3a3731]" />
                     {st.total > 0 && (
-                      <span className="text-[11px] text-[#A8A29E] tabular-nums">
+                      <span className="text-[11px] text-[#A8A29E] tabular-nums dark:text-zinc-500">
                         {st.done}/{st.total}
                       </span>
                     )}
                   </div>
                   {st.total > 0 && (
-                    <div className="mt-1 h-[3px] overflow-hidden rounded-full bg-[#F0EDE5]">
+                    <div className="mt-1 h-[3px] overflow-hidden rounded-full bg-[#F0EDE5] dark:bg-[#2a2723]">
                       <div
                         className="h-full rounded-full bg-[#D97757]/60 transition-all duration-500"
                         style={{ width: `${sectionPct}%` }}

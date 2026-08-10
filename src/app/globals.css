@@ -46,46 +46,77 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Claude-inspired warm palette */
+/* Dark "ZCode / Claude Code" palette — the app is forced dark. */
 :root {
   --radius: 0.75rem;
   /* Responsive font sizes */
   --font-size-base: clamp(13px, 1.4vw, 15px);
   --font-size-code: clamp(12px, 1.3vw, 14px);
   --font-size-ui-sm: clamp(11px, 1.1vw, 12px);
-  /* Warm whites & creams */
-  --background: #FAF9F7;
-  --foreground: #2D2B27;
-  --card: #FFFFFF;
-  --card-foreground: #2D2B27;
-  --popover: #FFFFFF;
-  --popover-foreground: #2D2B27;
-  /* Claude orange */
+  /* Near-black warm grays */
+  --background: #161512;
+  --foreground: #e7e5e4;
+  --card: #1c1a17;
+  --card-foreground: #e7e5e4;
+  --popover: #1c1a17;
+  --popover-foreground: #e7e5e4;
+  /* Claude orange, kept but softened for dark bg */
   --primary: #D97757;
-  --primary-foreground: #FFFFFF;
-  --secondary: #F5F3EE;
-  --secondary-foreground: #2D2B27;
-  --muted: #F0EDE5;
-  --muted-foreground: #8B8884;
-  --accent: #F5F3EE;
-  --accent-foreground: #2D2B27;
+  --primary-foreground: #1f1a16;
+  --secondary: #262320;
+  --secondary-foreground: #e7e5e4;
+  --muted: #262320;
+  --muted-foreground: #a8a29e;
+  --accent: #262320;
+  --accent-foreground: #e7e5e4;
   --destructive: #E54D2E;
-  --border: #E5E2D9;
-  --input: #E5E2D9;
+  --border: #3a3731;
+  --input: #3a3731;
   --ring: #D97757;
-  /* Claude orange for charts */
+  /* Charts */
   --chart-1: #D97757;
   --chart-2: #E8A87C;
   --chart-3: #C4A484;
   --chart-4: #8B7355;
   --chart-5: #6B5D54;
-  --sidebar: #F5F3EE;
-  --sidebar-foreground: #2D2B27;
+  --sidebar: #1e1c18;
+  --sidebar-foreground: #e7e5e4;
   --sidebar-primary: #D97757;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F0EDE5;
-  --sidebar-accent-foreground: #2D2B27;
-  --sidebar-border: #E5E2D9;
+  --sidebar-primary-foreground: #1f1a16;
+  --sidebar-accent: #2a2723;
+  --sidebar-accent-foreground: #e7e5e4;
+  --sidebar-border: #3a3731;
+  --sidebar-ring: #D97757;
+}
+
+/* Tailwind's dark: variant lives under a plain `.dark` ancestor too, so keep
+   the class-based variant resolved even though defaults ARE already dark. */
+:root.dark {
+  --background: #161512;
+  --foreground: #e7e5e4;
+  --card: #1c1a17;
+  --card-foreground: #e7e5e4;
+  --popover: #1c1a17;
+  --popover-foreground: #e7e5e4;
+  --primary: #D97757;
+  --primary-foreground: #1f1a16;
+  --secondary: #262320;
+  --secondary-foreground: #e7e5e4;
+  --muted: #262320;
+  --muted-foreground: #a8a29e;
+  --accent: #262320;
+  --accent-foreground: #e7e5e4;
+  --destructive: #E54D2E;
+  --border: #3a3731;
+  --input: #3a3731;
+  --ring: #D97757;
+  --sidebar: #1e1c18;
+  --sidebar-foreground: #e7e5e4;
+  --sidebar-primary: #D97757;
+  --sidebar-primary-foreground: #1f1a16;
+  --sidebar-accent: #2a2723;
+  --sidebar-accent-foreground: #e7e5e4;
+  --sidebar-border: #3a3731;
   --sidebar-ring: #D97757;
 }
 
@@ -172,6 +203,75 @@ pre[class*="language-"],
 
 .token.italic {
   font-style: italic;
+}
+
+/* ----- Prism dark overrides (app is forced dark) ----- */
+.dark code[class*="language-"],
+.dark pre[class*="language-"] {
+  background: #0f0e0b;
+}
+.dark .token.comment,
+.dark .token.prolog,
+.dark .token.doctype,
+.dark .token.cdata {
+  color: #7d7873;
+}
+.dark .token.punctuation {
+  color: #83807c;
+}
+.dark .token.property,
+.dark .token.tag,
+.dark .token.boolean,
+.dark .token.number,
+.dark .token.constant,
+.dark .token.symbol,
+.dark .token.deleted {
+  color: #f0a98c;
+}
+.dark .token.selector,
+.dark .token.attr-name,
+.dark .token.string,
+.dark .token.char,
+.dark .token.builtin,
+.dark .token.inserted {
+  color: #9ecb9a;
+}
+.dark .token.operator,
+.dark .token.entity,
+.dark .token.url,
+.dark .language-css .token.string,
+.dark .style .token.string {
+  color: #d6b98c;
+}
+.dark .token.atrule,
+.dark .token.attr-value,
+.dark .token.keyword {
+  color: #eba98a;
+}
+.dark .token.function,
+.dark .token.class-name {
+  color: #b7a6e0;
+}
+.dark .token.regex,
+.dark .token.important,
+.dark .token.variable {
+  color: #f0a98c;
+}
+
+/* ----- Scrollbars — dark ----- */
+.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #3a3731;
+  border-radius: 3px;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #52504b;
 }
 
 /* ----- Scrollbars — Claude style ----- */
