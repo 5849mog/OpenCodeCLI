@@ -31,12 +31,12 @@
 | 21   | 权限边界：无网络 | 脚本内发起请求 → 无此能力 | `socket`/`http` 均 nil，`require` 报 not found | ✅ |
 | 22   | Plan 模式可用性 | run_lua 在 Plan 模式可调用（纯计算非变更） | 代码层确认：不在 Plan 模式 mutating 拦截集合 | ✅ |
 | 23   | 降级路径 | wasm 未加载时返回「原生引擎不可用」而非假执行 | 本地 dispatch 全链路测试产出该信息 | ✅ |
-| 24   | files 读取：`io.open(path)` | `files=['data.csv']`，脚本读到工作区文件真实内容 | 部署后实测 | ⏳ |
-| 25   | files 嵌套路径 | `files=['src/util.ts']`，io.open 可读（父目录自动创建） | 部署后实测 | ⏳ |
-| 26   | files 缺失文件 | `files=['nope.txt']` → ok:false 列明缺失，不运行脚本 | 部署后实测 | ⏳ |
-| 27   | files 写入隔离 | 脚本 `io.open(path,'w')` 只改 MEMFS 副本，VFS 原文件不变 | 部署后实测 | ⏳ |
-| 28   | files 超限 | 文件数 >20 或单文件 >200KB → ok:false 列明原因 | 部署后实测 | ⏳ |
-| 29   | 脚本以 `--` 开头 | `-- 注释` 开头的脚本正常运行（脚本作为 MEMFS 文件执行，不走 -e 选项解析） | 修复后复测（见 BUG 记录） | ⏳ |
+| 24   | files 读取：`io.open(path)` | `files=['data.csv']`，脚本读到工作区文件真实内容 | `apple,3\nbanana,5\napple,2` 完整读回 | ✅ |
+| 25   | files 嵌套路径 | `files=['src/util.ts']`，io.open 可读（父目录自动创建） | `export function util() {...}` 完整读回 | ✅ |
+| 26   | files 缺失文件 | `files=['nope.txt']` → ok:false 列明缺失，不运行脚本 | `run_lua: 无法读取指定文件 — 文件不存在: nope.txt`（脚本未执行） | ✅ |
+| 27   | files 写入隔离 | 脚本 `io.open(path,'w')` 只改 MEMFS 副本，VFS 原文件不变 | 脚本写入 `HACKED` 后 read_file 读回原内容，VFS 未污染 | ✅ |
+| 28   | files 超限 | 文件数 >20 或单文件 >200KB → ok:false 列明原因 | `文件过大(>200,000 字符): big.txt`（233KB，脚本未执行） | ✅ |
+| 29   | 脚本以 `--` 开头 | `-- 注释` 开头的脚本正常运行（脚本作为 MEMFS 文件执行，不走 -e 选项解析） | `--`/前导空格/块注释/`-` 开头 4 种均正常（旧版全报 `'-e' needs argument`） | ✅ |
 
 ## BUG 记录（2026-08-10 实测发现并修复）
 
