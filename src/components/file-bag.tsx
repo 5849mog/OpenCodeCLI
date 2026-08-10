@@ -36,6 +36,7 @@ import { vfs, normalizePath, parentPath, basename, onVfsEvent, type VfsNode } fr
 import { extractZipFile } from "@/lib/tools/zip";
 import { useVfsView } from "@/store/vfs-view";
 import { PlanPanel } from "@/components/plan-panel";
+import { SubagentPanel } from "@/components/subagent-panel";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -184,6 +185,18 @@ function FileBagInner() {
             <ClipboardList className="h-3.5 w-3.5" />
             <span>Plan</span>
           </button>
+          <button
+            onClick={() => setRightPanelTab("subagents")}
+            className={cn(
+              "flex items-center gap-1.5 rounded px-2.5 py-1.5 font-medium transition-colors",
+              rightPanelTab === "subagents"
+                ? "bg-[#0D9488]/10 text-[#0F766E]"
+                : "text-[#8B8884] hover:bg-[#F5F3EE] hover:text-[#3D3B37]",
+            )}
+          >
+            <span className="h-2 w-2 rounded-full bg-[#14B8A6]" />
+            <span>子智能体</span>
+          </button>
         </div>
 
         {/* Files toolbar — only show when on files tab */}
@@ -270,7 +283,7 @@ function FileBagInner() {
         }}
       />
 
-      {/* Body: files tree + editor or Plan panel */}
+      {/* Body: files tree + editor or Plan / 子智能体 panel */}
       {rightPanelTab === "files" ? (
         <div className="flex min-h-0 flex-1">
           <div className={cn(
@@ -283,9 +296,13 @@ function FileBagInner() {
             {activeTab ? <TabbedEditor /> : <NoTabOpen />}
           </div>
         </div>
-      ) : (
+      ) : rightPanelTab === "plan" ? (
         <div className="flex min-h-0 flex-1">
           <PlanPanel eventsLen={vfsVersion} />
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1">
+          <SubagentPanel />
         </div>
       )}
 

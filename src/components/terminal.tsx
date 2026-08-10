@@ -61,6 +61,7 @@ import { toast } from "sonner";
 import { ZipDownloadBridge, ZipPickerModal } from "./zip-picker";
 import { cn } from "@/lib/utils";
 import { planStats } from "@/lib/plan-utils";
+import { CollapsibleText } from "./collapsible-text";
 
 export function Terminal() {
   const events = useSession((s) => s.events);
@@ -1123,6 +1124,17 @@ function EventRow({
         <AssistantRow text={ev.text ?? ""} reasoning={ev.reasoning} streaming={false} />
       );
     case "tool-call":
+      // dispatch_subagent → 专用「子智能体」卡片（运行中 / 完成态都长这样），
+      // 点击跳右侧栏子智能体面板查看委派提示词与最终回复。
+      if (ev.toolName === "dispatch_subagent") {
+        return (
+          <SubagentCard
+            eventId={ev.id}
+            task={typeof ev.toolArgs?.task === "string" ? ev.toolArgs.task : ""}
+            running={!pairedResult}
+          />
+        );
+      }
       // Merged card: tool-call + its matching tool-result
       if (pairedResult) {
         return (
@@ -1192,7 +1204,12 @@ function StreamingBubble({ text, reasoning }: { text: string; reasoning: string 
 // ---------------------------------------------------------------------------
 
 function TurnBlock({ turn }: { turn: TurnGroup }) {
-  const [collapsed, setCollapsed] = useState(true);
+  // 含 dispatch_subagent 的回合默认展开——委派发生时「子智能体」卡片必须
+  // 立即可见，不能藏在折叠的「思考与操作」里。
+  const hasSubagent = turn.tools.some(
+    (ev) => ev.kind === "tool-call" && ev.toolName === "dispatch_subagent",
+  );
+  const [collapsed, setCollapsed] = useState(!hasSubagent);
   const preview = turn.analysis.split("\n").find((l) => l.trim()) ?? "";
   const toolCount = turn.tools.length;
   return (
@@ -1267,8 +1284,8 @@ function UserRow({ text }: { text: string }) {
   return (
     <div className="group flex gap-2">
       <span className="shrink-0 pt-0.5 text-[#D97757]">&gt;</span>
-      <div className="flex-1 whitespace-pre-wrap break-words text-[#1A1815]">
-        {text}
+      <div className="flex-1 min-w-0 text-[#1A1815]">
+        <CollapsibleText text={text} />
       </div>
       <CopyButton text={text} />
     </div>
@@ -1344,13 +1361,87 @@ function AssistantRow({
       <span className="shrink-0 pt-0.5 text-[#8B7355]">⟫</span>
       <div className="flex-1 min-w-0 break-words text-[#2D2B27]" style={{ opacity: isStale ? 0.95 : 1 }}>
         {showReasoning && <ThinkingBlock text={reasoning!} streaming={streaming} />}
-        {text && <MarkdownRenderer text={streaming ? deferredText : text} />}
+        {text && (
+          <CollapsibleText
+            text={streaming ? deferredText : text}
+            render={(t) => <MarkdownRenderer text={t} />}
+          />
+        )}
         {streaming && (
           <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-emerald-400 align-middle" />
         )}
       </div>
       <CopyButton text={text || reasoning || ""} />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SubagentCard — the dedicated「子智能体」card in the main conversation flow.
+// Shows a teal dot + "子智能体" + cyan "Explore" tag + "·" + a short task
+// title (first line of the delegation prompt). Running state shows animated
+// dots; clicking the card opens the 子智能体 panel in the right sidebar.
+// ---------------------------------------------------------------------------
+
+function SubagentCard({
+  eventId,
+  task,
+  running,
+}: {
+  eventId: string;
+  task: string;
+  running: boolean;
+}) {
+  const setRightPanelTab = useVfsView((s) => s.setRightPanelTab);
+  const setSubagentFocus = useVfsView((s) => s.setSubagentFocus);
+  const title = useMemo(() => {
+    const firstLine = task.split("\n").map((l) => l.trim()).find((l) => l) ?? "";
+    return firstLine.length > 42 ? firstLine.slice(0, 42) + "…" : firstLine;
+  }, [task]);
+
+  const openPanel = () => {
+    setSubagentFocus(eventId);
+    setRightPanelTab("subagents");
+  };
+
+  return (
+    <motion.button
+      onClick={openPanel}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.15 }}
+      className="flex w-full items-center gap-2 rounded-md border border-[#0D9488]/25 bg-[#0D9488]/5 px-3 py-2 text-left text-xs transition-colors hover:bg-[#0D9488]/10"
+      title="查看子智能体详情"
+    >
+      {running ? (
+        <span className="relative flex h-2 w-2 shrink-0">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#14B8A6] opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-[#14B8A6]" />
+        </span>
+      ) : (
+        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#14B8A6]" />
+      )}
+      <span className="shrink-0 font-semibold text-[#3D3B37]">子智能体</span>
+      <span className="shrink-0 rounded bg-[#0D9488]/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0F766E]">
+        Explore
+      </span>
+      <span className="shrink-0 text-[#A8A29E]">·</span>
+      <span className="min-w-0 flex-1 truncate text-[#6B6862]">
+        {title || "探索任务"}
+      </span>
+      {running ? (
+        <span className="flex shrink-0 items-center gap-1.5 text-[#0F766E]">
+          <span className="flex gap-0.5">
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#14B8A6]" style={{ animationDelay: "0ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#14B8A6]" style={{ animationDelay: "120ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#14B8A6]" style={{ animationDelay: "240ms" }} />
+          </span>
+          <span className="hidden sm:inline">运行中…</span>
+        </span>
+      ) : (
+        <span className="shrink-0 text-[#A8A29E]">查看详情 →</span>
+      )}
+    </motion.button>
   );
 }
 
@@ -2007,7 +2098,7 @@ const markdownComponents: Components = {
   },
 };
 
-const MarkdownRenderer = memo(function MarkdownRenderer({
+export const MarkdownRenderer = memo(function MarkdownRenderer({
   text,
 }: {
   text: string;
