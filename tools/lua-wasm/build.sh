@@ -5,21 +5,22 @@
 #   ./build.sh
 #
 # Prerequisites:
-#   - Emscripten SDK (emsdk) in PATH: emcc, emar
+#   - Emscripten SDK (emsdk) in PATH: emcc
 #
 # Output (relative to project root):
 #   public/wasm/lua.wasm  — WebAssembly binary
 #   public/wasm/lua.js    — Emscripten JS module loader (classic script, window.LUAModule)
 #   tools/lua-wasm/source/ — cloned Lua source (cached)
-#   tools/lua-wasm/build/  — 中间产物 (smoke.js)
+#   tools/lua-wasm/build/  — 中间产物 (objects/, smoke.js)
 #
-# 构建要点（lua/lua 官方镜像，标准 Makefile 工程）：
-#   1. `make generic` 是官方针对自定义编译器的目标，允许用 CC/AR/RANLIB 覆盖。
-#      用 CC=emcc、AR="emar rcus"、RANLIB=emranlib 编译成 WebAssembly。
-#   2. 不启用 readline（LUA_USE_READLINE 默认关闭，浏览器不需要交互编辑）。
-#      CC 内部自动禁用掉 readline/termcap 依赖。
-#   3. 冒烟测试是硬门槛：失败 exit 1，让 CI 日志直接暴露问题。
-#   4. 链接时挂 emcc 旗标（镜像 awk-wasm/bc-wasm），产出 window.LUAModule。
+# 构建要点（lua/lua 官方镜像）：
+#   1. 不用 make——像 awk 一样逐文件 emcc -c 编译。
+#      镜像仓库布局与官方 tarball 不同（2026-08 CI 实测：根目录无 generic 目标、
+#      无 src/ 子目录），Makefile 目标不可依赖；显式列出官方 5.4 全部源文件最稳。
+#   2. 布局兼容：发行版布局（src/ 子目录）或镜像平铺（根目录）都支持。
+#   3. 不启用 readline（LUA_USE_READLINE 默认关闭，浏览器不需要交互编辑）。
+#   4. 冒烟测试是硬门槛：失败 exit 1，让 CI 日志直接暴露问题。
+#   5. 链接时挂 emcc 旗标（镜像 awk-wasm/bc-wasm），产出 window.LUAModule。
 
 set -euo pipefail
 
@@ -43,10 +44,6 @@ command -v emcc >/dev/null 2>&1 || {
   echo "  source ./emsdk_env.sh"
   exit 1
 }
-command -v emar >/dev/null 2>&1 || {
-  echo "ERROR: emar not found (part of Emscripten SDK). Check emsdk install."
-  exit 1
-}
 
 echo "=== lua-wasm build ==="
 echo "Emscripten: $(emcc --version | head -1)"
@@ -65,35 +62,38 @@ else
 fi
 
 cd "$SOURCE_DIR"
-mkdir -p "$BUILD_DIR"
+echo "  Cloned HEAD: $(git log -1 --oneline 2>/dev/null || echo '?')"
+mkdir -p "$BUILD_DIR/objects"
 
-# 官方发行版布局：真正的 Makefile 与全部 .c 在 src/ 子目录
-# （顶层 Makefile 只是转发器，没有 generic/all 的直接规则——CI 2026-08 已踩坑）
-cd src
+# --- Locate sources (layout-agnostic) ---
+# 发行版布局：src/ 子目录；镜像平铺：根目录。都要能找到 lua.c。
+if [ -f "$SOURCE_DIR/src/lua.c" ]; then
+  cd "$SOURCE_DIR/src"
+elif [ -f "$SOURCE_DIR/lua.c" ]; then
+  cd "$SOURCE_DIR"
+else
+  echo "ERROR: lua.c not found under $SOURCE_DIR (checked root and src/)."
+  echo "  Repo layout unexpected — check the cloned branch above."
+  exit 1
+fi
+echo "[2/4] Compiling Lua objects (emcc -c) in: $(pwd)"
 
-# --- Compile Lua via `make all` ---
-echo "[2/4] Compiling Lua (emcc via make all, in src/)..."
-# CC/AR/RANLIB 覆盖编译工具；MYCFLAGS 控制不引用宿主系统依赖。
-# -DLUA_USE_POSIX 提供 clock/localtime 等；不拉 readline（LUA_USE_READLINE 默认关）。
-make clean >/dev/null 2>&1 || true
-# 先编译 lua (interpretor + lua.o + liblua.a)，用 emcc 产出 WebAssembly 目标文件。
-make all \
-  CC=emcc \
-  AR="emar rcus" \
-  RANLIB=emranlib \
-  MYCFLAGS="-O2 -DLUA_USE_POSIX" \
-  MYLIBS="" \
-  -j"$(nproc 2>/dev/null || echo 4)"
+# --- Compile all official Lua 5.4 sources (no make) ---
+# 与 awk-wasm 的 build.sh 同一模式：逐文件 emcc -c，链接时再注入旗标。
+CORE_SRCS="lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c lmem.c lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c ltm.c lundump.c lvm.c lzio.c"
+LUALIB_SRCS="lauxlib.c lbaselib.c lcorolib.c ldblib.c liolib.c lmathlib.c loadlib.c loslib.c lstrlib.c ltablib.c lutf8lib.c linit.c"
+ALL_SRCS="lua.c $CORE_SRCS $LUALIB_SRCS"
+OBJS=""
+for f in $ALL_SRCS; do
+  [ -f "$f" ] || { echo "ERROR: source not found: $f"; exit 1; }
+  emcc -O2 -DLUA_USE_POSIX -c "$f" -o "$BUILD_DIR/objects/${f%.c}.o" || { echo "ERROR: failed to compile $f"; exit 1; }
+  OBJS="$OBJS $BUILD_DIR/objects/${f%.c}.o"
+done
 
 # --- Smoke test (hard gate) ---
 echo "[3/4] Smoke test (node)..."
-mkdir -p "$OUT_DIR" "$BUILD_DIR"
-# make all 已产出 lua.o + liblua.a（emcc 编译）→ 直接链成 node 可执行冒烟。
-# 不再重编 lua.c（否则与 lua.o 里的 main 重复）。
-if emcc lua.o liblua.a \
-    -lm \
-    -s ENVIRONMENT=node -s EXIT_RUNTIME=1 -s NODERAWFS=1 \
-    -o "$BUILD_DIR/lua-smoke.js" 2>/dev/null; then
+mkdir -p "$OUT_DIR"
+if emcc $OBJS -lm -s ENVIRONMENT=node -s EXIT_RUNTIME=1 -o "$BUILD_DIR/lua-smoke.js" 2>/dev/null; then
   SMOKE_OUT="$(node "$BUILD_DIR/lua-smoke.js" -e "print(6*7)" 2>&1 | tr -d '\r' | sed '/^$/d' | head -1)"
   if [ "$SMOKE_OUT" != "42" ]; then
     echo "ERROR: lua smoke test failed (got '$SMOKE_OUT', expected '42')"
@@ -112,20 +112,7 @@ fi
 
 # --- Link browser WASM module ---
 echo "[4/4] Linking lua.wasm (browser)..."
-# 重新用 emcc 编 lua 的 6 个核心 .c（官方 Makefile: lua.o, liblua.a 由 lapi/lcode/... 组成）。
-# 稳妥起见直接从源码重新编译一套目标文件，确保符号完整、无 host 依赖。
-mkdir -p "$BUILD_DIR/objects"
-CORE_SRCS="lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c lmem.c lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c ltm.c lundump.c lvm.c lzio.c"
-LUALIB_SRCS="lauxlib.c lbaselib.c lcorolib.c ldblib.c liolib.c lmathlib.c loadlib.c loslib.c lstrlib.c ltablib.c lutf8lib.c linit.c"
-OBJS=""
-for f in $CORE_SRCS $LUALIB_SRCS; do
-  emcc -O2 -DLUA_USE_POSIX -c "$f" -o "$BUILD_DIR/objects/${f%.c}.o" 2>/dev/null || { echo "ERROR: failed to compile $f"; exit 1; }
-  OBJS="$OBJS $BUILD_DIR/objects/${f%.c}.o"
-done
-# lua.c 是 main() 所在（解释器入口），一起链入 produce callMain
-emcc -O2 -DLUA_USE_POSIX -c lua.c -o "$BUILD_DIR/objects/lua.o" 2>/dev/null || { echo "ERROR: failed to compile lua.c"; exit 1; }
-
-emcc "$BUILD_DIR/objects/lua.o" $OBJS \
+emcc $OBJS \
   -O2 \
   -lm \
   -s WASM=1 \

@@ -33,8 +33,8 @@
 ## 编译流程
 
 1. 克隆 lua/lua（官方镜像，默认 tag `v5.4.7`；找不到时回退 HEAD）
-2. `make generic CC=emcc AR="emar rcus" RANLIB=emranlib MYCFLAGS="-O2 -DLUA_USE_POSIX"` 编译核心目标
-3. 逐个用 `emcc -c` 编译官方 6 个核心 + 6 个标准库 .c，得到 .o
+2. 布局自动兼容（`src/` 子目录或根目录平铺），定位到 lua.c
+3. 逐文件 `emcc -O2 -DLUA_USE_POSIX -c` 编译官方 5.4 全部源文件（20 核心 + 12 标准库 + lua.c，**不依赖 Makefile**——镜像仓库布局与官方 tarball 不同，make 目标不可靠）
 4. **硬门槛冒烟测试**（node）：`print(6*7)` → `42`，以及 `gsub` 字符串替换
 5. 用 awk/bc 同款 emcc 旗标链接成 `window.LUAModule`
 
