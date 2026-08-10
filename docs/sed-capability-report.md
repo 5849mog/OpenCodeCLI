@@ -30,7 +30,7 @@
 | 19   | `-e` 多脚本 | `-e 's/a/A/' -e 's/b/B/'` | 依次应用 | 部署后实测 | ⏳ |
 | 20   | `-f` 脚本文件 | `-f script.sed` | 从 VFS 脚本文件执行 | 部署后实测 | ⏳ |
 | 21   | `-i` 原地写回 VFS | `sed -i 's/old/new/' f.txt` | 文件内容更新、返回 mutated:true | 部署后实测 | ⏳ |
-| 22   | 多文件参数 | `sed 's/x/y/' a.txt b.txt` | 依次处理并输出 | 部署后实测 | ⏳ |
+| 22   | 多文件参数 | `sed 's/x/y/' a.txt b.txt` 依次处理输出；无 `-s` 时行号跨文件连续（`-n '1p'` 只输出整流第一行），`-s` 每文件独立；`-i` 多文件逐文件写回 | 部署后实测 | ⏳ |
 | 23   | 管道 stdin | `cat f | sed 's/x/y/'` | 读 stdin 处理 | 部署后实测 | ⏳ |
 | 24   | Plan 模式 `sed -i` 拦截 | Plan 模式下 `sed -i` 被 block | 部署后实测 | ⏳ |
 | 25   | 语法错误 | `sed 's/a'` → stderr 报错 ok:false | 部署后实测 | ⏳ |

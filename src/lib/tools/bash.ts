@@ -909,19 +909,28 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
         positional.push(t); i += 1;
       }
 
-      // 脚本来源：-e/-f 已含脚本 → positional[0] 是数据文件；否则 positional[0] 是脚本。
+      // 脚本来源：-e/-f 已含脚本 → positional 全是数据文件；否则 positional[0] 是脚本、
+      // 其余全是数据文件（多文件！GNU sed 无 -s 时按一条流依次处理，行号跨文件连续）。
       // 空字符串脚本（sed ''）合法 = no-op 原样输出，与旧 JS 及真实 sed 一致。
       const scriptFromFlag = sedArgs.some((a) => a === "-e" || a.startsWith("-e") || a === "-f" || a.startsWith("-f"));
       const script = scriptFromFlag ? "" : (positional[0] ?? "");
       if (positional.length === 0 && !scriptFromFlag) return { ok: false, output: "sed: missing script" };
-      const file = scriptFromFlag ? positional[0] : positional[1];
+      const dataFiles = scriptFromFlag ? positional : positional.slice(1);
+      const file = dataFiles[0] ?? undefined;
       const { content, source } = resolveInput(file);
-      if (content === null) return { ok: false, output: "sed: no input" };
+      if (content === null && dataFiles.length === 0) return { ok: false, output: "sed: no input" };
       const fromStdin = source === "stdin";
 
-      // files：数据文件 + -f 脚本文件 → MEMFS 内容表（argv 里的每个文件都要有内容）
+      // files：全部数据文件 + -f 脚本文件 → MEMFS 内容表（argv 里的每个文件都要有内容；
+      // 缺失文件报错，与 GNU sed 的 "can't read" 语义一致）
       const files: Record<string, string> = {};
-      if (file && !fromStdin) files[file] = content;
+      if (!fromStdin) {
+        for (const df of dataFiles) {
+          const c = df === file ? content : vfs.readFileSync(df);
+          if (c === null) return { ok: false, output: `sed: can't read ${df}: No such file or directory` };
+          files[df] = c;
+        }
+      }
 
       // JS 降级入参：-e/-f 的脚本拼成一段（-f 读 VFS 脚本文件内容并注入 MEMFS）
       let fbScript = script;
@@ -948,15 +957,40 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
         fbScript = parts.join(";");
       }
 
+      // -i 多文件：GNU -i 隐含 -s（每文件独立行号/独立处理）→ 逐文件求值写回
+      if (inplace && dataFiles.length > 1) {
+        for (const df of dataFiles) {
+          const r = await sedWasm.evaluate({
+            argv: [
+              ...sedArgs,
+              ...(!scriptFromFlag && positional.length > 0 ? [script] : []),
+              df,
+            ],
+            files, // 全量注入（含 -f 脚本文件；多余文件不进 argv 无副作用）
+            fallback: { script: fbScript, content: files[df] },
+          });
+          if (!r.ok) return { ok: false, output: r.output };
+          vfs.writeFileSync(df, r.output === "(no output)" ? "" : r.output);
+        }
+        return { ok: true, output: "", mutated: true };
+      }
+
       const result = await sedWasm.evaluate({
         argv: [
           ...sedArgs,
           ...(!scriptFromFlag && positional.length > 0 ? [script] : []),
-          ...(file && !fromStdin ? [file] : []),
+          ...(!fromStdin ? dataFiles : []),
         ],
         files: Object.keys(files).length > 0 ? files : undefined,
-        stdin: fromStdin ? content : undefined,
-        fallback: { script: fbScript, content },
+        stdin: fromStdin && content !== null ? content : undefined,
+        // 降级（单内容）：stdin 原样；多文件拼成一条流（近似 GNU 流式语义——
+        // 每文件去尾换行再 join \n，避免文件间多出空行）
+        fallback: {
+          script: fbScript,
+          content: fromStdin && content !== null
+            ? content
+            : dataFiles.map((df) => (files[df].endsWith("\n") ? files[df].slice(0, -1) : files[df])).join("\n"),
+        },
       });
       if (!result.ok) return { ok: false, output: result.output };
       if (inplace && file) {
