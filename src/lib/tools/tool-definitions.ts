@@ -451,7 +451,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "read_multiple_files",
       description:
-        "Read MULTIPLE files at once. Takes an array of file paths and returns each file's content with a clear header separator. More efficient than calling read_file repeatedly when you need to understand several files together. Maximum 20 files per call. For individual files with pagination, use read_file instead.",
+        "Read MULTIPLE files at once. Takes an array of file paths and returns each file's content with a clear header separator. More efficient than calling read_file repeatedly when you need to understand several files together. Maximum 20 files per call. For individual files with pagination, use read_file instead. **COST WARNING: the full contents land in YOUR context and are re-sent on every later round-trip — for multi-file research (more than 1-2 files) dispatch_subagent is cheaper: it reads in its own context and returns only a summary.**",
       parameters: {
         type: "object",
         properties: {
