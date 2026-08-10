@@ -86,12 +86,15 @@ echo "[2/4] Configuring GNU sed (emconfigure, cross-compile mode, timeout 900s).
 cd "$SOURCE_DIR"
 # 不 --quiet：configure 卡住时日志能看到最后一条 "checking for ..." 精确定位。
 # timeout 900：configure 病态卡死时 15 分钟快速失败（exit 124），不再无限等。
+# -DHAVE_DECL_PROGRAM_INVOCATION_*_NAME=0：program_invocation_name 是 glibc 扩展，
+# emscripten 的 libc 不提供但 gnulib stdlib.h 会声明它 → 不关掉必然 undefined symbol，
+# 让 sed 自带的 fallback 定义生效（2026-08 CI 链接期实测坑）。
 timeout 900 emconfigure ./configure \
   --host=wasm32-unknown-emscripten \
   --build=x86_64-pc-linux-gnu \
   --disable-nls --disable-i18n --disable-acl --without-selinux \
   --disable-dependency-tracking \
-  CFLAGS="-O2" || {
+  CFLAGS="-O2 -DHAVE_DECL_PROGRAM_INVOCATION_NAME=0 -DHAVE_DECL_PROGRAM_INVOCATION_SHORT_NAME=0" || {
     echo ""
     echo "ERROR: configure failed or timed out (exit $?)."
     echo "  Log 的最后一条 'checking for ...' 就是卡点，贴回仓库迭代。"
@@ -102,16 +105,25 @@ echo "[3/4] Compiling (emmake make, timeout=${GNU_PATH_TIMEOUT}s)..."
 timeout "$GNU_PATH_TIMEOUT" emmake make -j"$(nproc 2>/dev/null || echo 4)" >/dev/null
 
 echo "[4/4] Linking + smoke..."
-SED_OBJS="$(find sed -maxdepth 1 -name '*.o' | tr '\n' ' ') lib/libgnu.a"
-echo "  objects: $SED_OBJS"
-if [ -z "$SED_OBJS" ] || [ ! -f "lib/libgnu.a" ]; then
-  echo "ERROR: sed objects or lib/libgnu.a not found (make 产物缺失)"
+# 收集 sed/ 与 lib/ 的全部对象/归档——不硬编码 lib/libgnu.a（CI 实测该归档
+# 未生成，但 sed/*.o 与 lib/*.o 都在；链接 .o 列表与链接归档等效）。
+SED_OBJS="$(find sed -maxdepth 1 -name '*.o' 2>/dev/null | tr '\n' ' ')"
+LIB_ARCHIVES="$(find lib -maxdepth 1 -name '*.a' 2>/dev/null | tr '\n' ' ')"
+LIB_OBJS="$(find lib -maxdepth 1 -name '*.o' 2>/dev/null | tr '\n' ' ')"
+if [ -z "$SED_OBJS" ]; then
+  echo "ERROR: no sed objects found (make 产物缺失)"
   find sed -maxdepth 1 -name '*.o' 2>/dev/null
   exit 1
 fi
+if [ -n "$LIB_ARCHIVES" ]; then
+  LINK_INPUT="$SED_OBJS $LIB_ARCHIVES"          # 有归档：sed/*.o + 归档
+else
+  LINK_INPUT="$SED_OBJS $LIB_OBJS"              # 无归档：全量 .o 列表
+fi
+echo "  link input: $LINK_INPUT"
 
 # node 冒烟（硬门槛）——emcc 报错必须可见（此前 2>/dev/null 吞掉了链接错误）
-if ! emcc $SED_OBJS -lm -s ENVIRONMENT=node -s EXIT_RUNTIME=1 -o "$BUILD_DIR/sed-smoke.js"; then
+if ! emcc $LINK_INPUT -lm -s ENVIRONMENT=node -s EXIT_RUNTIME=1 -o "$BUILD_DIR/sed-smoke.js"; then
   echo "ERROR: sed smoke link failed (see emcc output above — 多半是 undefined symbol)"
   exit 1
 fi
@@ -132,7 +144,7 @@ smoke "abc123" "abcNUM" -E 's/([0-9]+)/NUM/'
 smoke "abc"    "xyz"    'y/abc/xyz/'
 
 # 浏览器产物（报错同样可见）
-if ! emcc $SED_OBJS "${BROWSER_FLAGS[@]}" -o "$OUT_DIR/sed.js"; then
+if ! emcc $LINK_INPUT "${BROWSER_FLAGS[@]}" -o "$OUT_DIR/sed.js"; then
   echo "ERROR: sed browser link failed (see emcc output above)"
   exit 1
 fi
