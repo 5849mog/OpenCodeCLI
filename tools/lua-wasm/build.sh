@@ -1,5 +1,5 @@
 #!/bin/bash
-# build.sh — Compile lunarmodules/lua to WebAssembly via Emscripten
+# build.sh — Compile lua/lua (official Lua source mirror) to WebAssembly via Emscripten
 #
 # Usage:
 #   ./build.sh
@@ -13,7 +13,7 @@
 #   tools/lua-wasm/source/ — cloned Lua source (cached)
 #   tools/lua-wasm/build/  — 中间产物 (smoke.js)
 #
-# 构建要点（lunarmodules/lua，标准 Makefile 工程）：
+# 构建要点（lua/lua 官方镜像，标准 Makefile 工程）：
 #   1. `make generic` 是官方针对自定义编译器的目标，允许用 CC/AR/RANLIB 覆盖。
 #      用 CC=emcc、AR="emar rcus"、RANLIB=emranlib 编译成 WebAssembly。
 #   2. 不启用 readline（LUA_USE_READLINE 默认关闭，浏览器不需要交互编辑）。
@@ -30,9 +30,10 @@ OUT_DIR="$PROJECT_ROOT/public/wasm"
 BUILD_DIR="$SCRIPT_DIR/build"
 
 # --- Config ---
-LUA_REPO="https://github.com/lunarmodules/lua.git"
-# lunarmodules/lua 是 lua 5.4.x 主线；镜像 bc 用 tag（这里用 release tag，找不到退回 HEAD）
-LUA_TAG="v5.4.8"
+# 官方源码镜像（lunarmodules/lua 不存在！2026-08 CI 首次构建即 401 失败）
+LUA_REPO="https://github.com/lua/lua.git"
+# 5.4.x 稳定版 tag；找不到时回退 HEAD（见下方 clone 的 || 兜底）
+LUA_TAG="v5.4.7"
 
 # --- Preflight ---
 command -v emcc >/dev/null 2>&1 || {

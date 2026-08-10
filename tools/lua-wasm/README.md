@@ -1,6 +1,6 @@
 # lua-wasm — 浏览器原生 Lua 引擎
 
-将 [lunarmodules/lua](https://github.com/lunarmodules/lua)（Lua 5.4.x 官方解释器）编译为 WebAssembly，让 AI 在浏览器内存中运行真正的 Lua 解释器，做纯计算与复杂数据转换。
+将 [lua/lua](https://github.com/lua/lua)（Lua 官方源码镜像，5.4.x）编译为 WebAssembly，让 AI 在浏览器内存中运行真正的 Lua 解释器，做纯计算与复杂数据转换。
 
 ## 为什么
 
@@ -32,7 +32,7 @@
 
 ## 编译流程
 
-1. 克隆 lunarmodules/lua（默认 tag `v5.4.8`）
+1. 克隆 lua/lua（官方镜像，默认 tag `v5.4.7`；找不到时回退 HEAD）
 2. `make generic CC=emcc AR="emar rcus" RANLIB=emranlib MYCFLAGS="-O2 -DLUA_USE_POSIX"` 编译核心目标
 3. 逐个用 `emcc -c` 编译官方 6 个核心 + 6 个标准库 .c，得到 .o
 4. **硬门槛冒烟测试**（node）：`print(6*7)` → `42`，以及 `gsub` 字符串替换
