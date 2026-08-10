@@ -108,7 +108,12 @@ async function toolRunLua(args: Record<string, unknown>, readOnly = false): Prom
 
   // outputs 写回 VFS + 摘要（全文不进上下文，需要内容用 read_file）。
   // 声明了 outputs 就必走摘要格式：写回数 0 时也要列出「未产生」。
+  // 但引擎错误（ok:false，如超限/脚本报错）必须优先透传，不能被摘要吞掉
+  // （f9ff18e 回归：C4 超限报错被覆盖成「未写回任何文件」）。
   if (outputs.length > 0) {
+    if (!result.ok) {
+      return { ok: false, output: result.output, tool: "run_lua", args };
+    }
     const writtenEntries = result.written ?? {};
     for (const [path, content] of Object.entries(writtenEntries)) {
       vfs.writeFileSync(path, content);
