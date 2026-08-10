@@ -567,15 +567,21 @@ export function Terminal() {
       >
         {events.length === 0 && !streamingText && !streamingReasoning && <EmptyState />}
         <div className="space-y-4">
-          {useMemo(() => groupToolEvents(events), [events]).map((ev) => (
-            <EventRow key={ev.id} ev={ev} pairedResult={ev.pairedResult} />
-          ))}
-          {/* Live streaming bubble — separate from events to avoid O(n) re-render */}
+          {useMemo(() => groupAssistantTurns(groupToolEvents(events)), [events]).map((ev) =>
+            ev.kind === "turn" ? (
+              <TurnBlock key={ev.id} turn={ev} />
+            ) : (
+              <EventRow key={ev.id} ev={ev} pairedResult={ev.pairedResult} />
+            ),
+          )}
+          {/* Live streaming bubble — collapsed "analyzing" card with a single
+              preview line. The full text stops scrolling in front of the user;
+              once done, events take over and it becomes either a TurnBlock
+              (process) or a full assistant message (the answer). */}
           {(streamingText?.text || streamingReasoning?.text) && (
-            <AssistantRow
+            <StreamingBubble
               text={streamingText?.text ?? ""}
               reasoning={streamingReasoning?.text ?? ""}
-              streaming={true}
             />
           )}
           {isStreaming && (
@@ -1037,6 +1043,68 @@ function groupToolEvents(
 }
 
 // ---------------------------------------------------------------------------
+// Group assistant message + its tool calls into a "turn" for collapsed rendering.
+// Rule: an assistant message FOLLOWED BY tool calls = process (analysis) →
+// rendered as a collapsible turn block. An assistant message with NO tool
+// calls = the final answer → rendered in full. This is the key to a calm UI:
+// the English analysis between tool calls stops being the main event.
+// ---------------------------------------------------------------------------
+
+interface TurnGroup {
+  kind: "turn";
+  id: string;
+  analysis: string;
+  reasoning?: string;
+  tools: (SessionEvent & { pairedResult?: SessionEvent })[];
+}
+
+type GroupedEvent = (SessionEvent & { pairedResult?: SessionEvent }) | TurnGroup;
+
+function groupAssistantTurns(
+  events: (SessionEvent & { pairedResult?: SessionEvent })[],
+): GroupedEvent[] {
+  const result: GroupedEvent[] = [];
+  let open: TurnGroup | null = null;
+
+  const close = (): void => {
+    if (!open) return;
+    if (open.tools.length === 0) {
+      // 无工具调用 → 总结/纯文本消息 → 独立全文渲染（现状路径）
+      result.push({
+        kind: "assistant-message",
+        id: open.id,
+        text: open.analysis,
+        reasoning: open.reasoning,
+      } as SessionEvent & { pairedResult?: SessionEvent });
+    } else {
+      result.push(open);
+    }
+    open = null;
+  };
+
+  for (const ev of events) {
+    if (ev.kind === "assistant-message") {
+      close();
+      open = { kind: "turn", id: ev.id, analysis: ev.text ?? "", reasoning: ev.reasoning, tools: [] };
+      continue;
+    }
+    if (ev.kind === "tool-call" || ev.kind === "tool-result") {
+      if (open) {
+        open.tools.push(ev);
+        continue;
+      }
+      result.push(ev); // 无 assistant 前导的工具事件（异常）→ 独立渲染
+      continue;
+    }
+    // user / error / system → 关回合，独立渲染
+    close();
+    result.push(ev);
+  }
+  close();
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Event rows — one component per EventKind
 // ---------------------------------------------------------------------------
 
@@ -1085,6 +1153,78 @@ function EventRow({
     default:
       return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// StreamingBubble — collapsed live indicator while the model is producing a
+// turn. Shows "正在分析…" + animation + a single preview line, instead of
+// scrolling the raw text. When the stream finishes, events take over.
+// ---------------------------------------------------------------------------
+
+function StreamingBubble({ text, reasoning }: { text: string; reasoning: string }) {
+  const deferred = useDeferredValue(text || reasoning);
+  const preview = deferred.split("\n").find((l) => l.trim()) ?? "";
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.15 }}
+      className="overflow-hidden rounded-md border border-[#D97757]/20 bg-[#D97757]/5 px-2.5 py-1.5 text-xs"
+    >
+      <div className="flex items-center gap-1.5 text-[#8B7355]">
+        <Sparkles className="h-3 w-3 text-[#D97757]/70" />
+        <span className="font-medium">正在分析…</span>
+        <span className="flex gap-0.5 pl-1">
+          <span className="h-1 w-1 animate-bounce rounded-full bg-[#D97757]/70" style={{ animationDelay: "0ms" }} />
+          <span className="h-1 w-1 animate-bounce rounded-full bg-[#D97757]/70" style={{ animationDelay: "120ms" }} />
+          <span className="h-1 w-1 animate-bounce rounded-full bg-[#D97757]/70" style={{ animationDelay: "240ms" }} />
+        </span>
+      </div>
+      {preview && <div className="mt-1 truncate text-[#A8A29E]">{preview}</div>}
+    </motion.div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TurnBlock — a collapsed "process" card: one assistant analysis message plus
+// the tool calls that followed it. Default collapsed: the English analysis
+// between tool calls stops being the main event; click to expand.
+// ---------------------------------------------------------------------------
+
+function TurnBlock({ turn }: { turn: TurnGroup }) {
+  const [collapsed, setCollapsed] = useState(true);
+  const preview = turn.analysis.split("\n").find((l) => l.trim()) ?? "";
+  const toolCount = turn.tools.length;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.15 }}
+      className="overflow-hidden rounded-md border border-[#E5E2D9] bg-[#FAF9F7]/60"
+    >
+      <button
+        onClick={() => setCollapsed((c) => !c)}
+        className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-xs"
+      >
+        <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform", !collapsed && "rotate-90")} />
+        <Wrench className="h-3 w-3 shrink-0 text-[#B87B5A]" />
+        <span className="font-medium text-[#6B6862]">思考与操作</span>
+        <span className="shrink-0 text-[#A8A29E]">· {toolCount} 个工具调用</span>
+        {collapsed && preview && <span className="ml-1 truncate text-[#A8A29E]">{preview}</span>}
+      </button>
+      {!collapsed && (
+        <div className="space-y-2 px-3 pb-3 pt-1">
+          {turn.analysis && <MarkdownRenderer text={turn.analysis} />}
+          {turn.reasoning && turn.reasoning.trim().length > 0 && (
+            <ThinkingBlock text={turn.reasoning} streaming={false} />
+          )}
+          {turn.tools.map((ev) => (
+            <EventRow key={ev.id} ev={ev} pairedResult={ev.pairedResult} />
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
 }
 
 function CopyButton({ text }: { text: string }) {
