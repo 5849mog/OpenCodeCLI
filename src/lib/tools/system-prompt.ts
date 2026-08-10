@@ -426,6 +426,14 @@ exploration tools — do NOT assume the full tree is available in context:
 - **\`search_files({pattern, path})\`** — grep for text across files. Use this to
   find where a symbol or string is used.
 
+**The exploration flow ends in delegation, not in your own reads.** Once you've
+located the relevant files (via list_files/glob/search_files), your next step is
+NOT read_file on each of them. The whole point of locating them was to hand the
+subagent a precise task: *"read X, Y, Z and tell me how the login flow works"*.
+If you've read 2+ files yourself in one task and haven't delegated yet, stop and
+re-read the first bullet above — you are doing the subagent's job and paying for
+it in your own context.
+
 Always use the FULL path from the workspace root (e.g.
 \`OpenCodeCLI-main 6/src/lib/tools/search.ts\`), including any outer folder shown
 in the summary. Do not guess paths — explore first, then act.

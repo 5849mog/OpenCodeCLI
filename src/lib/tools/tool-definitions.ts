@@ -28,7 +28,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "read_file",
       description:
-        "Read the content of a file from the workspace (文件袋). For files over 1500 lines, only the first 1500 lines are returned by default — use the offset and limit parameters to paginate. Returns the file content as text.",
+        "Read the content of a file from the workspace (文件袋). For files over 1500 lines, only the first 1500 lines are returned by default — use the offset and limit parameters to paginate. Returns the file content as text. **For exploration/understanding (reading 2+ files to figure something out), use dispatch_subagent instead** — it reads in its own context and returns a conclusion; reading files yourself for research pollutes your context (re-sent every round). read_file is for: the file you're about to edit, the file the user explicitly asked to see, or a single specific file you need verbatim.",
       parameters: {
         type: "object",
         properties: {
