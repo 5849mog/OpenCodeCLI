@@ -1208,9 +1208,11 @@ function TurnBlock({ turn }: { turn: TurnGroup }) {
       >
         <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform", !collapsed && "rotate-90")} />
         <Wrench className="h-3 w-3 shrink-0 text-[#B87B5A]" />
-        <span className="font-medium text-[#6B6862]">思考与操作</span>
+        <span className="shrink-0 font-medium text-[#6B6862]">思考与操作</span>
         <span className="shrink-0 text-[#A8A29E]">· {toolCount} 个工具调用</span>
-        {collapsed && preview && <span className="ml-1 truncate text-[#A8A29E]">{preview}</span>}
+        {collapsed && preview && (
+          <span className="ml-1 min-w-0 flex-1 truncate text-[#A8A29E]">{preview}</span>
+        )}
       </button>
       {!collapsed && (
         <div className="space-y-2 px-3 pb-3 pt-1">
