@@ -10,9 +10,11 @@
  *
  * 输入编排（匹配真实 lua 语义）：
  *   - script 经 `-e` 传入（如 lua -e 'print(6*7)'）
- *   - stdin 同时提供两条路：
+ *   - stdin 提供两条路，但**绝不进 argv**：
  *     ① emscripten stdin 回调喂字节 → 脚本 `io.read("*a")` / `io.lines()` 可读
- *     ② 写入 MEMFS 的 input.txt 并置于 argv[1] → 脚本 `io.open(arg[1])` 可读
+ *     ② 写入 MEMFS 的 input.txt → 脚本 `io.open("input.txt")` 可读
+ *     注意：不能把 input.txt 放进 argv——lua -e 'code' input.txt 会把
+ *     第一个非选项参数当脚本执行（2026-08 实测踩坑：input 内容被当 Lua 跑）
  *   - 无 stdin → 空 stdin，argv 只有 -e script
  *
  * 权限边界（严格，与 system-prompt 一致）：
@@ -92,7 +94,7 @@ async function init(): Promise<boolean> {
 export interface LuaOptions {
   /** Lua 程序文本，如 'print(6*7)' 或 'for i=1,3 do print(i) end' */
   script: string;
-  /** 管道输入（stdin）：脚本可用 io.read("*a") 读，或 io.open(arg[1]) 读 input.txt */
+  /** 管道输入（stdin）：脚本可用 io.read("*a") / io.lines() 读，或 io.open("input.txt") 读 */
   stdin?: string;
 }
 
@@ -122,12 +124,11 @@ async function createInstance(script: string, opts: Omit<LuaOptions, "script">):
   const callMain = inst.callMain as (args: string[]) => void;
 
   if (inputBuf !== null) {
-    // stdin 走 io.read；同时写 MEMFS input.txt 并置于 argv[1] → io.open(arg[1]) 也可读
+    // stdin 走 io.read('*a')/io.lines()；同时写 MEMFS input.txt 供 io.open("input.txt")。
+    // 绝不放进 argv——lua 会把第一个非选项参数当脚本执行（见文件头注释）。
     FS.writeFile('input.txt', inputBuf);
-    callMain(['-e', script, 'input.txt']);
-  } else {
-    callMain(['-e', script]);
   }
+  callMain(['-e', script]);
 
   const errOutput = stderr.join('\n').trim();
   if (errOutput) return { ok: false, output: errOutput };

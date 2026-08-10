@@ -654,7 +654,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "run_lua",
       description:
-        "在浏览器内存中运行真正的 Lua 5.4 解释器（WebAssembly 原生引擎），做**纯计算**——用于 awk 表达不了的复杂逻辑：嵌套数据结构/分组聚合转换、状态机、跨多个读取结果的累计处理、字符串模式匹配、自定义算法。传入 `script` 作为 Lua 程序（如 'local t={} for l in io.lines() do t[#t+1]=l end print(#t)'）；可选 `input` 作为 stdin，脚本可用 io.read('*a') 或 io.open(arg[1]) 读取。安全边界（严格，不可绕过）：纯内存计算——**不改/不读工作区文件、不访问网络、不持久化**。简单行列处理（取列、求和、替换）用 bash awk/sed 更合适，不要用 run_lua。脚本出错时返回 lua 的错误信息。",
+        "在浏览器内存中运行真正的 Lua 5.4 解释器（WebAssembly 原生引擎），做**纯计算**——用于 awk 表达不了的复杂逻辑：嵌套数据结构/分组聚合转换、状态机、跨多个读取结果的累计处理、字符串模式匹配、自定义算法。传入 `script` 作为 Lua 程序（如 'local t={} for l in io.lines() do t[#t+1]=l end print(#t)'）；可选 `input` 作为数据输入，脚本用 io.read('*a') / io.lines() 读取（或 io.open('input.txt') 以文件形式读同一份数据）。安全边界（严格，不可绕过）：纯内存计算——**不改/不读工作区文件、不访问网络、不持久化**。简单行列处理（取列、求和、替换）用 bash awk/sed 更合适，不要用 run_lua。脚本出错时返回 lua 的错误信息。",
       parameters: {
         type: "object",
         properties: {
@@ -666,7 +666,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           input: {
             type: "string",
             description:
-              "可选。作为脚本的 stdin 输入：io.read('*a') 读取全部，io.lines() 逐行，或 io.open(arg[1]) 打开 input.txt。用于处理文本数据（如表格、日志）。",
+              "可选。作为脚本的数据输入：io.read('*a') 读取全部，io.lines() 逐行，或 io.open('input.txt') 以文件形式读同一份数据。用于处理文本数据（如表格、日志）。",
           },
         },
         required: ["script"],
