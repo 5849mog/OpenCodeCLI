@@ -1,8 +1,8 @@
 import { vfs, grepSync } from "../vfs";
 import type { ToolResult } from "./types";
-import { splitAwkActions } from "./awk";
 import * as bcWasm from "../wasm/bc-wasm";
 import * as awkWasm from "../wasm/awk-wasm";
+import * as sedWasm from "../wasm/sed-wasm";
 import { bashPrintf } from "./printf";
 import { globToRegex } from "./glob";
 import { evalArithmetic } from "../math-eval";
@@ -888,248 +888,82 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       };
     }
     case "sed": {
-      const inplace = rest.includes("-i");
-      const scriptIdx = rest.findIndex((t) => !t.startsWith("-"));
-      if (scriptIdx < 0) return { ok: false, output: "sed: missing script" };
-      const script = rest[scriptIdx];
-      const file = rest.slice(scriptIdx + 1).find((t) => !t.startsWith("-"));
-      const { content } = resolveInput(file);
+      // 原生 GNU sed 引擎（WebAssembly）。-i 原地写回 VFS 保留在 wrapper 层：
+      // 不把 -i 传给引擎（MEMFS 里的改名写回碰不到 VFS），而是引擎输出后
+      // 由这里 vfs.writeFileSync 写回（与旧 JS 实现一致）。
+      const sedArgs: string[] = [];
+      const positional: string[] = [];
+      let inplace = false;
+      let i = 0;
+      while (i < rest.length) {
+        const t = rest[i];
+        // -i / -iSUFFIX / --in-place：wrapper 处理，不传引擎（-i.bak 备份在沙箱内不建）
+        if (t === "-i" || (t.startsWith("-i") && t.length > 2) || t === "--in-place" || t.startsWith("--in-place")) {
+          inplace = true; i += 1; continue;
+        }
+        if (t === "-e" && rest[i + 1] !== undefined) { sedArgs.push(t, rest[i + 1]); i += 2; continue; }
+        if (t.startsWith("-e") && t.length > 2)      { sedArgs.push(t); i += 1; continue; }
+        if (t === "-f" && rest[i + 1] !== undefined) { sedArgs.push(t, rest[i + 1]); i += 2; continue; }
+        if (t.startsWith("-f") && t.length > 2)      { sedArgs.push(t); i += 1; continue; }
+        if (t.startsWith("-")) { sedArgs.push(t); i += 1; continue; } // -E/-n/-r/-s/-z 等原样传引擎
+        positional.push(t); i += 1;
+      }
+
+      // 脚本来源：-e/-f 已含脚本 → positional[0] 是数据文件；否则 positional[0] 是脚本。
+      // 空字符串脚本（sed ''）合法 = no-op 原样输出，与旧 JS 及真实 sed 一致。
+      const scriptFromFlag = sedArgs.some((a) => a === "-e" || a.startsWith("-e") || a === "-f" || a.startsWith("-f"));
+      const script = scriptFromFlag ? "" : (positional[0] ?? "");
+      if (positional.length === 0 && !scriptFromFlag) return { ok: false, output: "sed: missing script" };
+      const file = scriptFromFlag ? positional[0] : positional[1];
+      const { content, source } = resolveInput(file);
       if (content === null) return { ok: false, output: "sed: no input" };
+      const fromStdin = source === "stdin";
 
-      /** Apply a substitution to specific lines of a text. */
-      const sedSubstOnLines = function (
-        text: string, pattern: string, replacement: string, flags: string,
-        lineFilter: (line: string, idx: number) => boolean,
-      ): string {
-        const re = new RegExp(pattern, flags.includes("g") ? flags : flags + "g");
-        const lines = text.split("\n");
-        for (let i = 0; i < lines.length; i++) {
-          if (lineFilter(lines[i], i)) lines[i] = lines[i].replace(re, replacement);
+      // files：数据文件 + -f 脚本文件 → MEMFS 内容表（argv 里的每个文件都要有内容）
+      const files: Record<string, string> = {};
+      if (file && !fromStdin) files[file] = content;
+
+      // JS 降级入参：-e/-f 的脚本拼成一段（-f 读 VFS 脚本文件内容并注入 MEMFS）
+      let fbScript = script;
+      if (scriptFromFlag) {
+        const parts: string[] = [];
+        for (let k = 0; k < sedArgs.length; k++) {
+          const a = sedArgs[k];
+          if (a === "-e" && sedArgs[k + 1] !== undefined) { parts.push(sedArgs[k + 1]); k += 1; }
+          else if (a.startsWith("-e") && a.length > 2) { parts.push(a.slice(2)); }
+          else if (a === "-f" && sedArgs[k + 1] !== undefined) {
+            const sc = vfs.readFileSync(sedArgs[k + 1]);
+            if (sc === null) return { ok: false, output: `sed: can't read ${sedArgs[k + 1]}: No such file or directory` };
+            files[sedArgs[k + 1]] = sc;
+            parts.push(sc);
+            k += 1;
+          } else if (a.startsWith("-f") && a.length > 2) {
+            const sf = a.slice(2);
+            const sc = vfs.readFileSync(sf);
+            if (sc === null) return { ok: false, output: `sed: can't read ${sf}: No such file or directory` };
+            files[sf] = sc;
+            parts.push(sc);
+          }
         }
-        return lines.join("\n");
+        fbScript = parts.join(";");
       }
 
-      const commands = splitAwkActions(script);
-      let result = content;
-
-      for (const cmd of commands) {
-        // --- Addressed s/// ---
-        // Line range: N,Ms/old/new/g
-        let m = cmd.match(/^(\d+)\s*,\s*(\d+)s(.)([\s\S]+?)\3([\s\S]*?)\3([gim]*)$/);
-        if (m) {
-          const s = parseInt(m[1], 10), e = parseInt(m[2], 10);
-          try {
-            result = sedSubstOnLines(result, m[4], m[5], m[6], (_, i) => i + 1 >= s && i + 1 <= e);
-          } catch {
-            return { ok: false, output: `sed: invalid regex: ${m[4]}` };
-          }
-          continue;
-        }
-        // Single line: Ns/old/new/g
-        m = cmd.match(/^(\d+)s(.)([\s\S]+?)\2([\s\S]*?)\2([gim]*)$/);
-        if (m) {
-          const n = parseInt(m[1], 10);
-          try {
-            result = sedSubstOnLines(result, m[3], m[4], m[5], (_, i) => i + 1 === n);
-          } catch {
-            return { ok: false, output: `sed: invalid regex: ${m[3]}` };
-          }
-          continue;
-        }
-        // Last line: $s/old/new/g
-        m = cmd.match(/^\$s(.)([\s\S]+?)\1([\s\S]*?)\1([gim]*)$/);
-        if (m) {
-          try {
-            const re = new RegExp(m[2], m[4].includes("g") ? m[4] : m[4] + "g");
-            const lines = result.split("\n");
-            if (lines.length > 0) lines[lines.length - 1] = lines[lines.length - 1].replace(re, m[3]);
-            result = lines.join("\n");
-          } catch {
-            return { ok: false, output: `sed: invalid regex: ${m[2]}` };
-          }
-          continue;
-        }
-        // Pattern match: /pat/s/old/new/g
-        m = cmd.match(/^\/(.+?)\/s(.)([\s\S]+?)\2([\s\S]*?)\2([gim]*)$/);
-        if (m) {
-          try {
-            const lineRe = new RegExp(m[1]);
-            result = sedSubstOnLines(result, m[3], m[4], m[5], (l) => lineRe.test(l));
-          } catch {
-            return { ok: false, output: `sed: invalid regex: ${m[3]}` };
-          }
-          continue;
-        }
-
-        // --- No-address s/// (existing) ---
-        const subMatch = cmd.match(/^s(.)([\s\S]+?)\1([\s\S]*?)\1([gim]*)$/);
-        if (subMatch) {
-          const [, , pattern, replacement, flags] = subMatch;
-          try {
-            const re = new RegExp(pattern, flags.includes("g") ? flags : flags + "g");
-            result = result.replace(re, replacement);
-          } catch {
-            return { ok: false, output: `sed: invalid regex: ${pattern}` };
-          }
-          continue;
-        }
-
-        // --- d (delete) — already supports N, N,M, /pattern/ ---
-        const delMatch = cmd.match(/^(.+?)d$/);
-        if (delMatch) {
-          const addr = delMatch[1];
-          const lines = result.split("\n");
-          if (addr.match(/^\d+$/)) {
-            const n = parseInt(addr, 10);
-            if (n >= 1 && n <= lines.length) lines.splice(n - 1, 1);
-            result = lines.join("\n");
-          } else if (addr.match(/^\d+,\d+$/)) {
-            const [start, end] = addr.split(",").map((n) => parseInt(n, 10));
-            lines.splice(start - 1, end - start + 1);
-            result = lines.join("\n");
-          } else if (addr.startsWith("/") && addr.endsWith("/")) {
-            const patternStr = addr.slice(1, -1);
-            try {
-              const re = new RegExp(patternStr);
-              result = lines.filter((l) => !re.test(l)).join("\n");
-            } catch {
-              return { ok: false, output: `sed: invalid pattern: ${patternStr}` };
-            }
-          } else {
-            return { ok: false, output: `sed: unsupported delete address: ${addr}` };
-          }
-          continue;
-        }
-
-        // --- p (print) — supports N, N,M, /pattern/ ---
-        const printMatch = cmd.match(/^(.+?)p$/);
-        if (printMatch && !cmd.startsWith("s")) {
-          const addr = printMatch[1];
-          const lines = result.split("\n");
-          if (addr.match(/^\d+$/)) {
-            const n = parseInt(addr, 10);
-            if (n >= 1 && n <= lines.length) result = lines[n - 1];
-            else result = "";
-          } else if (addr.match(/^\d+,\d+$/)) {
-            const [start, end] = addr.split(",").map((n) => parseInt(n, 10));
-            result = lines.slice(start - 1, end).join("\n");
-          } else if (addr.startsWith("/") && addr.endsWith("/")) {
-            try {
-              const re = new RegExp(addr.slice(1, -1));
-              result = lines.filter((l) => re.test(l)).join("\n");
-            } catch {
-              return { ok: false, output: `sed: invalid pattern` };
-            }
-          }
-          continue;
-        }
-
-        // --- q (quit) ---
-        if (cmd === "q") {
-          const lines = result.split("\n");
-          result = lines.length > 0 ? lines[0] : "";
-          break;
-        }
-        m = cmd.match(/^(\d+)q$/);
-        if (m) {
-          const n = parseInt(m[1], 10);
-          const lines = result.split("\n");
-          result = lines.slice(0, n).join("\n");
-          break;
-        }
-        m = cmd.match(/^\/(.+?)\/q$/);
-        if (m) {
-          try {
-            const re = new RegExp(m[1]);
-            const lines = result.split("\n");
-            const idx = lines.findIndex((l) => re.test(l));
-            result = idx >= 0 ? lines.slice(0, idx + 1).join("\n") : result;
-          } catch {
-            return { ok: false, output: `sed: invalid pattern: ${m[1]}` };
-          }
-          break;
-        }
-
-        // --- a (append) ---
-        m = cmd.match(/^(?:(\d+)|(?:\/(.+?)\/))?a\s+(.+)$/);
-        if (m) {
-          const text = m[3].replace(/^["']|["']$/g, "");
-          const lines = result.split("\n");
-          if (m[1]) {
-            const n = parseInt(m[1], 10);
-            if (n >= 1 && n <= lines.length) lines.splice(n, 0, text);
-          } else if (m[2] !== undefined) {
-            try {
-              const re = new RegExp(m[2]);
-              for (let i = lines.length - 1; i >= 0; i--) {
-                if (re.test(lines[i])) lines.splice(i + 1, 0, text);
-              }
-            } catch {
-              return { ok: false, output: `sed: invalid pattern: ${m[2]}` };
-            }
-          } else {
-            lines.splice(lines.length, 0, text);
-          }
-          result = lines.join("\n");
-          continue;
-        }
-
-        // --- i (insert) ---
-        m = cmd.match(/^(?:(\d+)|(?:\/(.+?)\/))?i\s+(.+)$/);
-        if (m) {
-          const text = m[3].replace(/^["']|["']$/g, "");
-          const lines = result.split("\n");
-          if (m[1]) {
-            const n = parseInt(m[1], 10);
-            if (n >= 1 && n <= lines.length) lines.splice(n - 1, 0, text);
-          } else if (m[2] !== undefined) {
-            try {
-              const re = new RegExp(m[2]);
-              for (let i = lines.length - 1; i >= 0; i--) {
-                if (re.test(lines[i])) lines.splice(i, 0, text);
-              }
-            } catch {
-              return { ok: false, output: `sed: invalid pattern: ${m[2]}` };
-            }
-          } else {
-            lines.splice(0, 0, text);
-          }
-          result = lines.join("\n");
-          continue;
-        }
-
-        // --- c (change) ---
-        m = cmd.match(/^(?:(\d+)|(?:\/(.+?)\/))?c\s+(.+)$/);
-        if (m) {
-          const text = m[3].replace(/^["']|["']$/g, "");
-          const lines = result.split("\n");
-          if (m[1]) {
-            const n = parseInt(m[1], 10);
-            if (n >= 1 && n <= lines.length) { lines[n - 1] = text; }
-          } else if (m[2] !== undefined) {
-            try {
-              const re = new RegExp(m[2]);
-              for (let i = 0; i < lines.length; i++) {
-                if (re.test(lines[i])) lines[i] = text;
-              }
-            } catch {
-              return { ok: false, output: `sed: invalid pattern: ${m[2]}` };
-            }
-          } else {
-            result = text;
-          }
-          result = lines.join("\n");
-          continue;
-        }
-
-        return { ok: false, output: `sed: unsupported command: ${cmd}. Supported: s/old/new/g, [addr]s/old/new/g, [addr]q, [addr]a text, [addr]i text, [addr]c text, Nd, N,Md, /pattern/d, /pattern/p` };
-      }
-
+      const result = await sedWasm.evaluate({
+        argv: [
+          ...sedArgs,
+          ...(!scriptFromFlag && positional.length > 0 ? [script] : []),
+          ...(file && !fromStdin ? [file] : []),
+        ],
+        files: Object.keys(files).length > 0 ? files : undefined,
+        stdin: fromStdin ? content : undefined,
+        fallback: { script: fbScript, content },
+      });
+      if (!result.ok) return { ok: false, output: result.output };
       if (inplace && file) {
-        vfs.writeFileSync(file, result);
+        vfs.writeFileSync(file, result.output === "(no output)" ? "" : result.output);
         return { ok: true, output: "", mutated: true };
       }
-      return { ok: true, output: result };
+      return { ok: true, output: result.output };
     }
     case "sort": {
       // The file is the LAST non-flag token — flags like -t DELIM or -k KEY
