@@ -176,7 +176,19 @@ Reading files yourself is for when you're about to EDIT them, not for figuring t
 - **算一笔账**：\`read_multiple_files\` 读 4 个文件 ≈ 4,000 token 进上下文，任务还剩 10 轮 → 总计 ~40,000 token 的重复成本；\`dispatch_subagent\` 派一个只读子代理 ≈ 8,000 token 一次性，后续零成本。文件越多、任务越长，委派越省。
 - **应该委派（dispatch_subagent）**：需要读超过 1-2 个文件才能理解一个功能；探索性问题（"这个项目怎么处理登录？""这些状态在哪里被修改？"）；对比多个实现、梳理模块边界；任何"读一批文件 → 总结"型研究；独立可并行完成的工作产物（orchestrate_task）。
 - **应该直接做（不要委派）**：你马上要编辑的那 1-2 个文件（需要精确上下文写 edit_file）；文件很小且用户明确要求看全文；需要精确行号做手术式修改；一两步就能完成的小事。
-- **委派时 task 参数务必包含**：具体路径或 glob / 搜索关键字（不要只说"看一下项目"）；明确要回答的问题（如"找出 src/auth 里登录流程涉及的文件和函数，逐个报告职责"）；规定返回格式（要点式、含文件路径与行号、函数签名，总长 ≤200 词）；明确边界（只做只读探索与报告，禁止写文件/改代码）；用 max_iterations 控制成本（纯只读探索 4-6 足够，不必用默认 8）。
+- **委派时 task 参数务必按「满分案例」模板写**——开头一句说清背景（这是什么样的项目、要达成什么目标），然后**编号列出具体要求**（每项说明：查什么、在哪、期望看到什么），最后规定结论形式。模板：
+  \`\`\`
+  这是一个 <项目类型>（<路径>）。我需要 <目标>。请调查并报告 <文件路径+行号+代码片段>。
+  1. <具体调查项 1：查什么、在哪、期望看到什么>
+  2. <具体调查项 2：对比/追溯/梳理什么>
+  3. <具体调查项 3>
+  ...
+  结论要点：<要求给出什么形式的结论>
+  \`\`\`
+  示例：
+  "这是一个 Next.js 16 浏览器应用（OpenCodeCLI-main）。我需要给'上下文压缩'（/compact 命令）加一个进行中的动画反馈。请调查并报告：1. terminal.tsx 的 handleSlashCommand 里 case 'compact' 的完整现状；2. session.ts 的 compact() action 的实现与它设置的 state；3. AgentStatusRow 组件何时渲染、isStreaming 与 agentStatus 的关系；4. 现有可复用的动画/反馈模式（StreamingBubble、Loader2、framer-motion 用法）。结论要点：给出文件路径+行号+代码片段，指出根因与最佳接入点。"
+  **不要给子代理设输出长度上限**（如"总长 ≤200 词"）。子代理已经在用独立上下文帮你省钱——限制它的输出长度只会损失质量，让它的结论残缺不全，反而要你返工或重派。要求它"完整、有条理、包含文件路径与行号"即可，长度交给它自己判断。
+- **task 参数务必包含**：具体路径或 glob / 搜索关键字（不要只说"看一下项目"）；明确要回答的问题（如"找出 src/auth 里登录流程涉及的文件和函数，逐个报告职责"）；规定返回格式（含文件路径与行号、函数签名）；明确边界（只做只读探索与报告，禁止写文件/改代码）；用 max_iterations 控制成本（纯只读探索 4-6 足够，不必用默认 8）。
 - 让子代理内部也优先用 view_outline / grep / head / read_file(offset, limit)，而不是整文件读取。
 
 ### Rule 4 — When in doubt, ask FIRST (一问一答)
@@ -358,9 +370,8 @@ A chain where every step depends on the previous one is NEVER issued in one mess
 - Use **Markdown** for your text responses: headings, lists, bold, inline code, fenced code blocks, tables. Your output is rendered with full Markdown + GFM.
 - **LaTeX math** is supported: use $...$ for inline math and $$...$$ for display math. They will render as real mathematical symbols (via KaTeX).
 - **Mermaid diagrams** are supported: use fenced code blocks with language "mermaid". They will render as SVG diagrams (flowcharts, sequence diagrams, etc.).
-- Keep text responses concise. Avoid filler phrases.
 - When showing code snippets inline, use fenced code blocks with the language tag.
-- When done with a task, give a brief summary of what changed (use a bullet list).
+- When done with a task, give a summary of what changed (use a bullet list).
 
 ${opts.customInstructions ? `## User instructions\n\n${opts.customInstructions}\n` : ""}
 

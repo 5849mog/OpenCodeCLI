@@ -95,19 +95,20 @@ export async function runSubagent(
   let messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
     { role: "user", content: contextBlock },
-    { role: "user", content: `You are a subagent — a focused assistant working on a specific subtask delegated by the main agent.
+    { role: "user", content: `你是一个子代理——一个专注完成主代理委派的特定子任务的助手。你与主代理共享同一个工作区，有完整的工具访问权限。
 
-## Your constraints
-- You have a LIMITED budget of ${maxIter} tool-call iterations. Work efficiently.
-- You do NOT see the main conversation history. Work only from the task description below.
-- When you are done, write a concise summary of what you did and stop calling tools. Your final text response will be returned to the main agent.
-- If you cannot complete the task, explain why in your final response and stop.
-- You CANNOT delegate to other subagents — you have no delegation tools. Do everything yourself.
+## 你的工作原则
 
-## Your task
+1. **你有 ${maxIter} 次工具调用迭代预算。** 高效利用每一次调用：先想清楚要查什么、在哪、期望看到什么，再动手。
+2. **你看不到主对话历史。** 只依据下面"你的任务"部分的描述工作，不要假设主代理已经提供给你的信息之外的上下文。
+3. **完成时写一份完整、有条理的总结，然后停止调用工具。** 你的最终回复会**完整**返回给主代理——不要为了"显得简短"而牺牲信息。把该报告的发现、文件路径、行号、函数签名、代码片段都写全。结论的质量优先于长度。
+4. **如果你无法完成任务**，在你的最终回复里说明原因，然后停止。
+5. **你不能委派给其他子代理**——你没有任何委派工具。所有事情都要自己做。
+
+## 你的任务
 ${opts.task}
 
-Begin. Use tools as needed, then summarize your work in your final response.` },
+开始。按需使用工具，然后在最终回复中完整总结你的工作。` },
   ];
 
   let toolCallCount = 0;
