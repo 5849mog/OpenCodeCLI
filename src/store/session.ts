@@ -198,6 +198,9 @@ interface SessionState {
   sessions: SessionMeta[];
   config: AiConfig;
   isStreaming: boolean;
+  /** True while /compact is running (LLM summarization) — drives the
+   *  "compressing…" animation in the terminal. */
+  isCompacting: boolean;
   abortController: AbortController | null;
   /** Human-readable status for the UI to show what the agent is doing. */
   agentStatus: string;
@@ -304,6 +307,7 @@ export const useSession = create<SessionState>((set, get) => ({
   sessions: [],
   config: DEFAULT_CONFIG,
   isStreaming: false,
+  isCompacting: false,
   abortController: null,
   agentStatus: "",
   streamingText: null,
@@ -541,14 +545,13 @@ export const useSession = create<SessionState>((set, get) => ({
       thinkingEnabled: config.thinkingEnabled,
       reasoningEffort: config.reasoningEffort,
     };
-    set({ agentStatus: "Compacting conversation…" });
+    set({ isCompacting: true, agentStatus: "正在压缩对话历史…" });
     try {
       const result = await compactConversation(messages, aiConfig);
       // 真写回 store——后续每一轮请求都发送压缩后的历史
       set({
         messages: result.messages,
         truncated: false,
-        agentStatus: "",
       });
       const modeLabel = result.mode === "llm" ? "LLM 摘要" : "启发式压缩（摘要调用失败，已降级）";
       useSession.setState((s) => ({
@@ -563,7 +566,6 @@ export const useSession = create<SessionState>((set, get) => ({
         ],
       }));
     } catch (e) {
-      set({ agentStatus: "" });
       useSession.setState((s) => ({
         events: [
           ...s.events,
@@ -575,6 +577,9 @@ export const useSession = create<SessionState>((set, get) => ({
           },
         ],
       }));
+    } finally {
+      // 无论成功失败都清除压缩状态——UI 的"压缩中"动画随之消失
+      set({ isCompacting: false, agentStatus: "" });
     }
   },
 

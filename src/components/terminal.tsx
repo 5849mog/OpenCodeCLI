@@ -66,6 +66,7 @@ import { CollapsibleText } from "./collapsible-text";
 export function Terminal() {
   const events = useSession((s) => s.events);
   const isStreaming = useSession((s) => s.isStreaming);
+  const isCompacting = useSession((s) => s.isCompacting);
   const agentStatus = useSession((s) => s.agentStatus);
   const agentIteration = useSession((s) => s.agentIteration);
   const agentMaxIterations = useSession((s) => s.agentMaxIterations);
@@ -577,7 +578,7 @@ export function Terminal() {
               reasoning={streamingReasoning?.text ?? ""}
             />
           )}
-          {isStreaming && (
+          {(isStreaming || isCompacting) && (
             <AgentStatusRow status={agentStatus} />
           )}
         </div>
@@ -642,12 +643,12 @@ export function Terminal() {
                 ? "agent is working…"
                 : "输入消息…  (@ 提及文件)"
             }
-            disabled={isStreaming}
+            disabled={isStreaming || isCompacting}
             className="max-h-[200px] flex-1 resize-none bg-transparent text-[length:var(--font-size-base)] text-[#1A1815] placeholder:text-[#A8A29E] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
           />
           <button
             onClick={submit}
-            disabled={!input.trim() || isStreaming}
+            disabled={!input.trim() || isStreaming || isCompacting}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#D97757] text-white transition-colors hover:bg-[#C66B4A] disabled:cursor-not-allowed disabled:bg-[#D6D3CE] disabled:text-[#A8A29E]"
             title="Send (Enter)"
           >
@@ -991,6 +992,7 @@ function AgentStatusRow({ status }: { status: string }) {
         <span className="relative inline-flex h-2 w-2 rounded-full bg-[#D97757]" />
       </span>
       <Sparkles className="h-3 w-3 text-[#D97757]/70" />
+      <Loader2 className="h-3 w-3 animate-spin text-[#D97757]/70" />
       <span className="text-[#2D2B27] dark:text-zinc-200">{status || "agent is working…"}</span>
     </motion.div>
   );
