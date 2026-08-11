@@ -18,10 +18,12 @@
 | 8    | 嵌套表 | 嵌套结构组装/取值 | `test 1 2` | ✅ |
 | 9    | 循环/条件 | `for i=1,3 do ... end` / `if ... else` | `1 two 3` | ✅ |
 | 10   | 函数 + 闭包 | 自定义函数、upvalue | `1 2 3` | ✅ |
-| 11   | stdin `io.read("*a")` | 读取 `input` 全部内容 | 修复后复测（见 BUG 记录） | ⏳ |
-| 12   | stdin `io.lines()` | 逐行处理 `input` | 修复后复测 | ⏳ |
-| 13   | `io.open("input.txt")` | 以文件形式读取同一份 `input` | 修复后复测 | ⏳ |
-| 14   | input 分组聚合 | 对多行数字求和/计数/分组 | 修复后复测 | ⏳ |
+| 11   | stdin `io.read("*a")` | 读取 `input` 全部内容 | `42\n100` 完整读回 | ✅ |
+| 12   | stdin `io.lines()` | 逐行处理 `input` | `line1\nline2` 逐行打印 | ✅ |
+| 13   | `io.open("input.txt")` | 以文件形式读取同一份 `input` | 与 stdin 内容一致 | ✅ |
+| 14   | input 分组聚合 | 对多行数字求和/计数/分组 | 多行数字求和正确 | ✅ |
+| 14b  | **多轮 `io.read()`**（游戏交互核心） | 脚本内多次 `io.read()` 逐次读到预置行 | `input:"50\n75\n42"`，三次 io.read() 依次得 50/75/42 | ✅ |
+| 14c  | **交互式游戏脚本** | 猜数字/文字冒险/状态机脚本 | 猜数字游戏（io.read 循环 + 条件判断 + input 预置多行）正常输出交互过程 | ✅ |
 | 15   | 语法错误 | stderr 返回 `lua: ...` 错误信息，ok:false | `syntax error near 'is'` | ✅ |
 | 16   | 运行期错误 | 除零/索引 nil → 报错含 traceback | `attempt to index a nil value` + traceback | ✅ |
 | 17   | 大输出截断 | 超 20k 字符给截断提示 | `truncated at 20,000 chars; original 48,892` | ✅ |
@@ -80,6 +82,28 @@
 - 本地 `bun dev`（未装 emsdk）时 run_lua 走降级路径（诚实报「原生引擎不可用」），
   以上矩阵反映的是 **部署版（CI 构建的 wasm）** 的行为。
 - 简单行列处理（取列、求和、替换）仍应使用 bash awk/sed；run_lua 服务于 awk 表达不了的复杂逻辑。
+
+### ✅ 交互式 / 游戏脚本支持
+
+引擎**支持交互式程序**——猜数字、文字冒险、模拟器、回合制状态机都能写：
+
+- **多轮输入**：`input` 预置多行后，脚本内**多次 `io.read()` 会逐次取到下一行**（stdin 按需供字节，非一次性消费）。这是游戏"每回合读一个输入"的基础。
+- **状态管理**：表存游戏状态（玩家血量、关卡、背包），循环驱动回合，`math.random` 提供随机。
+- **示例**（猜数字，`input: "50\n75\n42"`）：
+  ```lua
+  local n = 42
+  print("猜 1-100")
+  for i = 1, 10 do
+    local g = tonumber(io.read() or "")
+    if not g then break end
+    if g == n then print("对了!"); return
+    elseif g < n then print("小了")
+    else print("大了") end
+  end
+  print("次数用尽，答案是 " .. n)
+  ```
+  输出：`猜 1-100 / 小了 / 大了 / 对了!`
+- 边界：输入是 `input` 参数一次性预置的（非实时键盘交互），脚本逐行消费；输出经 print 回传。
 
 ## 何时不要用 run_lua
 

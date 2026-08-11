@@ -658,7 +658,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "run_lua",
       description:
-        "在浏览器内存中运行真正的 Lua 5.4 解释器（WebAssembly 原生引擎）——用于 awk 表达不了的复杂逻辑：嵌套数据结构/分组聚合转换、状态机、跨多个读取结果的累计处理、字符串模式匹配、自定义算法。**脚本来源二选一**：`script` 内联程序文本（如 'local t={} for l in io.lines() do t[#t+1]=l end print(#t)'）；或 `script_file` 直接指定工作区 .lua 脚本文件运行（脚本资产化：write_file 写好脚本 → 直接跑，可复用可 review；缺失报错）。可选 `input` 作为数据输入（io.read('*a')/io.lines() 或 io.open('input.txt')）；可选 `files` 读取工作区文件（只传路径，注入只读副本，io.open(path) 读取）；可选 `args` 传给脚本 argv（脚本读 arg[1..]）；可选 `outputs` 声明写回白名单——脚本 io.open(path,'w') 写 MEMFS 后同步回工作区，**回传摘要而非全文（长结果落盘，需要内容用 read_file）**。安全边界（引擎强制）：不访问网络、不持久化；写回仅限 outputs 白名单（未声明路径不同步）、Plan 模式带 outputs 被拦截、可 undo 撤销。简单行列处理用 bash awk/sed。脚本出错返回 lua 错误信息。",
+        "在浏览器内存中运行真正的 Lua 5.4 解释器（WebAssembly 原生引擎）——用于 awk 表达不了的复杂逻辑：嵌套数据结构/分组聚合转换、状态机、跨多个读取结果的累计处理、字符串模式匹配、自定义算法。**也支持交互式/游戏脚本**（猜数字、文字冒险、模拟器、RPG 状态机）：循环 + io.read() 逐行消费 input（每次 io.read() 取下一行预置输入）、表存状态、math.random 随机、coroutine 回合制。**脚本来源二选一**：`script` 内联程序文本（如 'local t={} for l in io.lines() do t[#t+1]=l end print(#t)'）；或 `script_file` 直接指定工作区 .lua 脚本文件运行（脚本资产化：write_file 写好脚本 → 直接跑，可复用可 review；缺失报错）。可选 `input` 作为数据输入（io.read('*a')/io.lines() 或 io.open('input.txt')）；可选 `files` 读取工作区文件（只传路径，注入只读副本，io.open(path) 读取）；可选 `args` 传给脚本 argv（脚本读 arg[1..]）；可选 `outputs` 声明写回白名单——脚本 io.open(path,'w') 写 MEMFS 后同步回工作区，**回传摘要而非全文（长结果落盘，需要内容用 read_file）**。安全边界（引擎强制）：不访问网络、不持久化；写回仅限 outputs 白名单（未声明路径不同步）、Plan 模式带 outputs 被拦截、可 undo 撤销。简单行列处理用 bash awk/sed。脚本出错返回 lua 错误信息。",
       parameters: {
         type: "object",
         properties: {
