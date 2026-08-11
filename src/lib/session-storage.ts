@@ -41,6 +41,10 @@ export interface PersistedSession {
   events: SessionEvent[];
   totalTokens: number;
   lastUsage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null;
+  /** Cumulative tokens released by compaction (for the compression-aware panel). */
+  compactedReleases?: number;
+  /** Number of successful /compact runs. */
+  compactCount?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -186,6 +190,45 @@ export async function loadSession(id: string): Promise<PersistedSession | null> 
     return result;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Load ALL full session records (for full export). Tool results can make a
+ * single session several MB — only use when the user explicitly exports.
+ */
+export async function loadAllSessions(): Promise<PersistedSession[]> {
+  const db = await getDB();
+  if (!db) return [];
+  try {
+    const all = (await db.getAll(STORE)) as PersistedSession[];
+    // Merge meta titles (rename live in meta only, never in the full record).
+    const metas = (await db.getAll(META_STORE)) as SessionMeta[];
+    const metaById = new Map(metas.map((m) => [m.id, m]));
+    for (const rec of all) {
+      const meta = metaById.get(rec.id);
+      if (meta?.title) rec.title = meta.title;
+    }
+    return all.sort((a, b) => b.updatedAt - a.updatedAt);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Wipe ALL sessions (records + meta). Used by full-overwrite import — the
+ * user opted into replacing the entire local history, so this is intentional.
+ */
+export async function wipeAllSessions(): Promise<void> {
+  const db = await getDB();
+  if (!db) return;
+  try {
+    const recs = (await db.getAllKeys(STORE)) as IDBValidKey[];
+    const metas = (await db.getAllKeys(META_STORE)) as IDBValidKey[];
+    for (const k of recs) await db.delete(STORE, k);
+    for (const k of metas) await db.delete(META_STORE, k);
+  } catch {
+    /* ignore */
   }
 }
 

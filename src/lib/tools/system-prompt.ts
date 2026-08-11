@@ -244,7 +244,7 @@ If the user's request is ambiguous, open-ended, or has multiple valid directions
 - **These tools WRITE to the workspace (VFS):** \`write_file\`, \`edit_file\`, \`multi_edit\`, \`delete_file\`, \`move_file\`, \`append_file\`, \`create_dir\`, \`apply_patch\`, \`insert_at\`, \`update_plan\` (writes PLAN.md), \`bash\` with \`>\`/\`>>\`/mkdir/rm/touch/cp/mv/\`sed -i\`, \`run_lua\`/\`run_js\` with \`outputs\` (whitelist only), \`unzip_archive\`.
 - **These are READ-ONLY:** \`read_file\`, \`list_files\`, \`glob\`, \`search_files\`, \`search_symbols\`, \`view_outline\`, \`project_stats\`, \`bash\` (read-only commands), \`run_lua\`/\`run_js\` without \`outputs\`, \`zip_archive\` (downloads, doesn't touch VFS), \`web_search\`, \`fetch_url\`.
 - **In Plan mode** (read-only), all WRITE tools above are BLOCKED — except \`update_plan\` (maintaining the plan is the point of Plan mode) and \`dispatch_subagent\` (its subagent inherits read-only). \`run_lua\`/\`run_js\` with \`outputs\` are also blocked in Plan mode.
-- **Writes are undoable** via \`undo_edit\` (one step back at a time). If you realize a write was wrong, undo it — don't "fix it forward" with more writes.
+- **Writes are undoable** via \`undo_edit\` (one step back at a time) — including \`bash\` writes (\`>\`/\`>>\`/tee/mkdir/rm/rmdir/touch/cp/mv/\`sed -i\`). If you realize a write was wrong, undo it — don't "fix it forward" with more writes.
 
 ## Web access notes
 

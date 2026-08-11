@@ -59,6 +59,7 @@ import { useVfsView } from "@/store/vfs-view";
 import { vfs } from "@/lib/vfs";
 import { toast } from "sonner";
 import { ZipDownloadBridge, ZipPickerModal } from "./zip-picker";
+import { PayloadInspector } from "./payload-inspector";
 import { cn } from "@/lib/utils";
 import { planStats } from "@/lib/plan-utils";
 import { CollapsibleText } from "./collapsible-text";
@@ -71,6 +72,8 @@ export function Terminal() {
   const agentIteration = useSession((s) => s.agentIteration);
   const agentMaxIterations = useSession((s) => s.agentMaxIterations);
   const totalTokens = useSession((s) => s.totalTokens);
+  const compactedReleases = useSession((s) => s.compactedReleases ?? 0);
+  const compactCount = useSession((s) => s.compactCount ?? 0);
   const lastUsage = useSession((s) => s.lastUsage);
   const config = useSession((s) => s.config);
   const setConfig = useSession((s) => s.setConfig);
@@ -91,6 +94,8 @@ export function Terminal() {
   // @mention state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
+  // Payload inspector modal (查看/编辑上次发送给 AI 的完整上下文)
+  const [payloadOpen, setPayloadOpen] = useState(false);
 
   // Auto-scroll to bottom on new events when user is near the bottom.
   useLayoutEffect(() => {
@@ -207,8 +212,20 @@ export function Terminal() {
       case "tokens":
         pushSystem(
           lastUsage
-            ? `Tokens used this session: ${totalTokens.toLocaleString()} total\n  • Last request: ${lastUsage.prompt_tokens.toLocaleString()} prompt + ${lastUsage.completion_tokens.toLocaleString()} completion = ${lastUsage.total_tokens.toLocaleString()} total\n  • Context budget: ~60,000 tokens (auto-truncates when exceeded)`
-            : `Tokens used this session: ${totalTokens.toLocaleString()} total\n  • No usage data yet — send a message to the AI.\n  • Context budget: ~60,000 tokens (auto-truncates when exceeded)`,
+            ? [
+                `Tokens used this session: ${totalTokens.toLocaleString()} total (real API usage)`,
+                `  • Last request: ${lastUsage.prompt_tokens.toLocaleString()} prompt + ${lastUsage.completion_tokens.toLocaleString()} completion = ${lastUsage.total_tokens.toLocaleString()} total`,
+                `  • Compaction: ${compactCount} time(s), cumulatively released ~${(compactedReleases / 1000).toFixed(1)}K token`,
+                `  • Context budget: ~60,000 tokens (auto-truncates when exceeded)`,
+              ].join("\n")
+            : [
+                `Tokens used this session: ${totalTokens.toLocaleString()} total (real API usage)`,
+                `  • No usage data yet — send a message to the AI.`,
+                compactCount > 0
+                  ? `  • Compaction: ${compactCount} time(s), cumulatively released ~${(compactedReleases / 1000).toFixed(1)}K token`
+                  : `  • No compaction yet — type /compact to collapse old context into a summary`,
+                `  • Context budget: ~60,000 tokens (auto-truncates when exceeded)`,
+              ].join("\n"),
         );
         break;
 
@@ -250,6 +267,17 @@ export function Terminal() {
         // 真正的压缩：LLM 摘要旧对话并写回 store。进度与结果由
         // compact() 以 system 事件反馈（含压缩前后对比）。
         void useSession.getState().compact();
+        break;
+      }
+
+      case "inspect": {
+        // 打开 payload 查看/编辑器：展示上次实际发送给 AI 服务器的完整上下文。
+        const lastPayload = useSession.getState().lastSentPayload;
+        if (!lastPayload || lastPayload.length === 0) {
+          pushSystem("No payload to inspect yet — send a message to the AI first, then run /inspect.");
+          break;
+        }
+        setPayloadOpen(true);
         break;
       }
 
@@ -607,6 +635,9 @@ export function Terminal() {
           {/* Zip tool bridges — download (zip_archive) + file picker (unzip_archive) */}
           <ZipDownloadBridge />
           <ZipPickerModal />
+
+          {/* Payload inspector — 查看/编辑上次发送给 AI 的完整上下文（/inspect 打开） */}
+          <PayloadInspector open={payloadOpen} onClose={() => setPayloadOpen(false)} />
       </div>
 
       {/* Input */}

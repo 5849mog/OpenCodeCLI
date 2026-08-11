@@ -5,11 +5,17 @@
  * Settings persist to localStorage.
  */
 
-import { useState } from "react";
-import { X, Settings, Eye, EyeOff, Zap } from "lucide-react";
+import { useRef, useState } from "react";
+import { X, Settings, Eye, EyeOff, Zap, Download, Upload } from "lucide-react";
 import { useSession } from "@/store/session";
 import { fetchModels } from "@/lib/ai-client";
 import { apiKeyVault } from "@/lib/api-key-vault";
+import {
+  loadAllSessions,
+  saveSession,
+  wipeAllSessions,
+  type PersistedSession,
+} from "@/lib/session-storage";
 import { toast } from "sonner";
 
 const PRESETS: Array<{
@@ -69,8 +75,11 @@ export function SettingsDialog({
 }) {
   const config = useSession((s) => s.config);
   const setConfig = useSession((s) => s.setConfig);
+  const refreshSessionList = useSession((s) => s.refreshSessionList);
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // API key is held in a LOCAL state variable — NOT in the Zustand store.
   // On save, it goes to the apiKeyVault (private closure), not localStorage.
   const [keyInput, setKeyInput] = useState(() => apiKeyVault.getKey() ?? "");
@@ -111,6 +120,102 @@ export function SettingsDialog({
     } finally {
       setTesting(false);
     }
+  };
+
+  // ── Session export / import (全量) ──
+  // Export NEVER includes API keys — they live in the encrypted sessionStorage
+  // vault, not in session records; config is exported minus any credential.
+  const handleExportAll = async () => {
+    try {
+      const sessions = await loadAllSessions();
+      const safeConfig = {
+        baseUrl: config.baseUrl,
+        model: config.model,
+        temperature: config.temperature,
+        maxTokens: config.maxTokens,
+        thinkingEnabled: config.thinkingEnabled,
+        reasoningEffort: config.reasoningEffort,
+        searchProvider: config.searchProvider,
+        useJinaReader: config.useJinaReader,
+        corsProxyUrl: config.corsProxyUrl,
+        customInstructions: config.customInstructions,
+      };
+      const payload = {
+        kind: "opencode-sessions-export",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        sessions,
+        config: safeConfig,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `opencode-all-sessions-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`已导出 ${sessions.length} 个会话（不含任何 API 密钥）`);
+    } catch (e) {
+      toast.error(`导出失败：${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  const handleImportFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      setImporting(true);
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        if (parsed.kind !== "opencode-sessions-export" || parsed.version !== 1) {
+          toast.error("不是有效的 OpenCode 会话导出文件（kind/version 不符）");
+          return;
+        }
+        const sessions: PersistedSession[] = Array.isArray(parsed.sessions) ? parsed.sessions : [];
+        const confirmed = window.confirm(
+          `导入将覆盖本地全部 ${sessions.length ? `${sessions.length} 个` : ""}历史会话（全量覆盖，不可撤销）。继续？`,
+        );
+        if (!confirmed) return;
+        // 全量覆盖：清空旧会话，写入导入的会话。
+        await wipeAllSessions();
+        for (const rec of sessions) {
+          await saveSession({
+            id: rec.id,
+            title: rec.title || "导入会话",
+            messages: rec.messages ?? [],
+            events: rec.events ?? [],
+            totalTokens: rec.totalTokens ?? 0,
+            lastUsage: rec.lastUsage ?? null,
+            compactedReleases: rec.compactedReleases ?? 0,
+            compactCount: rec.compactCount ?? 0,
+            createdAt: rec.createdAt ?? Date.now(),
+            updatedAt: rec.updatedAt ?? Date.now(),
+          });
+        }
+        // 导入配置（不含凭据——只覆盖非敏感项，API key 不受影响）
+        if (parsed.config && typeof parsed.config === "object") {
+          const c = parsed.config as Record<string, unknown>;
+          setConfig({
+            baseUrl: typeof c.baseUrl === "string" ? c.baseUrl : config.baseUrl,
+            model: typeof c.model === "string" ? c.model : config.model,
+            temperature: typeof c.temperature === "number" ? c.temperature : config.temperature,
+            maxTokens: typeof c.maxTokens === "number" ? c.maxTokens : config.maxTokens,
+            thinkingEnabled: typeof c.thinkingEnabled === "boolean" ? c.thinkingEnabled : config.thinkingEnabled,
+            reasoningEffort: typeof c.reasoningEffort === "string" ? c.reasoningEffort : config.reasoningEffort,
+          });
+        }
+        // 让 store 的 refreshSessionList 重新读取 IndexedDB；活动会话指针保持。
+        await refreshSessionList();
+        toast.success(`已导入 ${sessions.length} 个会话并覆盖本地历史`);
+      } catch (e) {
+        toast.error(`导入失败：${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        setImporting(false);
+      }
+    };
+    reader.onerror = () => toast.error("读取文件失败");
+    reader.readAsText(file);
   };
 
   return (
@@ -406,6 +511,43 @@ export function SettingsDialog({
               className="w-full resize-none rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 text-sm focus:border-[#D97757] focus:outline-none"
             />
           </Field>
+
+          {/* ── 会话导出 / 导入（全量） ── */}
+          <div className="mb-4 border-t border-[#E5E2D9] pt-5 dark:border-[#3a3731]">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+              会话 · Session backup
+            </div>
+            <div className="mb-2 text-[11px] text-[#A8A29E] dark:text-zinc-500">
+              导出全部历史会话为 JSON 文件（可在换浏览器 / 清缓存后导入恢复）。
+              导出文件<b>绝不包含 API 密钥</b>（密钥只存在会话内的加密存储中）。
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleExportAll}
+                className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-3 py-2 text-xs text-[#3D3B37] hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:text-zinc-300 dark:hover:bg-[#2a2723]"
+              >
+                <Download className="h-3.5 w-3.5" /> 导出全部会话
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+                className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-3 py-2 text-xs text-[#3D3B37] hover:bg-[#F0EDE5] disabled:opacity-50 dark:border-[#3a3731] dark:text-zinc-300 dark:hover:bg-[#2a2723]"
+              >
+                <Upload className="h-3.5 w-3.5" /> {importing ? "导入中…" : "导入并覆盖全部"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleImportFile(f);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+          </div>
 
           {/* Privacy note */}
           <div className="mt-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 text-[11px] text-[#8B8884] dark:text-zinc-500">
