@@ -7,6 +7,38 @@ import { bashPrintf } from "./printf";
 import { globToRegex } from "./glob";
 import { evalArithmetic } from "../math-eval";
 
+/**
+ * 会话级工作目录（VFS 根相对，空 = 根目录）。`cd` 会更新它，所有文件
+ * 路径类命令通过 resolvePath 应用。注意这是"路径前缀"而非真实 chdir：
+ * 每个 execCommand 的文件参数都先过 resolvePath，把相对路径拼上 cwd。
+ */
+let cwd = "";
+
+/** 解析路径：相对路径（不以 / 开头、非空）且 cwd 非空 → 前缀 cwd；否则原样。
+ *  `cd ..` 由调用方处理（这里只做前缀拼接）。 */
+function resolvePath(p: string): string {
+  if (!p) return p;
+  if (p === "/") return "";
+  if (p.startsWith("/")) return p.replace(/^\/+/, "");
+  if (!cwd) return p;
+  return `${cwd}/${p}`;
+}
+
+/** 规范化路径：去掉多余的 ./ 和重复 //，解析 .. （仅向上、不越出根）。 */
+function normalizePath(p: string): string {
+  const parts = p.split("/").filter((s) => s && s !== ".");
+  const out: string[] = [];
+  for (const part of parts) {
+    if (part === "..") {
+      if (out.length > 0) out.pop();
+      // 越出根则忽略（保持根）
+    } else {
+      out.push(part);
+    }
+  }
+  return out.join("/");
+}
+
 /** [Plan mode] block message for a bash command that would modify the filesystem. */
 function planReadOnlyMsg(cmd: string): string {
   return `[Plan mode] bash is read-only in Plan mode: '${cmd}' would modify the filesystem and was blocked. In Plan mode you can only READ and ANALYZE — propose your plan in text, and the user will switch to Bypass mode to let you execute it.`;
@@ -83,10 +115,73 @@ function splitCommandSegments(cmd: string): Array<{ cmd: string; sep: "&&" | "||
   return segments;
 }
 
+// --- for 循环轻量支持 ---
+// 仅支持单层：`for VAR in $(CMD) / 静态列表; do BODY; done`（换行/裸 do 亦可）。
+// 命令替换（$(find ...)/$(ls)）运行内部命令，输出按行展开为列表；
+// 静态列表逐项替换 body 中的 $VAR / ${VAR} 后递归执行。
+// 嵌套 for、glob 列表、条件分支不支持——明确报错引导 find -exec / xargs，而非死胡同。
+type ForExpandResult =
+  | { kind: "ok"; varName: string; body: string; list: string[] }
+  | { kind: "error"; message: string }
+  | null;
+
+async function expandForLoop(command: string, readOnly: boolean): Promise<ForExpandResult> {
+  const trimmed = command.trim();
+  // 两种写法：`; do`（单行）与裸 `do`（换行/无分号）
+  let m = trimmed.match(/^for\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\s+(.+?)\s*;\s*do\s+([\s\S]+?)\s*;\s*done\s*$/);
+  if (!m) m = trimmed.match(/^for\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\s+(.+?)\s*do\s+([\s\S]+?)\s*done\s*$/);
+  if (!m) return null;
+  const varName = m[1];
+  const listSrc = m[2].trim();
+  const body = m[3].trim();
+  if (!varName || !listSrc || !body) return null;
+  if (/^for\s+[A-Za-z_]/.test(body)) {
+    return { kind: "error", message: "bash: nested for loops not supported in sandbox. Use find -exec or xargs instead." };
+  }
+  let list: string[];
+  const sub = listSrc.match(/^\$\(([\s\S]+)\)$/);
+  if (sub) {
+    const res = await runPipeline(sub[1].trim(), readOnly);
+    if (!res.ok) return { kind: "error", message: `bash: for list command failed: ${res.output}` };
+    list = res.output.split("\n").map((s) => s.trim()).filter(Boolean);
+  } else {
+    if (/[*?]/.test(listSrc)) {
+      return { kind: "error", message: `bash: glob list in for is not expanded in sandbox. Use \`for f in $(find . -name "PATTERN")\` or \`for f in $(ls)\` instead.` };
+    }
+    list = listSrc.split(/\s+/).filter(Boolean);
+  }
+  return { kind: "ok", varName, body, list };
+}
+
 async function toolBash(args: Record<string, unknown>, readOnly = false): Promise<ToolResult> {
   const command = String(args.command ?? "").trim();
   if (!command) {
     return { ok: false, output: "Empty command", tool: "bash", args };
+  }
+  // for 循环：整体识别（do/done 跨分号与换行），逐项展开 body 后递归执行
+  if (/^for\s+[A-Za-z_]/.test(command)) {
+    const forExp = await expandForLoop(command, readOnly);
+    if (forExp) {
+      if (forExp.kind === "error") return { ok: false, output: forExp.message, tool: "bash", args };
+      const outputs: string[] = [];
+      let mutated = false;
+      let allOk = true;
+      for (const item of forExp.list) {
+        let bodyCmd = forExp.body.replace(new RegExp(`\\$\\{${forExp.varName}\\}`, "g"), item);
+        bodyCmd = bodyCmd.replace(new RegExp(`\\$${forExp.varName}\\b`, "g"), item);
+        const res = await toolBash({ command: bodyCmd }, readOnly);
+        if (res.mutated) mutated = true;
+        if (res.output && res.output !== "(command completed with no output)") outputs.push(res.output);
+        if (!res.ok) allOk = false;
+      }
+      return {
+        ok: allOk,
+        output: outputs.join("\n") || "(command completed with no output)",
+        tool: "bash",
+        args,
+        mutated,
+      };
+    }
   }
   const segments = splitCommandSegments(command);
   const outputs: string[] = [];
@@ -142,12 +237,12 @@ async function runPipeline(cmdLine: string, readOnly = false): Promise<{
       i++;
     } else if (tok === ">" || tok === ">>") {
       const append = tok === ">>";
-      const file = tokens[i + 1];
+      const file = resolvePath(tokens[i + 1] ?? "");
       if (!file) return { ok: false, output: `${tok}: missing file` };
       current.outputRedirect = { file, append };
       i += 2;
     } else if (tok === "<") {
-      const file = tokens[i + 1];
+      const file = resolvePath(tokens[i + 1] ?? "");
       if (!file) return { ok: false, output: "<: missing file" };
       current.inputRedirect = file;
       i += 2;
@@ -353,9 +448,30 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
 
   switch (program) {
     case "pwd":
-      return { ok: true, output: "/" };
-    case "cd":
+      return { ok: true, output: cwd ? `/${cwd}` : "/" };
+    case "cd": {
+      // cd 持久化：更新会话级 cwd。cd（无参）→ 回根；cd .. → 父目录。
+      const target = rest[0];
+      if (target === undefined) {
+        cwd = "";
+        return { ok: true, output: "" };
+      }
+      let resolved = resolvePath(target);
+      // 处理 cd .. / cd ../..
+      if (target === ".." || target.startsWith("../")) {
+        resolved = normalizePath(`${cwd ? cwd + "/" : ""}${target}`);
+      }
+      // 校验目标存在且是目录
+      const stat = vfs.statSync(resolved);
+      if (!stat) {
+        return { ok: false, output: `cd: ${target}: No such file or directory` };
+      }
+      if (stat.type !== "dir") {
+        return { ok: false, output: `cd: ${target}: Not a directory` };
+      }
+      cwd = resolved;
       return { ok: true, output: "" };
+    }
     case "clear":
     case "cls":
       return { ok: true, output: "" };
@@ -405,7 +521,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       const reverse = /r/.test(allFlags);
       const recursive = /R/.test(allFlags);
       const humanReadable = /h/.test(allFlags);
-      const dir = rest.find((t) => !t.startsWith("-")) ?? "";
+      const dir = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
 
       const fmtSize = (bytes: number): string => {
         if (!humanReadable) return String(bytes).padStart(8);
@@ -481,11 +597,11 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       };
     }
     case "tree": {
-      const dir = rest.find((t) => !t.startsWith("-")) ?? "";
+      const dir = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
       return { ok: true, output: vfs.treeSync(dir) || "(empty)" };
     }
     case "cat": {
-      const fileArgs = rest.filter((t) => !t.startsWith("-"));
+      const fileArgs = rest.filter((t) => !t.startsWith("-")).map(resolvePath);
       let content: string | null;
       if (fileArgs.length > 0) {
         // 与真实 cat 一致：按参数顺序拼接全部文件，且给出文件时忽略管道 stdin。
@@ -521,7 +637,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
           fileIdx = rest.findIndex((t, i) => i !== numIdx && !t.startsWith("-"));
         }
       }
-      const file = rest[fileIdx];
+      const file = resolvePath(rest[fileIdx] ?? "");
       const { content } = resolveInput(file);
       if (content === null) return { ok: false, output: "head: no input" };
       return { ok: true, output: splitLines(content).slice(0, n).join("\n") };
@@ -540,7 +656,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
           fileIdx = rest.findIndex((t, i) => i !== numIdx && !t.startsWith("-"));
         }
       }
-      const file = rest[fileIdx];
+      const file = resolvePath(rest[fileIdx] ?? "");
       const { content } = resolveInput(file);
       if (content === null) return { ok: false, output: "tail: no input" };
       const lines = splitLines(content);
@@ -548,7 +664,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
     }
     case "wc": {
       const flags = rest.filter((t) => t.startsWith("-")).join("");
-      const files = rest.filter((t) => !t.startsWith("-"));
+      const files = rest.filter((t) => !t.startsWith("-")).map(resolvePath);
       const onlyLines = /l/.test(flags);
       const onlyWords = /w/.test(flags);
       const onlyChars = /c/.test(flags) || /m/.test(flags);
@@ -594,7 +710,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       return { ok: true, output: `${lines} ${words} ${bytes}${suffix}` };
     }
     case "mkdir": {
-      const targets = rest.filter((t) => !t.startsWith("-"));
+      const targets = rest.filter((t) => !t.startsWith("-")).map(resolvePath);
       if (targets.length === 0) return { ok: false, output: "mkdir: missing operand" };
       for (const t of targets) {
         try {
@@ -607,7 +723,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       return { ok: true, output: "", mutated: true };
     }
     case "rm": {
-      const targets = rest.filter((t) => !t.startsWith("-"));
+      const targets = rest.filter((t) => !t.startsWith("-")).map(resolvePath);
       if (targets.length === 0) return { ok: false, output: "rm: missing operand" };
       let total = 0;
       const missing: string[] = [];
@@ -622,7 +738,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       return { ok: missing.length === 0, output: parts.join("; "), mutated: total > 0 };
     }
     case "rmdir": {
-      const targets = rest.filter((t) => !t.startsWith("-"));
+      const targets = rest.filter((t) => !t.startsWith("-")).map(resolvePath);
       if (targets.length === 0) return { ok: false, output: "rmdir: missing operand" };
       for (const t of targets) {
         const node = vfs.statSync(t);
@@ -634,7 +750,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       return { ok: true, output: "", mutated: true };
     }
     case "touch": {
-      const targets = rest.filter((t) => !t.startsWith("-"));
+      const targets = rest.filter((t) => !t.startsWith("-")).map(resolvePath);
       if (targets.length === 0) return { ok: false, output: "touch: missing operand" };
       for (const t of targets) {
         if (vfs.readFileSync(t) === null) vfs.writeFileSync(t, "");
@@ -642,7 +758,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       return { ok: true, output: "", mutated: true };
     }
     case "cp": {
-      const targets = rest.filter((t) => !t.startsWith("-"));
+      const targets = rest.filter((t) => !t.startsWith("-")).map(resolvePath);
       if (targets.length < 2) return { ok: false, output: "cp: missing operand" };
       const [from, to] = targets;
       const content = vfs.readFileSync(from);
@@ -651,7 +767,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       return { ok: true, output: "", mutated: true };
     }
     case "mv": {
-      const targets = rest.filter((t) => !t.startsWith("-"));
+      const targets = rest.filter((t) => !t.startsWith("-")).map(resolvePath);
       if (targets.length < 2) return { ok: false, output: "mv: missing operand" };
       const [from, to] = targets;
       vfs.renameSync(from, to);
@@ -659,8 +775,9 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
     }
     case "find": {
       const positional = rest.filter((t) => !t.startsWith("-") && t !== "{}" && !/\\+;/.test(t) && t !== ";");
-      let root = positional[0] ?? "";
+      let root = resolvePath(positional[0] ?? "");
       if (root === ".") root = "";
+      else if (root === "./") root = "";
       const typeIdx = rest.indexOf("-type");
       const typeFilter = typeIdx >= 0 ? rest[typeIdx + 1] : null;
       const nameIdx = rest.indexOf("-name");
@@ -734,7 +851,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
         return { ok: false, output: "grep: missing pattern" };
       }
       const pattern = positional[0];
-      const fileArg = positional[1];
+      const fileArg = resolvePath(positional[1] ?? "");
       const caseSensitive = !/i/.test(allFlags);
       const onlyMatch = /o/.test(allFlags);
       const withLineNum = /n/.test(allFlags);
@@ -915,7 +1032,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       const scriptFromFlag = sedArgs.some((a) => a === "-e" || a.startsWith("-e") || a === "-f" || a.startsWith("-f"));
       const script = scriptFromFlag ? "" : (positional[0] ?? "");
       if (positional.length === 0 && !scriptFromFlag) return { ok: false, output: "sed: missing script" };
-      const dataFiles = scriptFromFlag ? positional : positional.slice(1);
+      const dataFiles = (scriptFromFlag ? positional : positional.slice(1)).map(resolvePath);
       const file = dataFiles[0] ?? undefined;
       const { content, source } = resolveInput(file);
       if (content === null && dataFiles.length === 0) return { ok: false, output: "sed: no input" };
@@ -1005,7 +1122,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       // for the file.
       let file: string | undefined;
       for (let i = rest.length - 1; i >= 0; i--) {
-        if (!rest[i].startsWith("-")) { file = rest[i]; break; }
+        if (!rest[i].startsWith("-")) { file = resolvePath(rest[i]); break; }
       }
       const { content } = resolveInput(file);
       if (content === null) return { ok: false, output: "sort: no input" };
@@ -1042,7 +1159,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       return { ok: true, output: sorted.join("\n") };
     }
     case "uniq": {
-      const file = rest.find((t) => !t.startsWith("-"));
+      const file = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
       const { content } = resolveInput(file);
       if (content === null) return { ok: false, output: "uniq: no input" };
       const count = rest.includes("-c");
@@ -1066,7 +1183,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       // -c RANGE) are never mistaken for the file (e.g. `cut -d' ' -f1 file`).
       let file: string | undefined;
       for (let i = rest.length - 1; i >= 0; i--) {
-        if (!rest[i].startsWith("-")) { file = rest[i]; break; }
+        if (!rest[i].startsWith("-")) { file = resolvePath(rest[i]); break; }
       }
       const { content } = resolveInput(file);
       if (content === null) return { ok: false, output: "cut: no input" };
@@ -1169,7 +1286,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       if (sets.length < minSets) return { ok: false, output: deleteMode ? "tr: -d needs SET1" : "tr: needs SET1 and SET2" };
       const set1 = sets[0];
       const set2 = deleteMode ? "" : sets[1];
-      const file = sets[deleteMode ? 1 : 2];
+      const file = resolvePath(sets[deleteMode ? 1 : 2] ?? "");
       const { content } = resolveInput(file);
       if (content === null) return { ok: false, output: "tr: no input" };
       const unescape = (s: string) => s.replace(/\\t/g, "\t").replace(/\\n/g, "\n").replace(/\\\\/g, "\\");
@@ -1196,14 +1313,14 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       return { ok: true, output: result };
     }
     case "nl": {
-      const file = rest.find((t) => !t.startsWith("-"));
+      const file = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
       const { content } = resolveInput(file);
       if (content === null) return { ok: false, output: "nl: no input" };
       const lines = content.split("\n");
       return { ok: true, output: lines.map((l, i) => `${String(i + 1).padStart(6)}  ${l}`).join("\n") };
     }
     case "file": {
-      const file = rest.find((t) => !t.startsWith("-"));
+      const file = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
       if (!file) return { ok: false, output: "file: missing file" };
       const stat = vfs.statSync(file);
       if (!stat) return { ok: false, output: `file: ${file}: not found` };
@@ -1219,7 +1336,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       return { ok: true, output: `${file}: ${type} (${content.length} bytes, ${content.split("\n").length} lines)` };
     }
     case "stat": {
-      const file = rest.find((t) => !t.startsWith("-"));
+      const file = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
       if (!file) return { ok: false, output: "stat: missing file" };
       const node = vfs.statSync(file);
       if (!node) return { ok: false, output: `stat: ${file}: not found` };
@@ -1230,7 +1347,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
     }
     case "diff": {
       const unified = rest.includes("-u");
-      const files = rest.filter((t) => !t.startsWith("-"));
+      const files = rest.filter((t) => !t.startsWith("-")).map(resolvePath);
       if (files.length < 2) return { ok: false, output: "diff: needs two files" };
       const a = vfs.readFileSync(files[0]);
       const b = vfs.readFileSync(files[1]);
@@ -1314,7 +1431,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       return { ok: true, output: out.length === 2 ? "Files are identical" : out.join("\n") };
     }
     case "tee": {
-      const file = rest.find((t) => !t.startsWith("-"));
+      const file = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
       if (!file) return { ok: false, output: "tee: missing file" };
       // Real tee writes its stdin to the file AND echoes it to stdout. When
       // piped (e.g. `echo hi | tee out`), stdin carries the text; without a
@@ -1344,7 +1461,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
     case "uptime":
       return { ok: true, output: "up (browser sandbox), load average: 0.00, 0.00, 0.00" };
     case "rev": {
-      const file = rest.find((t) => !t.startsWith("-"));
+      const file = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
       if (!file) return { ok: false, output: "rev: missing file" };
       const content = vfs.readFileSync(file);
       if (content === null) return { ok: false, output: `rev: ${file}: not found` };
@@ -1353,7 +1470,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
     case "fold": {
       const wIdx = rest.indexOf("-w");
       const width = wIdx >= 0 ? parseInt(rest[wIdx + 1], 10) : 80;
-      const file = rest.find((t) => !t.startsWith("-") && !t.match(/^\d+$/));
+      const file = resolvePath(rest.find((t) => !t.startsWith("-") && !t.match(/^\d+$/)) ?? "");
       if (!file) return { ok: false, output: "fold: missing file" };
       const content = vfs.readFileSync(file);
       if (content === null) return { ok: false, output: `fold: ${file}: not found` };
@@ -1382,7 +1499,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
     case "readlink": {
       const p = rest.find((t) => !t.startsWith("-"));
       if (!p) return { ok: false, output: `${program}: missing operand` };
-      return { ok: true, output: "/" + p };
+      return { ok: true, output: "/" + resolvePath(p) };
     }
     case "seq": {
       const nums = rest.filter((t) => /^-?\d+$/.test(t)).map((n) => parseInt(n, 10));
@@ -1397,7 +1514,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
     }
     case "shuf":
     case "shuffle": {
-      const file = rest.find((t) => !t.startsWith("-"));
+      const file = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
       if (!file) return { ok: false, output: `${program}: missing file` };
       const content = vfs.readFileSync(file);
       if (content === null) return { ok: false, output: `${program}: ${file}: not found` };
@@ -1411,7 +1528,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
     case "head_dash":
     case "strings": {
       const minLen = 4;
-      const file = rest.find((t) => !t.startsWith("-"));
+      const file = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
       if (!file) return { ok: false, output: `${program}: missing file` };
       const content = vfs.readFileSync(file);
       if (content === null) return { ok: false, output: `${program}: ${file}: not found` };
@@ -1420,7 +1537,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
     }
     case "base64": {
       const decode = rest.includes("-d") || rest.includes("--decode");
-      const file = rest.find((t) => !t.startsWith("-"));
+      const file = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
       const { content } = resolveInput(file);
       if (content === null) return { ok: false, output: "base64: no input" };
       try {
@@ -1441,6 +1558,35 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
         return { ok: false, output: `base64: invalid input` };
       }
     }
+    case "xxd":
+    case "od":
+    case "hexdump": {
+      // 十六进制查看，兼容真实 xxd 主格式：`偏移: 每行16字节十六进制  ASCII`。
+      // 支持 -n <len> 限制查看长度；od/hexdump 作为别名统一十六进制输出。
+      let limit = Infinity;
+      const nIdx = rest.indexOf("-n");
+      const nVal = nIdx >= 0 ? rest[nIdx + 1] : undefined;
+      if (nVal && /^\d+$/.test(nVal)) limit = parseInt(nVal, 10);
+      const file = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
+      if (!file) return { ok: false, output: `${program}: missing file` };
+      const content = vfs.readFileSync(file);
+      if (content === null) return { ok: false, output: `${program}: ${file}: not found` };
+      const bytes = new TextEncoder().encode(content);
+      const perLine = 16;
+      const lines: string[] = [];
+      for (let off = 0; off < bytes.length && off < limit; off += perLine) {
+        const hex: string[] = [];
+        const ascii: string[] = [];
+        for (let j = 0; j < perLine && off + j < bytes.length && off + j < limit; j++) {
+          const b = bytes[off + j];
+          hex.push(b.toString(16).padStart(2, "0"));
+          ascii.push(b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : ".");
+        }
+        while (hex.length < perLine) hex.push("  "); // 尾行对齐真实 xxd 的空白
+        lines.push(`${off.toString(16).padStart(8, "0")}: ${hex.join(" ")}  ${ascii.join("")}`);
+      }
+      return { ok: true, output: lines.join("\n") };
+    }
     case "awk": {
       // 重建原生 awk 的 argv：旗标置于 script 之前；降级完全收敛在 awkWasm.evaluate 内部。
       const awkArgs: string[] = [];
@@ -1457,7 +1603,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
 
       if (scriptArgs.length === 0) return { ok: false, output: "awk: missing script" };
       const script = scriptArgs[0];
-      const file = scriptArgs[1];
+      const file = resolvePath(scriptArgs[1] ?? "");
       const { content, source } = resolveInput(file);
       // 无输入：只有 BEGIN 块时传空 stdin（BEGIN 不需要输入），否则报错
       if (content === null) {
@@ -1473,7 +1619,9 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       const dIdx = rest.indexOf("-d");
       const serial = sIdx >= 0;
       const delim = dIdx >= 0 ? rest[dIdx + 1] : "\t";
-      const files = rest.filter((t) => !t.startsWith("-") && t !== (dIdx >= 0 ? rest[dIdx + 1] : ""));
+      const files = rest
+        .filter((t) => !t.startsWith("-") && t !== (dIdx >= 0 ? rest[dIdx + 1] : ""))
+        .map((f) => resolvePath(f));
       if (serial) {
         const file = files[0];
         const { content } = resolveInput(file);
@@ -1575,7 +1723,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       const tIdx = rest.indexOf("-t");
       const sIdx = rest.indexOf("-s");
       const sep = sIdx >= 0 ? rest[sIdx + 1] : /\s+/;
-      const file = rest.find((t) => !t.startsWith("-") && t !== (sIdx >= 0 ? rest[sIdx + 1] : ""));
+      const file = resolvePath(rest.find((t) => !t.startsWith("-") && t !== (sIdx >= 0 ? rest[sIdx + 1] : "")) ?? "");
       const { content } = resolveInput(file);
       if (content === null) return { ok: false, output: "column: no input" };
       if (tIdx < 0) return { ok: true, output: content };
@@ -1591,7 +1739,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       return { ok: true, output: out.join("\n") };
     }
     case "comm": {
-      const files = rest.filter((t) => !t.startsWith("-"));
+      const files = rest.filter((t) => !t.startsWith("-")).map(resolvePath);
       if (files.length < 2) return { ok: false, output: "comm: needs 2 files" };
       const a = vfs.readFileSync(files[0]);
       const b = vfs.readFileSync(files[1]);
@@ -1609,7 +1757,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       return { ok: true, output: out.join("\n") };
     }
     case "join": {
-      const files = rest.filter((t) => !t.startsWith("-"));
+      const files = rest.filter((t) => !t.startsWith("-")).map(resolvePath);
       if (files.length < 2) return { ok: false, output: "join: needs 2 files" };
       const a = vfs.readFileSync(files[0]);
       const b = vfs.readFileSync(files[1]);
@@ -1656,18 +1804,18 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       const notFlag = rest.indexOf("!");
       const isNot = notFlag >= 0;
       if (fFlag >= 0) {
-        const path = rest[fFlag + 1];
+        const path = resolvePath(rest[fFlag + 1] ?? "");
         const stat = vfs.readFileSync(path) !== null;
         return { ok: isNot ? !stat : stat, output: "" };
       }
       if (dFlag >= 0) {
-        const path = rest[dFlag + 1];
+        const path = resolvePath(rest[dFlag + 1] ?? "");
         const stat = vfs.statSync(path);
         const ok = stat !== null && stat.type === "dir";
         return { ok: isNot ? !ok : ok, output: "" };
       }
       if (sFlag >= 0 || eFlag >= 0) {
-        const path = rest[(sFlag >= 0 ? sFlag : eFlag) + 1];
+        const path = resolvePath(rest[(sFlag >= 0 ? sFlag : eFlag) + 1] ?? "");
         const stat = vfs.readFileSync(path) !== null;
         return { ok: isNot ? !stat : stat, output: "" };
       }

@@ -10,7 +10,7 @@
  *   - Root is represented by "".
  */
 
-import { openDB, type IDBPDatabase } from "idb";
+import { openDB, deleteDB, type IDBPDatabase } from "idb";
 
 export type VfsNodeType = "file" | "dir";
 
@@ -77,7 +77,7 @@ function getDB() {
       console.warn("[vfs] IndexedDB open failed, attempting recovery:", e);
       dbPromise = null;
       // Try to wipe the DB and re-create
-      return indexedDB.deleteDatabase(DB_NAME).then(
+      return deleteDB(DB_NAME).then(
         () => openDB(DB_NAME, DB_VERSION, {
           upgrade(db) {
             if (!db.objectStoreNames.contains(STORE)) {
