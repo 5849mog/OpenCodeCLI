@@ -28,7 +28,7 @@
 | 特性 | 一句话说明 |
 |------|-----------|
 | 📁 **文件袋 (VFS)** | 所有文件在浏览器内存 + IndexedDB 中运作，支持快照和一键回滚（`/undo`） |
-| 🖥️ **原生引擎** | 真正的 WASM 编译引擎：Lua 5.4、GNU awk、GNU sed、bc——不是 JS 模拟，是原生二进制 |
+| 🖥️ **原生引擎** | 真正的 WASM 引擎：Lua 5.4、JavaScript (QuickJS)、GNU awk、GNU sed、bc——不是 JS 模拟，是原生二进制 |
 | 🧠 **子智能体 (Explore)** | AI 可以把多文件探索委派给专用子代理，独立上下文、只回传结论，主对话保持干净 |
 | 🌗 **深色模式** | 黑底白字的 ZCode 风格界面，Markdown 渲染精调——告别刺眼的浅色青绿 |
 | 🔒 **密钥自持** | API Key 用 AES-GCM 加密存在 sessionStorage，标签页一关就消失 |
@@ -95,7 +95,7 @@ npm run build
 | ⚛️ 框架 | Next.js 16 + React 19 |
 | 📦 状态 | Zustand 5 |
 | ✏️ 编辑器 | CodeMirror 6 |
-| 🧠 引擎 | Lua 5.4 / GNU awk / GNU sed / bc — Emscripten WASM |
+| 🧠 引擎 | Lua 5.4 / JavaScript (QuickJS) / GNU awk / GNU sed / bc — WebAssembly |
 | 🎯 AI | OpenAI 兼容 API（DeepSeek / OpenRouter / Groq / Ollama…） |
 | 💾 持久化 | IndexedDB + idb |
 | 🎨 样式 | Tailwind CSS 4 + shadcn/ui（深色主题） |

@@ -80,3 +80,6 @@ server.log
 /public/wasm/sed.js
 /tools/sed-wasm/source/
 /tools/sed-wasm/build/
+
+# js-wasm (quickjs-emscripten) artifacts — copied by prepare.sh after install
+/public/wasm/js.wasm

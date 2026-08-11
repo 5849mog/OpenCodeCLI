@@ -49,6 +49,10 @@ jobs:
             sleep 5
           done
 
+      # --- run_js (quickjs-emscripten) 的 wasm 需要 install 之后才能拿 ---
+      - name: Prepare js.wasm
+        run: bash tools/js-wasm/prepare.sh
+
       - name: Set repo name
         run: |
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)

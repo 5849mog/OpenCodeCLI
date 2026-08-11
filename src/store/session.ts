@@ -962,7 +962,7 @@ async function runAgentLoop(
 const MUTATING_TOOLS = new Set([
   "write_file", "edit_file", "multi_edit", "delete_file",
   "move_file", "append_file", "create_dir", "update_plan",
-  "apply_patch", "insert_at", "run_lua", // run_lua 带 outputs 时写回 VFS → 需快照可 undo
+  "apply_patch", "insert_at", "run_lua", "run_js", // run_lua/run_js 带 outputs 时写回 VFS → 需快照可 undo
 ]);
 
 /** Wrapper that guarantees a tool result message is ALWAYS added to the

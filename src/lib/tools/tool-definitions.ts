@@ -700,6 +700,53 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "run_js",
+      description:
+        "在浏览器内存中运行真正的 JavaScript 解释器（QuickJS WebAssembly 引擎）——完整现代 JS：箭头函数、数组 map/filter/reduce、模板字符串、对象解构、class、**原生 JSON.parse/stringify**。适合：JSON 数据处理/重组、复杂算法、需要 JS 生态语法的脚本、交互式/游戏脚本（猜数字、模拟器）。**数据编排（无 C 式 stdin，用全局变量）**：`input` 注入为 `globalThis.__input`（string）；`files` 注入为 `globalThis.__files`（{path: content} 只读副本）；`args` 注入为 `globalThis.__args`（string[]）。**输出两条路**：脚本 `return` 的值（同步返回值，string 原样、对象 JSON.stringify），以及 `console.log` 输出；要写回工作区就用 `globalThis.__outputs = { \"out.json\": \"...\" }`（白名单，回传摘要而非全文）。**脚本来源二选一**：`script` 内联程序文本，或 `script_file` 指定工作区 .js 文件运行。安全边界（引擎强制）：不访问网络、不持久化、无 DOM/浏览器 API；写回仅限 outputs 白名单（未声明路径不同步）、Plan 模式带 outputs 被拦截、可 undo 撤销。**不要用浏览器裸 eval——这个工具才是安全的 JS 执行方式**。示例：'const a=[1,2,3]; return a.map(x=>x*2).join(\",\")' → \"2,4,6\"；JSON 解析：'const o=JSON.parse(globalThis.__input); return JSON.stringify(Object.keys(o))' 配 input '{\"a\":1,\"b\":2}' → '[\"a\",\"b\"]'。",
+      parameters: {
+        type: "object",
+        properties: {
+          script: {
+            type: "string",
+            description:
+              "JavaScript 程序文本（与 script_file 二选一）。例如：'const a=[1,2,3]; return a.map(x=>x*2).join(\\\",\\\")'、'return JSON.stringify(Object.keys(JSON.parse(globalThis.__input)))'。同步 JS（无 async/await）。",
+          },
+          script_file: {
+            type: "string",
+            description:
+              "可选。工作区 .js 脚本文件路径（相对工作区根，如 'tools/filter.js'），直接运行该脚本。与 script 二选一；文件不存在会报错。",
+          },
+          input: {
+            type: "string",
+            description:
+              "可选。作为脚本的数据输入，注入为 globalThis.__input（string）。用于处理文本数据（如表格、日志、JSON 字符串）。",
+          },
+          args: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "可选。传给脚本的参数，注入为 globalThis.__args（string[]）。用于同一脚本参数化复用。",
+          },
+          files: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "可选。要读取的工作区文件路径数组（相对工作区根，无前导斜杠，如 ['data.csv', 'src/util.ts']）。只传路径——内容由系统注入为只读副本（globalThis.__files = {path: content}），脚本无法写回工作区。最多 20 个、单文件 ≤200KB。",
+          },
+          outputs: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "可选。写回白名单——脚本里 globalThis.__outputs = { path: content } 写出的文件路径数组（相对工作区根）。求值后白名单内的文件同步回工作区；**回传摘要而非全文**。未声明路径不同步；最多 20 个、单文件 ≤200KB；Plan 模式下带 outputs 的调用被拦截；可 undo 撤销。",
+          },
+        },
+        required: ["script"],
+      },
+    },
+  },
 ];
 
 export function getToolByName(name: string): ToolDefinition | undefined {

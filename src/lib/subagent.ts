@@ -186,7 +186,7 @@ ${opts.task}
       const mutatingTools = new Set([
         "write_file", "edit_file", "multi_edit", "delete_file",
         "move_file", "append_file", "create_dir", "update_plan",
-        "apply_patch", "insert_at", "run_lua",
+        "apply_patch", "insert_at", "run_lua", "run_js",
       ]);
       if (mutatingTools.has(tc.function.name)) {
         const preview = (typeof args.path === "string") ? args.path : (typeof args.from === "string") ? args.from : "";
