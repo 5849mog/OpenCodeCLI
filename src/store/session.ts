@@ -553,6 +553,10 @@ export const useSession = create<SessionState>((set, get) => ({
         messages: result.messages,
         truncated: false,
       });
+      // 立即持久化压缩后的历史——否则刷新页面后 IndexedDB 里还是
+      // 未压缩的完整对话，压缩效果丢失（send 里下一次 schedulePersist
+      // 才会覆盖，但刷新前这个窗口期内持久化层是旧数据）。
+      void flushPersist(get);
       const modeLabel = result.mode === "llm" ? "LLM 摘要" : "启发式压缩（摘要调用失败，已降级）";
       useSession.setState((s) => ({
         events: [
