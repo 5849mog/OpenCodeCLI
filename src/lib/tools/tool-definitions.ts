@@ -45,6 +45,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             type: "number",
             description: "Maximum number of lines to return. Default 1500 for large files, unlimited for small files.",
           },
+          lineNumbers: {
+            type: "boolean",
+            description: "If true, prefixes every line with its 1-based line number (e.g. ' 42 | const x = 1'). Use when you need to report exact line numbers back (e.g. for a subagent report) — gives ground-truth numbers instead of counting by eye.",
+          },
         },
         required: ["path"],
       },

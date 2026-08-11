@@ -24,6 +24,7 @@ async function toolReadFile(args: Record<string, unknown>): Promise<ToolResult> 
   }
   const offset = args.offset !== undefined ? parseInt(String(args.offset), 10) : undefined;
   const limit = args.limit !== undefined ? parseInt(String(args.limit), 10) : undefined;
+  const lineNumbers = args.lineNumbers === true;
   const content = await vfs.readFile(path);
   if (content === null) {
     const stat = vfs.statSync(path);
@@ -83,6 +84,16 @@ async function toolReadFile(args: Record<string, unknown>): Promise<ToolResult> 
     if (end < lines.length) {
       warned.push(`Showing lines ${start + 1}-${Math.min(end, lines.length)} of ${lines.length}. Use offset=${end + 1} to read the next page.`);
     }
+  }
+
+  // lineNumbers=true prefixes every line with its 1-based number (e.g. " 42 | const x = 1").
+  // This gives the model GROUND-TRUTH line numbers for reports — no guessing.
+  if (lineNumbers) {
+    const startLine = offset !== undefined ? Math.max(0, offset - 1) : 0;
+    output = output
+      .split("\n")
+      .map((l, i) => `${String(startLine + i + 1).padStart(4)} | ${l}`)
+      .join("\n");
   }
 
   const prefix = warned.length > 0 ? warned.join(" ") + "\n\n" : "";
