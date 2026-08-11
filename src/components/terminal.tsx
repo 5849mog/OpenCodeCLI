@@ -28,6 +28,8 @@ import {
   XCircle,
   Wrench,
   Sparkles,
+  Gauge,
+  ScrollText,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -60,6 +62,7 @@ import { vfs } from "@/lib/vfs";
 import { toast } from "sonner";
 import { ZipDownloadBridge, ZipPickerModal } from "./zip-picker";
 import { PayloadInspector } from "./payload-inspector";
+import { TokenSheet } from "./token-sheet";
 import { cn } from "@/lib/utils";
 import { planStats } from "@/lib/plan-utils";
 import { CollapsibleText } from "./collapsible-text";
@@ -96,6 +99,8 @@ export function Terminal() {
   const [mentionIndex, setMentionIndex] = useState(0);
   // Payload inspector modal (查看/编辑上次发送给 AI 的完整上下文)
   const [payloadOpen, setPayloadOpen] = useState(false);
+  // Token usage sheet (右侧滑出)
+  const [tokenSheetOpen, setTokenSheetOpen] = useState(false);
 
   // Auto-scroll to bottom on new events when user is near the bottom.
   useLayoutEffect(() => {
@@ -561,6 +566,29 @@ export function Terminal() {
           >
             <Download className="h-3.5 w-3.5" />
           </button>
+          {/* Payload 查看器 — 图形入口（命令 /inspect 仍可用） */}
+          <button
+            onClick={() => {
+              const hasPayload = useSession.getState().lastSentPayload?.length;
+              if (!hasPayload) {
+                toast.info("还没有可查看的上下文——先发一条消息给 AI，再打开这里。");
+                return;
+              }
+              setPayloadOpen(true);
+            }}
+            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            title="查看/编辑发送给 AI 的上下文"
+          >
+            <ScrollText className="h-3.5 w-3.5" />
+          </button>
+          {/* Token 用量面板 — 图形入口（命令 /tokens 仍可用） */}
+          <button
+            onClick={() => setTokenSheetOpen(true)}
+            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            title="Token 用量面板"
+          >
+            <Gauge className="h-3.5 w-3.5" />
+          </button>
           <button
             onClick={reset}
             className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
@@ -638,6 +666,9 @@ export function Terminal() {
 
           {/* Payload inspector — 查看/编辑上次发送给 AI 的完整上下文（/inspect 打开） */}
           <PayloadInspector open={payloadOpen} onClose={() => setPayloadOpen(false)} />
+
+          {/* Token 用量面板 — 右侧滑出（header Gauge 按钮 / 输入区 token 计数打开） */}
+          <TokenSheet open={tokenSheetOpen} onClose={() => setTokenSheetOpen(false)} />
       </div>
 
       {/* Input */}
@@ -689,15 +720,17 @@ export function Terminal() {
         <div className="mt-2 flex items-center justify-between px-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E]">
           <span className="flex items-center gap-3">
             {totalTokens > 0 && (
-              <span
+              <button
+                onClick={() => setTokenSheetOpen(true)}
                 title={
                   lastUsage
-                    ? `Last: ${lastUsage.prompt_tokens} prompt + ${lastUsage.completion_tokens} completion`
-                    : "Total tokens used this session"
+                    ? `Last: ${lastUsage.prompt_tokens} prompt + ${lastUsage.completion_tokens} completion · 点击查看 Token 面板`
+                    : "Total tokens used this session · 点击查看 Token 面板"
                 }
+                className="cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
               >
                 {totalTokens.toLocaleString()} tokens
-              </span>
+              </button>
             )}
             {isStreaming && (
               <span className="flex items-center gap-1.5">
