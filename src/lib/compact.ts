@@ -5,14 +5,16 @@
  * an unread flag. This module implements what the README always claimed:
  * compress the conversation history with a genuine LLM summary.
  *
- * Strategy:
- *   1. Protect the LAST user message (the current task anchor — the AI needs
- *      to know what the user just asked) and any system message.
- *   2. EVERYTHING older (earlier user messages, assistant analysis, tool
- *      results) is compressed with `compressToolResult` (mechanical: tool
- *      name + first line) and handed to the LLM to produce a compact summary.
- *   3. The summary replaces all of those messages as a single user message.
- *   4. If the LLM call fails or times out, fall back to a heuristic
+ * Strategy (fully summary-driven — NO anchor messages are kept):
+ *   1. EVERYTHING except the system message — the whole history, including the
+ *      last user message AND its assistant reply — is handed to the LLM to
+ *      produce a single dense summary.
+ *   2. The summary REPLACES all of it. After compact the context is
+ *      `[system?, summary]`. When the user next speaks, the context is
+ *      `[system?, summary, user N]` and the model answers ONLY the new
+ *      message — there is no "unanswered older user message" left behind to
+ *      trigger a duplicate response.
+ *   3. If the LLM call fails or times out, fall back to a heuristic
  *      compaction (compress tool results + keep recent 12) so `/compact`
  *      still has a real effect.
  */
@@ -22,28 +24,52 @@ import {
   type AiClientConfig,
   type ChatMessage,
 } from "./ai-client";
-import { compressToolResult, estimateConversationTokens } from "./context";
+import { estimateConversationTokens } from "./context";
 
 /** How long the summary request may take before we fall back (ms). */
 const SUMMARY_TIMEOUT_MS = 60_000;
 
-/** Max output tokens for the summary itself. */
-const SUMMARY_MAX_TOKENS = 1500;
+/** Max output tokens for the summary itself — generous so nothing is dropped. */
+const SUMMARY_MAX_TOKENS = 3000;
 
 /** Fallback heuristic: keep this many recent messages verbatim. */
 const FALLBACK_KEEP_RECENT = 12;
 
+/** Safety cap on the transcript handed to the summarizer (chars). */
+const MAX_TRANSCRIPT_CHARS = 120_000;
+
+/** How many leading lines of a tool result to keep for the summarizer. */
+const TOOL_KEEP_LINES = 5;
+
 /**
- * Summarize the given messages with the LLM. `messages` must already be
- * mechanically compressed (tool results → first line). Returns the summary
- * text. Throws on failure so the caller can fall back.
+ * Compress a long tool result for the summarizer: keep the tool name + first
+ * N lines + a marker. Less aggressive than compressToolResult (1 line) —
+ * the summary needs enough signal to recall what each tool did.
+ */
+function compressToolResultForSummary(msg: ChatMessage): ChatMessage {
+  if (msg.role !== "tool" || typeof msg.content !== "string") return msg;
+  const content = msg.content;
+  const lines = content.split("\n");
+  if (lines.length <= TOOL_KEEP_LINES + 1) return msg;
+  const kept = lines.slice(0, TOOL_KEEP_LINES).join("\n");
+  const name = msg.name ? ` (${msg.name})` : "";
+  return {
+    ...msg,
+    content: `[tool result${name} truncated]\n${kept}\n[... ${lines.length - TOOL_KEEP_LINES} more lines, ${content.length} chars total]`,
+  };
+}
+
+/**
+ * Summarize the given messages with the LLM. `messages` must already have
+ * tool results compressed. Returns the summary text. Throws on failure so
+ * the caller can fall back.
  */
 async function summarizeWithLLM(
   aiConfig: AiClientConfig,
   messages: ChatMessage[],
   signal?: AbortSignal,
 ): Promise<string> {
-  // Render the compressed history as text for the summarizer prompt.
+  // Render the history as text for the summarizer prompt.
   const transcript = messages
     .map((m) => {
       switch (m.role) {
@@ -60,22 +86,34 @@ async function summarizeWithLLM(
     .filter((s) => s.trim().length > 0)
     .join("\n\n");
 
-  const sysPrompt = `You are a conversation summarizer for an AI coding agent. You will be given a transcript of an earlier part of a session. Produce a COMPACT but COMPLETE summary that lets the agent continue the work seamlessly.
+  const sysPrompt = `你是一个 AI 编程助手会话的摘要器。你会收到一段早期会话的记录。你的任务是产出一份**紧凑但完整**的摘要，让助手能够无缝地继续未完成的工作。
 
-MUST preserve:
-- The user's original intent and requirements (in their own words where possible).
-- Every decision made and why.
-- Files created/modified/deleted and their paths (exact paths!).
-- Key findings: function names, line numbers, signatures, config values.
-- What is DONE and what is STILL PENDING / next steps.
-- Any constraints or preferences the user expressed (style, language, tone).
+## 摘要必须严格按以下分节结构输出：
 
-Rules:
-- Write in the same language as the transcript's user messages (Chinese stays Chinese, English stays English).
-- Use bullet points, not prose paragraphs.
-- Keep it under 600 words. Dense beats pretty.
-- Do NOT include tool noise (every tool call), only the outcomes that matter.
-- Output ONLY the summary. No preamble, no "Here is a summary:".`;
+## 用户意图
+完整保留用户最后一条消息提出的要求与措辞（这是最关键的——如果省略，后续会答非所问）。同时概述整体任务目标。
+
+## 已做决策
+列出每一个已经做出的决定，以及为什么做出这个决定。
+
+## 文件操作
+列出所有创建/修改/删除的文件，**必须写完整精确的路径**（例如 src/lib/tools/search.ts），以及每个文件做了什么改动。路径写错会导致后续操作全错。
+
+## 关键发现
+列出探索中得出的重要结论：函数名、行号、函数签名、配置值、关键代码片段、模块之间的关系。
+
+## 已完成 vs 待办
+明确区分：哪些已经完成，哪些还差什么。下一步具体要做什么。
+
+## 用户约束与偏好
+列出用户表达的约束/偏好：语言（如"用中文回复"）、代码风格、命名习惯、内容尺度要求等。**这类约束一旦丢失，后续整个会话都会偏离用户预期。**
+
+## 规则
+- 用与对话中用户消息相同的语言写摘要（用户说中文就写中文，说英文就写英文）。
+- 宁可长，不可漏。丢失一个文件路径、一个决策、一条用户约束 = 后续返工。目标长度 800-1200 词，不设硬性上限。
+- 用要点（bullet points）而非散文段落。
+- 不要记录工具调用的噪音（每一次 read_file 之类），只记录有意义的产出与结论。
+- 只输出摘要本身，不要任何开场白（如"以下是摘要"）。`;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), SUMMARY_TIMEOUT_MS);
@@ -91,7 +129,7 @@ Rules:
       },
       [
         { role: "system", content: sysPrompt },
-        { role: "user", content: transcript.slice(0, 120_000) }, // safety cap
+        { role: "user", content: transcript.slice(0, MAX_TRANSCRIPT_CHARS) },
       ],
       [],
       {},
@@ -120,6 +158,9 @@ export interface CompactResult {
  * (system prompt and workspace context are injected separately at send time,
  * so they are NOT expected here).
  *
+ * Fully summary-driven: the entire history (except any system message) is
+ * collapsed into a single summary message. No anchor message is kept.
+ *
  * @param messages Full history (all roles).
  * @param aiConfig Config for the summarizer LLM call.
  * @param signal Optional abort signal.
@@ -135,20 +176,14 @@ export async function compactConversation(
     return { messages, removedCount: 0, tokensBefore, tokensAfter: tokensBefore, mode: "llm" };
   }
 
-  // Protect the system message (if any) and the LAST user message.
   const systemMsg = messages[0]?.role === "system" ? messages[0] : null;
-  const rest = systemMsg ? messages.slice(1) : messages;
-  const lastUserIdx = rest.length - 1 - [...rest].reverse().findIndex((m) => m.role === "user");
-  const lastUserMsg = lastUserIdx >= 0 ? rest[lastUserIdx] : null;
-  const older = lastUserMsg ? rest.slice(0, lastUserIdx) : rest.slice(0, rest.length - 1);
+  const history = systemMsg ? messages.slice(1) : messages;
 
-  if (older.length === 0) {
-    // Only the anchor exists — nothing to compact.
-    return { messages, removedCount: 0, tokensBefore, tokensAfter: tokensBefore, mode: "llm" };
-  }
-
-  // Mechanically compress old tool results before handing to the LLM.
-  const compressed = older.map((m) => (m.role === "tool" ? compressToolResult(m) : m));
+  // Mechanically compress old tool results before handing to the LLM
+  // (keeps enough signal: tool name + first 5 lines).
+  const compressed = history.map((m) =>
+    m.role === "tool" ? compressToolResultForSummary(m) : m,
+  );
 
   try {
     const summary = await summarizeWithLLM(aiConfig, compressed, signal);
@@ -156,11 +191,7 @@ export async function compactConversation(
       role: "user",
       content: `[此前对话摘要 — earlier conversation summary]\n${summary}`,
     };
-    const newMessages = [
-      ...(systemMsg ? [systemMsg] : []),
-      summaryMsg,
-      ...(lastUserMsg ? [lastUserMsg] : []),
-    ];
+    const newMessages = systemMsg ? [systemMsg, summaryMsg] : [summaryMsg];
     return {
       messages: newMessages,
       removedCount: messages.length - newMessages.length,
@@ -168,15 +199,19 @@ export async function compactConversation(
       tokensAfter: estimateConversationTokens(newMessages),
       mode: "llm",
     };
-  } catch (e) {
+  } catch {
     // LLM failed (network, timeout, no key) — fall back to heuristic
     // compaction so /compact still does something real.
     const keepRecent = FALLBACK_KEEP_RECENT;
     const protectedMsgs = systemMsg ? [systemMsg] : [];
-    const recentStart = Math.max(0, rest.length - keepRecent);
-    const middle = rest.slice(0, recentStart);
-    const recent = rest.slice(recentStart);
-    const working = [...protectedMsgs, ...middle.map((m) => (m.role === "tool" ? compressToolResult(m) : m)), ...recent];
+    const recentStart = Math.max(0, history.length - keepRecent);
+    const middle = history.slice(0, recentStart);
+    const recent = history.slice(recentStart);
+    const working = [
+      ...protectedMsgs,
+      ...middle.map((m) => (m.role === "tool" ? compressToolResultForSummary(m) : m)),
+      ...recent,
+    ];
     return {
       messages: working,
       removedCount: messages.length - working.length,
