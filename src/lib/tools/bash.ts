@@ -16,12 +16,15 @@ let cwd = "";
 
 /** 解析路径：相对路径（不以 / 开头、非空）且 cwd 非空 → 前缀 cwd；否则原样。
  *  `cd ..` 由调用方处理（这里只做前缀拼接）。 */
+/** 解析路径：相对路径（不以 / 开头、非空）且 cwd 非空 → 前缀 cwd；否则原样。
+ *  结果统一过 normalizePath（处理 . / .. / 重复斜杠），使 `ls ..`、`find .`、
+ *  `cd ../x`、`cd /`（→根 ""）、`cd ..`（在根时仍留根）等按真实 shell 行为归一。 */
 function resolvePath(p: string): string {
   if (!p) return p;
   if (p === "/") return "";
-  if (p.startsWith("/")) return p.replace(/^\/+/, "");
-  if (!cwd) return p;
-  return `${cwd}/${p}`;
+  if (p.startsWith("/")) return normalizePath(p);
+  if (!cwd) return normalizePath(p);
+  return normalizePath(`${cwd}/${p}`);
 }
 
 /** 规范化路径：去掉多余的 ./ 和重复 //，解析 .. （仅向上、不越出根）。 */
@@ -158,22 +161,57 @@ async function toolBash(args: Record<string, unknown>, readOnly = false): Promis
   if (!command) {
     return { ok: false, output: "Empty command", tool: "bash", args };
   }
-  // for 循环：整体识别（do/done 跨分号与换行），逐项展开 body 后递归执行
-  if (/^for\s+[A-Za-z_]/.test(command)) {
-    const forExp = await expandForLoop(command, readOnly);
+  // for 循环：整体识别（do/done 跨分号与换行），逐项展开 body 后递归执行。
+  // 允许前缀结合：`echo hi && for f in ...; do ...; done` / `cd dir; for ...` —
+  // 前缀可含 && || ; 与换行，for 块整体取出；前缀按 `&&` 要求成功、`;`/换行无条件，
+  // 然后再跑 for 块（前缀失败时 && 短路跳过 for）。
+  const forMatch = command.match(/(^|[\n;]|\s&&|\s\|\|)\s*for\s+[A-Za-z_][A-Za-z0-9_]*\s+in\s+[\s\S]+\bdone\s*$/);
+  if (forMatch) {
+    const forStart = command.indexOf("for", forMatch.index ?? 0);
+    const forCmd = command.slice(forStart).trim();
+    const prefix = command.slice(0, forStart).trim();
+    const forExp = await expandForLoop(forCmd, readOnly);
     if (forExp) {
-      if (forExp.kind === "error") return { ok: false, output: forExp.message, tool: "bash", args };
+      if (forExp.kind === "error") {
+        return { ok: false, output: forExp.message, tool: "bash", args };
+      }
       const outputs: string[] = [];
       let mutated = false;
       let allOk = true;
-      for (const item of forExp.list) {
-        let bodyCmd = forExp.body.replace(new RegExp(`\\$\\{${forExp.varName}\\}`, "g"), item);
-        bodyCmd = bodyCmd.replace(new RegExp(`\\$${forExp.varName}\\b`, "g"), item);
-        const res = await toolBash({ command: bodyCmd }, readOnly);
-        if (res.mutated) mutated = true;
-        if (res.output && res.output !== "(command completed with no output)") outputs.push(res.output);
-        if (!res.ok) allOk = false;
+      const runForBody = async () => {
+        for (const item of forExp!.list) {
+          let bodyCmd = forExp!.body.replace(new RegExp(`\\$\\{${forExp!.varName}\\}`, "g"), item);
+          bodyCmd = bodyCmd.replace(new RegExp(`\\$${forExp!.varName}\\b`, "g"), item);
+          const res = await toolBash({ command: bodyCmd }, readOnly);
+          if (res.mutated) mutated = true;
+          if (res.output && res.output !== "(command completed with no output)") outputs.push(res.output);
+          if (!res.ok) allOk = false;
+        }
+      };
+      if (prefix) {
+        // 前缀：最后一个分隔符与后续的 && || 语义。&& 前缀在 for 前 → 需成功才跑 for；
+        // || 前缀 → 失败才跑 for；;或换行 → 无条件跑 for。
+        const prefixMatch = prefix.match(/(\|\||&&|;|\n)\s*$/);
+        const lastSep = prefixMatch ? prefixMatch[1] : ";";
+        const execPrefix = await toolBash({ command: prefix }, readOnly);
+        if (execPrefix.mutated) mutated = true;
+        if (execPrefix.output && execPrefix.output !== "(command completed with no output)") outputs.push(execPrefix.output);
+        const prefixOk = execPrefix.ok;
+        outputLoop: {
+          if (lastSep === "&&") { if (!prefixOk) { allOk = false; break outputLoop; } }
+          else if (lastSep === "||") { if (prefixOk) { allOk = true; break outputLoop; } }
+          // else: 默认运行 for
+        }
+        await runForBody();
+        return {
+          ok: allOk,
+          output: outputs.join("\n") || "(command completed with no output)",
+          tool: "bash",
+          args,
+          mutated,
+        };
       }
+      await runForBody();
       return {
         ok: allOk,
         output: outputs.join("\n") || "(command completed with no output)",
@@ -456,10 +494,11 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
         cwd = "";
         return { ok: true, output: "" };
       }
-      let resolved = resolvePath(target);
-      // 处理 cd .. / cd ../..
-      if (target === ".." || target.startsWith("../")) {
-        resolved = normalizePath(`${cwd ? cwd + "/" : ""}${target}`);
+      const resolved = resolvePath(target);
+      // 根目录（""）在 VFS cache 中无节点，特判为合法目标。
+      if (resolved === "") {
+        cwd = "";
+        return { ok: true, output: "" };
       }
       // 校验目标存在且是目录
       const stat = vfs.statSync(resolved);
@@ -828,7 +867,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       const dirSuffix = typeFilter === "d" ? "/" : "";
       return {
         ok: true,
-        output: nodes.map((n) => "./" + n.path + dirSuffix).join("\n") || "(none)",
+        output: nodes.map((n) => "./" + n.path + dirSuffix).join("\n"),
       };
     }
     case "grep": {
@@ -1562,12 +1601,15 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
     case "od":
     case "hexdump": {
       // 十六进制查看，兼容真实 xxd 主格式：`偏移: 每行16字节十六进制  ASCII`。
-      // 支持 -n <len> 限制查看长度；od/hexdump 作为别名统一十六进制输出。
+      // 支持 -n/-l <len> 限制查看长度；od/hexdump 作为别名统一十六进制输出。
       let limit = Infinity;
-      const nIdx = rest.indexOf("-n");
+      const nIdx = Math.max(rest.indexOf("-n"), rest.indexOf("-l"));
       const nVal = nIdx >= 0 ? rest[nIdx + 1] : undefined;
       if (nVal && /^\d+$/.test(nVal)) limit = parseInt(nVal, 10);
-      const file = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
+      // file 提取：排除 -n/-l 及其取值，避免 `xxd -n 20 file` 把 20 当文件名。
+      const file = resolvePath(
+        rest.find((t) => !t.startsWith("-") && t !== nVal) ?? "",
+      );
       if (!file) return { ok: false, output: `${program}: missing file` };
       const content = vfs.readFileSync(file);
       if (content === null) return { ok: false, output: `${program}: ${file}: not found` };
