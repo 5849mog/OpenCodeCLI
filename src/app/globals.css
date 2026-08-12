@@ -208,69 +208,72 @@ pre[class*="language-"],
 }
 
 /* ----- Prism dark overrides (app is forced dark) -----
-   Rosé Pine palette — the warm-rose dark theme. Our code background is a warm
-   near-black, and GitHub-Dark's cool blue/violet hues clashed with it (grey
-   and muddy). Rosé Pine's low-saturation warm hues (rose/gold/foam/iris) sit
-   on the same temperature and read clean, elegant, and distinct. */
+   VSCode Dark+ palette — the neutral, globally-verified classic. Neutral
+   grey bg (#1e1e1e, no colour cast), soft blue keywords (#569cd6, medium
+   brightness), warm-orange strings (echo the app primary), pale-yellow
+   functions, olive-green comments. No neon blues, no loud red/purple; the
+   contrast is balanced so nothing reads "too dark" or "too bright". */
 .dark code[class*="language-"],
 .dark pre[class*="language-"] {
-  background: #191724; /* Rosé Pine base — soft warm violet-black */
+  background: #1e1e1e;
 }
 .dark .token.comment,
 .dark .token.prolog,
 .dark .token.doctype,
 .dark .token.cdata {
-  color: #6e6a86; /* muted */
+  color: #6a9955; /* olive-grey */
   font-style: italic;
 }
 .dark .token.punctuation {
-  color: #908caa; /* subtle */
+  color: #d4d4d4;
 }
 .dark .token.property,
+.dark .token.tag,
 .dark .token.boolean,
 .dark .token.constant,
-.dark .token.symbol {
-  color: #9ccfd8; /* foam */
+.dark .token.symbol,
+.dark .token.attr-name,
+.dark .token.selector {
+  color: #569cd6; /* soft blue */
 }
 .dark .token.number {
-  color: #c4a7e7; /* iris — distinct from booleans */
-}
-.dark .token.tag,
-.dark .token.selector,
-.dark .token.attr-name {
-  color: #31748f; /* pine */
-}
-.dark .token.inserted {
-  color: #f6c177; /* gold */
-}
-.dark .token.deleted {
-  color: #eb6f92; /* love */
+  color: #b5cea8; /* pale green */
 }
 .dark .token.string,
 .dark .token.char,
 .dark .token.url,
 .dark .language-css .token.string,
-.dark .style .token.string,
-.dark .token.regex {
-  color: #f6c177; /* gold — warm strings */
-}
-.dark .token.builtin,
-.dark .token.class-name,
-.dark .token.variable {
-  color: #ebbcba; /* rose */
+.dark .style .token.string {
+  color: #ce9178; /* warm orange — echoes the app primary */
 }
 .dark .token.operator,
 .dark .token.entity {
-  color: #eb6f92; /* love */
+  color: #d4d4d4;
 }
 .dark .token.atrule,
 .dark .token.attr-value,
 .dark .token.keyword,
 .dark .token.important {
-  color: #eb6f92; /* love */
+  color: #569cd6; /* soft blue */
 }
 .dark .token.function {
-  color: #c4a7e7; /* iris */
+  color: #dcdcaa; /* pale yellow */
+}
+.dark .token.class-name {
+  color: #4ec9b0; /* teal */
+}
+.dark .token.builtin,
+.dark .token.variable {
+  color: #9cdcfe; /* light blue — muted, not neon */
+}
+.dark .token.deleted {
+  color: #d16969; /* muted red, only for deletions */
+}
+.dark .token.inserted {
+  color: #b5cea8; /* pale green */
+}
+.dark .token.regex {
+  color: #ce9178; /* warm orange */
 }
 
 /* ----- Scrollbars — dark ----- */
