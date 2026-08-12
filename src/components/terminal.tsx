@@ -688,20 +688,20 @@ export function Terminal() {
       </div>
 
       {/* Input */}
-      {/* Input area — clean, minimal */}
-      <div className="border-t border-[#E5E2D9] bg-[#FFFFFF] px-4 py-3 dark:border-[#3a3731] dark:bg-[#161512]">
-        <div className="relative flex items-end gap-2.5 rounded-xl border border-[#E5E2D9] bg-[#FAF9F7] px-4 py-3 transition-colors focus-within:border-[#D97757]/40 dark:border-[#3a3731] dark:bg-[#1c1a17]">
+      {/* Input area — modern: soft glass panel, focus glow, gradient send */}
+      <div className="border-t border-[#E5E2D9] bg-gradient-to-b from-[#FFFFFF] to-[#FAF9F7] px-4 py-3 dark:border-[#3a3731] dark:from-[#161512] dark:to-[#121110]">
+        <div className="group relative flex items-end gap-2.5 rounded-2xl border border-[#E5E2D9] bg-[#FAF9F7]/80 px-4 py-3 shadow-sm backdrop-blur transition-all duration-200 focus-within:border-[#D97757]/60 focus-within:shadow-[0_0_0_4px_rgba(217,119,87,0.08),0_4px_20px_rgba(0,0,0,0.06)] dark:border-[#3a3731] dark:bg-[#1c1a17]/70 dark:shadow-none dark:focus-within:border-[#D97757]/50 dark:focus-within:shadow-[0_0_0_4px_rgba(217,119,87,0.12),0_8px_30px_rgba(0,0,0,0.4)]">
           {/* @mention autocomplete dropdown */}
           {mentionQuery !== null && mentionFiles.length > 0 && (
-            <div className="absolute bottom-full left-0 mb-2 w-72 overflow-hidden rounded-lg border border-[#E5E2D9] bg-white shadow-lg dark:border-[#3a3731] dark:bg-[#1c1a17]">
+            <div className="absolute bottom-full left-0 mb-2 w-72 overflow-hidden rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
               {mentionFiles.map((f, i) => (
                 <button
                   key={f.path}
                   onClick={() => insertMention(f.path)}
                   onMouseEnter={() => setMentionIndex(i)}
                   className={cn(
-                    "flex w-full items-center gap-2 px-3 py-2 text-left text-xs",
-                    i === mentionIndex ? "bg-[#D97757]/8 text-[#D97757]" : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
+                    "flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors",
+                    i === mentionIndex ? "bg-[#D97757]/10 text-[#D97757]" : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
                   )}
                 >
                   <FileText className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
@@ -727,7 +727,7 @@ export function Terminal() {
           <button
             onClick={submit}
             disabled={!input.trim() || isStreaming || isCompacting}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#D97757] text-white transition-colors hover:bg-[#C66B4A] disabled:cursor-not-allowed disabled:bg-[#D6D3CE] disabled:text-[#A8A29E]"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#E88A5F] to-[#C96A45] text-white shadow-md shadow-[#D97757]/30 transition-all hover:from-[#F09A70] hover:to-[#D97757] hover:shadow-lg hover:shadow-[#D97757]/40 active:scale-95 disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#D6D3CE] disabled:text-[#A8A29E] disabled:shadow-none dark:disabled:bg-[#3a3731]"
             title="Send (Enter)"
           >
             <ArrowUp className="h-3.5 w-3.5" />
@@ -763,7 +763,7 @@ export function Terminal() {
               </span>
             )}
           </span>
-          <span>Enter 发送 · Shift+Tab 切换模式 · /help</span>
+          <span className="opacity-80">Enter 发送 · Shift+Tab 切换模式 · /help</span>
         </div>
       </div>
     </div>
