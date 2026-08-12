@@ -6,7 +6,7 @@
  */
 
 import { useRef, useState } from "react";
-import { X, Settings, Eye, EyeOff, Zap, Download, Upload } from "lucide-react";
+import { X, Settings, Eye, EyeOff, Zap, Download, Upload, Lock } from "lucide-react";
 import { useSession } from "@/store/session";
 import { fetchModels } from "@/lib/ai-client";
 import { apiKeyVault } from "@/lib/api-key-vault";
@@ -498,6 +498,74 @@ export function SettingsDialog({
                   Only needed if Jina Reader is disabled and the target site blocks CORS.
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* ── Security ── */}
+          <div className="mb-4 border-t border-[#E5E2D9] pt-5 dark:border-[#3a3731]">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+              <Lock className="h-3.5 w-3.5" />
+              Security · 密钥安全
+            </div>
+
+            {/* Re-entry hint after refresh */}
+            {apiKeyVault.llmNeedsReentry() && (
+              <div className="mb-3 rounded border border-amber-300/60 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-300">
+                检测到已配置过 LLM API Key，但主密钥只在内存中、刷新后已失效——请在上方重新输入 Key 以继续使用。
+              </div>
+            )}
+            {apiKeyVault.searchNeedsReentry() && (
+              <div className="mb-3 rounded border border-amber-300/60 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-300">
+                检测到已配置过 Search API Key，但主密钥只在内存中、刷新后已失效——请在上方重新输入。
+              </div>
+            )}
+
+            <div className="rounded border border-[#E5E2D9] bg-[#FAF9F7] px-4 py-3 dark:border-[#3a3731] dark:bg-[#161512]">
+              <div className="mb-1.5 text-[11px] text-[#8B8884] dark:text-zinc-500">
+                密钥用随机主密钥 AES-GCM 加密，主密钥只存在内存、绝不落盘——刷新页面后需重新输入。离开设备前可一键清除全部密钥。
+              </div>
+              <button
+                onClick={() => {
+                  apiKeyVault.lockAll();
+                  setConfig({ hasApiKey: false, hasSearchKey: false });
+                  setKeyInput("");
+                  setSearchKeyInput("");
+                  setKeyDirty(false);
+                  setSearchKeyDirty(false);
+                  toast.success("已清除全部 API 密钥（内存 + sessionStorage）");
+                }}
+                className="rounded border border-[#E54D2E]/40 px-3 py-1.5 text-xs font-medium text-[#E54D2E] hover:bg-[#E54D2E]/10"
+              >
+                立即锁定并清除密钥
+              </button>
+            </div>
+
+            <div className="mt-3 rounded border border-[#E5E2D9] bg-[#FAF9F7] px-4 py-3 dark:border-[#3a3731] dark:bg-[#161512]">
+              <label className="mb-1 flex items-center gap-2 text-sm text-[#3D3B37] dark:text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={(config.idleLockMinutes ?? 0) > 0}
+                  onChange={(e) => setConfig({ idleLockMinutes: e.target.checked ? 30 : 0 })}
+                  className="h-4 w-4 accent-[#D97757]"
+                />
+                空闲自动锁定
+              </label>
+              {(config.idleLockMinutes ?? 0) > 0 && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xs text-[#8B8884] dark:text-zinc-500">闲置</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={480}
+                    value={config.idleLockMinutes}
+                    onChange={(e) =>
+                      setConfig({ idleLockMinutes: Math.max(1, parseInt(e.target.value, 10) || 1) })
+                    }
+                    className="w-20 rounded border border-[#E5E2D9] bg-white dark:bg-[#161512] dark:text-zinc-100 px-2 py-1 text-sm font-mono focus:border-[#D97757] focus:outline-none"
+                  />
+                  <span className="text-xs text-[#8B8884] dark:text-zinc-500">分钟后自动清除密钥</span>
+                </div>
+              )}
             </div>
           </div>
 

@@ -162,7 +162,7 @@ npm run build
 - **bash 是"模拟 shell"而非真实 bash** — 无 shell 变量（除 for 循环体内 `$f`）、参数不做 glob 展开（`echo *` 输出字面 `*`）、`2>/dev/null` 静默忽略、`echo`/`printf` 不自动加尾换行、无 heredoc、for 循环仅单层（不支持嵌套 / glob 列表 / break / continue）
 - **大文件（>5 MiB）** 自动转为占位符，防止 AI 消耗过多 Token
 - **纯前端** — 没有后端数据库、没有用户系统，所有数据只在你的浏览器里
-- **API Key 安全** — AES-GCM 加密存储于 sessionStorage；虽已加密，XSS 攻击仍可能导致泄露。建议用 API 网关代理（如 Cloudflare Workers）做二次保护
+- **API Key 安全** — 密钥用随机**主密钥** AES-GCM 加密，主密钥只存在内存、绝不落盘（sessionStorage 仅有密文+盐+IV），刷新页面后需重新输入；支持一键锁定与可选空闲自动锁定。虽已加密，XSS 攻击仍可能导致泄露。建议用 API 网关代理（如 Cloudflare Workers）做二次保护
 
 ---
 

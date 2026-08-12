@@ -53,6 +53,51 @@ import { apiKeyVault } from "@/lib/api-key-vault";
 import { uuid } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
+// Idle auto-lock — wipes API keys from memory after N minutes of inactivity.
+// ---------------------------------------------------------------------------
+
+const IDLE_ACTIVITY_EVENTS = ["pointerdown", "keydown", "pointermove", "wheel", "touchstart"];
+let idleLockTimer: ReturnType<typeof setTimeout> | null = null;
+let idleLockListenersAttached = false;
+
+/** Re-arm (or disarm) the idle-lock timer based on the current config. */
+function rearmIdleLock() {
+  if (typeof window === "undefined") return;
+  if (idleLockTimer) {
+    clearTimeout(idleLockTimer);
+    idleLockTimer = null;
+  }
+  const minutes = useSession.getState().config.idleLockMinutes ?? 0;
+  if (minutes <= 0) return; // disabled
+  idleLockTimer = setTimeout(() => {
+    // Inactive long enough — wipe keys from memory + sessionStorage.
+    apiKeyVault.lockAll();
+    useSession.setState((s) => ({
+      config: { ...s.config, hasApiKey: false, hasSearchKey: false },
+      events: [
+        ...s.events,
+        {
+          id: `e${Date.now()}_idlelock`,
+          kind: "system" as const,
+          text: `已因空闲超时自动锁定 API 密钥（超过 ${minutes} 分钟无操作）。需要时在设置中重新输入。`,
+          ts: Date.now(),
+        },
+      ],
+    }));
+  }, minutes * 60_000);
+}
+
+/** Attach activity listeners once; each activity re-arms the timer. */
+function attachIdleLock() {
+  if (typeof window === "undefined" || idleLockListenersAttached) return;
+  idleLockListenersAttached = true;
+  for (const ev of IDLE_ACTIVITY_EVENTS) {
+    window.addEventListener(ev, rearmIdleLock, { passive: true });
+  }
+}
+
+
+// ---------------------------------------------------------------------------
 // UI-facing event types — what gets rendered in the terminal
 // ---------------------------------------------------------------------------
 
@@ -108,6 +153,8 @@ export interface AiConfig {
   useJinaReader: boolean;
   /** Optional custom CORS proxy URL for fetch_url. */
   corsProxyUrl: string;
+  /** Auto-lock API keys after N minutes of inactivity (0 = disabled). */
+  idleLockMinutes: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +198,7 @@ const DEFAULT_CONFIG: AiConfig = {
   hasSearchKey: false,
   useJinaReader: true,
   corsProxyUrl: "",
+  idleLockMinutes: 0,
 };
 
 function loadConfig(): AiConfig {
@@ -369,6 +417,9 @@ export const useSession = create<SessionState>((set, get) => ({
 
   init: () => {
     const cfg = loadConfig();
+    // Idle auto-lock: attach listeners once, arm the timer per config.
+    attachIdleLock();
+    rearmIdleLock();
     // Try to restore API keys from encrypted sessionStorage
     void apiKeyVault.tryRestore().then((restored) => {
       set({ config: { ...cfg, hasApiKey: restored || apiKeyVault.hasKey() } });
@@ -405,6 +456,8 @@ export const useSession = create<SessionState>((set, get) => ({
     const next = { ...get().config, ...patch };
     set({ config: next });
     saveConfig(next);
+    // If the idle-lock threshold changed, re-arm the timer.
+    if ("idleLockMinutes" in patch) rearmIdleLock();
   },
 
   clearSession: async () => {
