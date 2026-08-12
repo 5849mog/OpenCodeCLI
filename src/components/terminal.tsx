@@ -152,20 +152,14 @@ export function Terminal() {
     void send(text);
   };
 
-  /** Replace @path/to/file mentions with inline file content. */
+  /** @ 引用：只把 @路径 规范成明确的路径标记，供 AI 用 read_file 等工具
+   *  自行读取——不把文件内容注入上下文（内容注入是本工具的反模式，
+   *  会撑爆上下文，且 AI 需要时自会去读）。找不到文件也保留路径让 AI 判断。 */
   const processMentions = (text: string): string => {
     // @ 后匹配路径：非空白、非 @ 字符序列（支持中文/点开头/带点目录），
-    // 到空白或行尾为止。找不到文件时原样保留（不报错）。
+    // 到空白或行尾为止。
     return text.replace(/@([^\s@]+)/g, (match, filePath) => {
-      const content = vfs.readFileSync(filePath);
-      if (content === null) return match; // leave as-is if not found
-      const ext = filePath.split(".").pop() ?? "";
-      const lineCount = content.split("\n").length;
-      // Truncate very large files to first 200 lines
-      const truncated = lineCount > 200
-        ? content.split("\n").slice(0, 200).join("\n") + `\n... (${lineCount - 200} more lines, use read_file to see full content)`
-        : content;
-      return `\n\n<file path="${filePath}">\n\`\`\`${ext}\n${truncated}\n\`\`\`\n</file>\n\n`;
+      return `[文件引用 ${filePath}]`;
     });
   };
 
