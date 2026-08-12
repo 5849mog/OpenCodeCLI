@@ -46,7 +46,9 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Dark "ZCode / Claude Code" palette — the app is forced dark. */
+/* Dark "ZCode / Claude Code" palette — the app is forced dark.
+   Primary is BRIGHTENED under dark (#E58F67 vs #D97757) so the orange reads
+   as a highlight on the near-black bg instead of being swallowed by it. */
 :root {
   --radius: 0.75rem;
   /* Responsive font sizes */
@@ -60,8 +62,8 @@
   --card-foreground: #e7e5e4;
   --popover: #1c1a17;
   --popover-foreground: #e7e5e4;
-  /* Claude orange, kept but softened for dark bg */
-  --primary: #D97757;
+  /* Claude orange — brightened on dark so it glows, not drowns */
+  --primary: #E58F67;
   --primary-foreground: #1f1a16;
   --secondary: #262320;
   --secondary-foreground: #e7e5e4;
@@ -72,21 +74,21 @@
   --destructive: #E54D2E;
   --border: #3a3731;
   --input: #3a3731;
-  --ring: #D97757;
+  --ring: #E58F67;
   /* Charts */
-  --chart-1: #D97757;
+  --chart-1: #E58F67;
   --chart-2: #E8A87C;
   --chart-3: #C4A484;
   --chart-4: #8B7355;
   --chart-5: #6B5D54;
   --sidebar: #1e1c18;
   --sidebar-foreground: #e7e5e4;
-  --sidebar-primary: #D97757;
+  --sidebar-primary: #E58F67;
   --sidebar-primary-foreground: #1f1a16;
   --sidebar-accent: #2a2723;
   --sidebar-accent-foreground: #e7e5e4;
   --sidebar-border: #3a3731;
-  --sidebar-ring: #D97757;
+  --sidebar-ring: #E58F67;
 }
 
 /* Tailwind's dark: variant lives under a plain `.dark` ancestor too, so keep
@@ -98,7 +100,7 @@
   --card-foreground: #e7e5e4;
   --popover: #1c1a17;
   --popover-foreground: #e7e5e4;
-  --primary: #D97757;
+  --primary: #E58F67;
   --primary-foreground: #1f1a16;
   --secondary: #262320;
   --secondary-foreground: #e7e5e4;
@@ -109,15 +111,15 @@
   --destructive: #E54D2E;
   --border: #3a3731;
   --input: #3a3731;
-  --ring: #D97757;
+  --ring: #E58F67;
   --sidebar: #1e1c18;
   --sidebar-foreground: #e7e5e4;
-  --sidebar-primary: #D97757;
+  --sidebar-primary: #E58F67;
   --sidebar-primary-foreground: #1f1a16;
   --sidebar-accent: #2a2723;
   --sidebar-accent-foreground: #e7e5e4;
   --sidebar-border: #3a3731;
-  --sidebar-ring: #D97757;
+  --sidebar-ring: #E58F67;
 }
 
 @layer base {
@@ -250,7 +252,8 @@ pre[class*="language-"],
 }
 .dark .token.function,
 .dark .token.class-name {
-  color: #b7a6e0;
+  /* warm sand — matches the orange system instead of clashing violet */
+  color: #e8c39e;
 }
 .dark .token.regex,
 .dark .token.important,

@@ -223,7 +223,7 @@ export function SettingsDialog({
       <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-[#E5E2D9] bg-[#FFFFFF] text-[#2D2B27] dark:text-zinc-200 shadow-2xl dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-100">
         {/* Header */}
         <div className="flex items-center gap-2 border-b border-[#E5E2D9] px-5 py-4 dark:border-[#3a3731]">
-          <Settings className="h-5 w-5 text-[#D97757]" />
+          <Settings className="h-5 w-5 text-[#E58F67]" />
           <h2 className="text-lg font-semibold">Settings · AI Provider</h2>
           <button
             onClick={onClose}
@@ -251,7 +251,7 @@ export function SettingsDialog({
                   }
                   className={`rounded border px-3 py-2 text-left text-xs transition ${
                     config.baseUrl === p.baseUrl
-                      ? "border-[#D97757] bg-emerald-950/30 dark:bg-emerald-950/40"
+                      ? "border-[#E58F67] bg-emerald-950/30 dark:bg-emerald-950/40"
                       : "border-[#E5E2D9] bg-[#FFFFFF] hover:border-zinc-600 dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-zinc-500"
                   }`}
                 >
@@ -270,7 +270,7 @@ export function SettingsDialog({
               value={config.baseUrl}
               onChange={(e) => setConfig({ baseUrl: e.target.value })}
               placeholder="https://api.openai.com/v1"
-              className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none dark:text-zinc-100"
+              className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none dark:text-zinc-100"
             />
           </Field>
 
@@ -285,7 +285,7 @@ export function SettingsDialog({
                   setKeyDirty(true);
                 }}
                 placeholder={config.hasApiKey && !keyDirty ? "•••••••• (key is set, type to change)" : "sk-…"}
-                className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
+                className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
               />
               <button
                 onClick={() => setShowKey(!showKey)}
@@ -295,7 +295,7 @@ export function SettingsDialog({
               </button>
             </div>
             {config.hasApiKey && !keyDirty && (
-              <div className="mt-1 text-[11px] text-[#D97757]">
+              <div className="mt-1 text-[11px] text-[#E58F67]">
                 ✓ API key is set (encrypted in sessionStorage)
               </div>
             )}
@@ -309,7 +309,7 @@ export function SettingsDialog({
                 onChange={(e) => setConfig({ model: e.target.value })}
                 placeholder="gpt-4o"
                 list="model-suggestions"
-                className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
+                className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
               />
               <datalist id="model-suggestions">
                 {PRESETS.find((p) => p.baseUrl === config.baseUrl)?.models.map(
@@ -339,7 +339,7 @@ export function SettingsDialog({
                 onChange={(e) =>
                   setConfig({ temperature: parseFloat(e.target.value) || 0 })
                 }
-                className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
+                className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
               />
             </Field>
             <Field label="Max tokens">
@@ -352,7 +352,7 @@ export function SettingsDialog({
                 onChange={(e) =>
                   setConfig({ maxTokens: parseInt(e.target.value, 10) || 1024 })
                 }
-                className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
+                className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
               />
             </Field>
           </div>
@@ -369,7 +369,7 @@ export function SettingsDialog({
                   type="checkbox"
                   checked={config.thinkingEnabled}
                   onChange={(e) => setConfig({ thinkingEnabled: e.target.checked })}
-                  className="h-4 w-4 accent-[#D97757]"
+                  className="h-4 w-4 accent-[#E58F67]"
                 />
                 <span className="text-sm text-[#3D3B37] dark:text-zinc-300">Thinking mode</span>
               </label>
@@ -379,7 +379,7 @@ export function SettingsDialog({
                 <select
                   value={config.reasoningEffort}
                   onChange={(e) => setConfig({ reasoningEffort: e.target.value })}
-                  className="rounded border border-[#E5E2D9] bg-white dark:bg-[#161512] dark:text-zinc-100 px-2 py-1 text-sm font-mono focus:border-[#D97757] focus:outline-none"
+                  className="rounded border border-[#E5E2D9] bg-white dark:bg-[#161512] dark:text-zinc-100 px-2 py-1 text-sm font-mono focus:border-[#E58F67] focus:outline-none"
                 >
                   <option value="low">low</option>
                   <option value="high">high</option>
@@ -389,7 +389,7 @@ export function SettingsDialog({
               </label>
             </div>
             <div className="mt-1.5 text-[11px] text-[#A8A29E] dark:text-zinc-500">
-              For DeepSeek V4 models. On sends <code className="text-[#D97757]">thinking=enabled</code> + <code className="text-[#D97757]">reasoning_effort</code>; off sends <code className="text-[#D97757]">thinking=disabled</code>. Valid efforts: low/high/xhigh/max. Note: thinking &amp; answer share the Max tokens budget.
+              For DeepSeek V4 models. On sends <code className="text-[#E58F67]">thinking=enabled</code> + <code className="text-[#E58F67]">reasoning_effort</code>; off sends <code className="text-[#E58F67]">thinking=disabled</code>. Valid efforts: low/high/xhigh/max. Note: thinking &amp; answer share the Max tokens budget.
             </div>
           </div>
 
@@ -410,7 +410,7 @@ export function SettingsDialog({
                     onClick={() => setConfig({ searchProvider: p })}
                     className={`flex-1 rounded border px-3 py-2 text-xs transition ${
                       config.searchProvider === p
-                        ? "border-[#D97757] bg-emerald-950/30 dark:bg-emerald-950/40"
+                        ? "border-[#E58F67] bg-emerald-950/30 dark:bg-emerald-950/40"
                         : "border-[#E5E2D9] bg-[#FFFFFF] hover:border-zinc-600 dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-zinc-500"
                     }`}
                   >
@@ -440,7 +440,7 @@ export function SettingsDialog({
                       ? "•••••••• (key is set, type to change)"
                       : `Enter your ${config.searchProvider} API key…`
                   }
-                  className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
+                  className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
                 />
                 <button
                   onClick={() => setShowSearchKey(!showSearchKey)}
@@ -450,7 +450,7 @@ export function SettingsDialog({
                 </button>
               </div>
               {apiKeyVault.hasSearchKey() && !searchKeyDirty ? (
-                <div className="mt-1 text-[11px] text-[#D97757]">
+                <div className="mt-1 text-[11px] text-[#E58F67]">
                   ✓ 已配置自定义 Key（加密存储在 sessionStorage）
                 </div>
               ) : !apiKeyVault.hasSearchKey() && !searchKeyDirty && !searchKeyInput ? (
@@ -472,7 +472,7 @@ export function SettingsDialog({
                   type="checkbox"
                   checked={config.useJinaReader}
                   onChange={(e) => setConfig({ useJinaReader: e.target.checked })}
-                  className="h-4 w-4 accent-[#D97757]"
+                  className="h-4 w-4 accent-[#E58F67]"
                 />
                 <span className="text-sm text-[#3D3B37] dark:text-zinc-300">
                   Use Jina AI Reader <span className="text-[#A8A29E] dark:text-zinc-500">(r.jina.ai)</span>
@@ -492,7 +492,7 @@ export function SettingsDialog({
                   value={config.corsProxyUrl}
                   onChange={(e) => setConfig({ corsProxyUrl: e.target.value })}
                   placeholder="http://localhost:81/cors-proxy/"
-                  className="w-full rounded border border-[#E5E2D9] bg-white dark:bg-[#161512] dark:text-zinc-100 px-3 py-2 font-mono text-sm focus:border-[#D97757] focus:outline-none"
+                  className="w-full rounded border border-[#E5E2D9] bg-white dark:bg-[#161512] dark:text-zinc-100 px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
                 />
                 <div className="mt-0.5 text-[11px] text-[#A8A29E] dark:text-zinc-500">
                   Only needed if Jina Reader is disabled and the target site blocks CORS.
@@ -546,7 +546,7 @@ export function SettingsDialog({
                   type="checkbox"
                   checked={(config.idleLockMinutes ?? 0) > 0}
                   onChange={(e) => setConfig({ idleLockMinutes: e.target.checked ? 30 : 0 })}
-                  className="h-4 w-4 accent-[#D97757]"
+                  className="h-4 w-4 accent-[#E58F67]"
                 />
                 空闲自动锁定
               </label>
@@ -561,7 +561,7 @@ export function SettingsDialog({
                     onChange={(e) =>
                       setConfig({ idleLockMinutes: Math.max(1, parseInt(e.target.value, 10) || 1) })
                     }
-                    className="w-20 rounded border border-[#E5E2D9] bg-white dark:bg-[#161512] dark:text-zinc-100 px-2 py-1 text-sm font-mono focus:border-[#D97757] focus:outline-none"
+                    className="w-20 rounded border border-[#E5E2D9] bg-white dark:bg-[#161512] dark:text-zinc-100 px-2 py-1 text-sm font-mono focus:border-[#E58F67] focus:outline-none"
                   />
                   <span className="text-xs text-[#8B8884] dark:text-zinc-500">分钟后自动清除密钥</span>
                 </div>
@@ -576,7 +576,7 @@ export function SettingsDialog({
               onChange={(e) => setConfig({ customInstructions: e.target.value })}
               rows={3}
               placeholder="e.g. Always use TypeScript. Prefer functional components. Use Tailwind for styling."
-              className="w-full resize-none rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 text-sm focus:border-[#D97757] focus:outline-none"
+              className="w-full resize-none rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 text-sm focus:border-[#E58F67] focus:outline-none"
             />
           </Field>
 
@@ -632,12 +632,12 @@ export function SettingsDialog({
         <div className="flex items-center justify-between border-t border-[#E5E2D9] px-5 py-3">
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#8B8884] dark:text-zinc-500">
             {config.hasApiKey ? (
-              <span className="text-[#D97757]">● Key configured</span>
+              <span className="text-[#E58F67]">● Key configured</span>
             ) : (
               <span className="text-[#B87B5A]">● No API key</span>
             )}
             {config.hasSearchKey ? (
-              <span className="text-[#D97757]">● Search configured</span>
+              <span className="text-[#E58F67]">● Search configured</span>
             ) : (
               <span className="text-[#8B8884] dark:text-zinc-500">● No search key</span>
             )}
@@ -666,7 +666,7 @@ export function SettingsDialog({
               }
               onClose();
             }}
-            className="rounded bg-[#D97757] px-4 py-2 text-sm font-medium text-white hover:bg-[#C66B4A]"
+            className="rounded bg-[#E58F67] px-4 py-2 text-sm font-medium text-white hover:bg-[#C66B4A]"
           >
             Done
           </button>

@@ -37,7 +37,7 @@ const claudeTheme = EditorView.theme(
       fontSize: "var(--font-size-code, 12.5px)",
     },
     ".cm-content": {
-      caretColor: "#D97757",
+      caretColor: "#E58F67",
       fontFamily: 'var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, Monaco, monospace',
       padding: "16px 0",
       lineHeight: "1.6",
@@ -51,7 +51,7 @@ const claudeTheme = EditorView.theme(
     ".cm-activeLine": { backgroundColor: "#1c1a17" },
     ".cm-activeLineGutter": { backgroundColor: "#1c1a17", color: "#a1a1aa" },
     ".cm-selectionBackground, ::selection": { backgroundColor: "rgba(217, 119, 87, 0.25)" },
-    ".cm-cursor": { borderLeftColor: "#D97757", borderLeftWidth: "2px" },
+    ".cm-cursor": { borderLeftColor: "#E58F67", borderLeftWidth: "2px" },
     ".cm-matchingBracket": { backgroundColor: "rgba(217, 119, 87, 0.3)", outline: "none" },
     ".cm-searchMatch": { backgroundColor: "rgba(217, 119, 87, 0.25)", outline: "1px solid rgba(217, 119, 87, 0.4)" },
     ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "rgba(217, 119, 87, 0.4)" },

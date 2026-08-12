@@ -79,7 +79,7 @@ export function PayloadInspector({
       <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-[#E5E2D9] bg-[#FFFFFF] text-[#2D2B27] shadow-2xl dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-100">
         {/* Header */}
         <div className="flex items-center gap-2 border-b border-[#E5E2D9] px-5 py-4 dark:border-[#3a3731]">
-          <Eye className="h-5 w-5 text-[#D97757]" />
+          <Eye className="h-5 w-5 text-[#E58F67]" />
           <h2 className="text-lg font-semibold">Payload Inspector · 发送给 AI 的上下文</h2>
           <button
             onClick={onClose}
@@ -141,7 +141,7 @@ export function PayloadInspector({
                   onChange={(e) => updateMsg(i, { content: e.target.value })}
                   rows={Math.max(2, Math.min(12, Math.ceil((m.content?.length ?? 0) / 80)))}
                   placeholder="消息内容…"
-                  className="w-full resize-y rounded border border-[#E5E2D9] bg-[#FFFFFF] px-3 py-2 font-mono text-xs focus:border-[#D97757] focus:outline-none dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-100"
+                  className="w-full resize-y rounded border border-[#E5E2D9] bg-[#FFFFFF] px-3 py-2 font-mono text-xs focus:border-[#E58F67] focus:outline-none dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-100"
                 />
               </div>
             </div>
@@ -177,7 +177,7 @@ export function PayloadInspector({
           </div>
           <button
             onClick={apply}
-            className="flex items-center gap-1.5 rounded bg-[#D97757] px-4 py-2 text-sm font-medium text-white hover:bg-[#C66B4A]"
+            className="flex items-center gap-1.5 rounded bg-[#E58F67] px-4 py-2 text-sm font-medium text-white hover:bg-[#C66B4A]"
           >
             <Check className="h-4 w-4" /> 应用修改
           </button>

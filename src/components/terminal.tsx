@@ -44,7 +44,7 @@ mermaid.initialize({
   startOnLoad: false,
   theme: "dark",
   themeVariables: {
-    // 与整体 #D97757 主色呼应的强调色；其余用 dark 主题默认值。
+    // 与整体 #E58F67 主色呼应的强调色；其余用 dark 主题默认值。
     primaryColor: "#2a2723",
     primaryTextColor: "#e4e4e7",
     lineColor: "#a1a1aa",
@@ -554,7 +554,7 @@ export function Terminal() {
         <div className="flex items-center gap-2 text-[#6B6862] dark:text-zinc-400">
           {config.hasApiKey && (
             <span className="flex items-center gap-1.5 rounded-md bg-[#F5F3EE] px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium text-[#8B7355] dark:bg-[#262320] dark:text-[#E8A87C]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#D97757]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-[#E58F67]" />
               {config.model}
             </span>
           )}
@@ -566,7 +566,7 @@ export function Terminal() {
             className={cn(
               "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium transition-colors",
               mode === "plan"
-                ? "border-[#D97757]/30 bg-[#D97757]/10 text-[#D97757]"
+                ? "border-[#E58F67]/30 bg-[#E58F67]/10 text-[#E58F67]"
                 : "border-[#E5E2D9] bg-[#F5F3EE] text-[#8B8884] hover:text-[#2D2B27] dark:border-[#3a3731] dark:bg-[#262320] dark:text-zinc-500 dark:hover:text-zinc-200",
             )}
             title="Shift+Tab to toggle"
@@ -690,7 +690,7 @@ export function Terminal() {
       {/* Input */}
       {/* Input area — modern: soft glass panel, focus glow, gradient send */}
       <div className="border-t border-[#E5E2D9] bg-gradient-to-b from-[#FFFFFF] to-[#FAF9F7] px-4 py-3 dark:border-[#3a3731] dark:from-[#161512] dark:to-[#121110]">
-        <div className="group relative flex items-end gap-2.5 rounded-2xl border border-[#E5E2D9] bg-[#FAF9F7]/80 px-4 py-3 shadow-sm backdrop-blur transition-all duration-200 focus-within:border-[#D97757]/60 focus-within:shadow-[0_0_0_4px_rgba(217,119,87,0.08),0_4px_20px_rgba(0,0,0,0.06)] dark:border-[#3a3731] dark:bg-[#1c1a17]/70 dark:shadow-none dark:focus-within:border-[#D97757]/50 dark:focus-within:shadow-[0_0_0_4px_rgba(217,119,87,0.12),0_8px_30px_rgba(0,0,0,0.4)]">
+        <div className="group relative flex items-end gap-2.5 rounded-2xl border border-[#E5E2D9] bg-[#FAF9F7]/80 px-4 py-3 shadow-sm backdrop-blur transition-all duration-200 focus-within:border-[#E58F67]/60 focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.08),0_4px_20px_rgba(0,0,0,0.06)] dark:border-[#3a3731] dark:bg-[#1c1a17]/70 dark:shadow-none dark:focus-within:border-[#E58F67]/50 dark:focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.12),0_8px_30px_rgba(0,0,0,0.4)]">
           {/* @mention autocomplete dropdown */}
           {mentionQuery !== null && mentionFiles.length > 0 && (
             <div className="absolute bottom-full left-0 mb-2 w-72 overflow-hidden rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
@@ -701,7 +701,7 @@ export function Terminal() {
                   onMouseEnter={() => setMentionIndex(i)}
                   className={cn(
                     "flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors",
-                    i === mentionIndex ? "bg-[#D97757]/10 text-[#D97757]" : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
+                    i === mentionIndex ? "bg-[#E58F67]/10 text-[#E58F67]" : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
                   )}
                 >
                   <FileText className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
@@ -727,13 +727,13 @@ export function Terminal() {
           <button
             onClick={submit}
             disabled={!input.trim() || isStreaming || isCompacting}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#E88A5F] to-[#C96A45] text-white shadow-md shadow-[#D97757]/30 transition-all hover:from-[#F09A70] hover:to-[#D97757] hover:shadow-lg hover:shadow-[#D97757]/40 active:scale-95 disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#D6D3CE] disabled:text-[#A8A29E] disabled:shadow-none dark:disabled:bg-[#3a3731]"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#E88A5F] to-[#C96A45] text-white shadow-md shadow-[#E58F67]/30 transition-all hover:from-[#F09A70] hover:to-[#E58F67] hover:shadow-lg hover:shadow-[#E58F67]/40 active:scale-95 disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#D6D3CE] disabled:text-[#A8A29E] disabled:shadow-none dark:disabled:bg-[#3a3731]"
             title="Send (Enter)"
           >
             <ArrowUp className="h-3.5 w-3.5" />
           </button>
         </div>
-        <div className="mt-2 flex items-center justify-between px-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E]">
+        <div className="mt-2 flex items-center justify-between px-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
           <span className="flex items-center gap-3">
             {totalTokens > 0 && (
               <button
@@ -751,10 +751,10 @@ export function Terminal() {
             {isStreaming && (
               <span className="flex items-center gap-1.5">
                 <span>step</span>
-                <span className="font-mono text-[#6B6862]">{agentIteration}</span>
+                <span className="font-mono text-[#6B6862] dark:text-zinc-500">{agentIteration}</span>
                 <span className="inline-block h-1 w-16 overflow-hidden rounded-full bg-zinc-800">
                   <span
-                    className="block h-full w-1/3 animate-pulse rounded-full bg-[#D97757]"
+                    className="block h-full w-1/3 animate-pulse rounded-full bg-[#E58F67]"
                     style={{
                       animation: "slide-progress 1.5s ease-in-out infinite",
                     }}
@@ -861,7 +861,7 @@ function QuestionPanel({
   };
 
   return (
-    <div className="rounded-lg border border-[#D97757]/30 bg-[#FFFFFF] shadow-sm dark:bg-[#1c1a17]">
+    <div className="rounded-lg border border-[#E58F67]/30 bg-[#FFFFFF] shadow-sm dark:bg-[#1c1a17]">
       {/* Header */}
       {panel.title && (
         <div className="border-b border-[#E5E2D9] px-5 py-3 dark:border-[#3a3731]">
@@ -890,7 +890,7 @@ function QuestionPanel({
                       key={opt.id}
                       className={`flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors ${
                         selected
-                          ? "border-[#D97757] bg-[#D97757]/8"
+                          ? "border-[#E58F67] bg-[#E58F67]/8"
                           : "border-[#E5E2D9] bg-[#FAF9F7] hover:border-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-[#52504b]"
                       }`}
                     >
@@ -900,7 +900,7 @@ function QuestionPanel({
                         value={opt.id}
                         checked={selected}
                         onChange={() => setAnswer(q.id, opt.id)}
-                        className="mt-0.5 h-3.5 w-3.5 accent-[#D97757]"
+                        className="mt-0.5 h-3.5 w-3.5 accent-[#E58F67]"
                       />
                       <div>
                         <div className="text-[#2D2B27] dark:text-zinc-200">{opt.label}</div>
@@ -916,7 +916,7 @@ function QuestionPanel({
                     <label
                       className={`flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors ${
                         answers[q.id] === "__other__"
-                          ? "border-[#D97757] bg-[#D97757]/8"
+                          ? "border-[#E58F67] bg-[#E58F67]/8"
                           : "border-[#E5E2D9] bg-[#FAF9F7] hover:border-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-[#52504b]"
                       }`}
                     >
@@ -926,7 +926,7 @@ function QuestionPanel({
                         value="__other__"
                         checked={answers[q.id] === "__other__"}
                         onChange={() => setAnswer(q.id, "__other__")}
-                        className="mt-0.5 h-3.5 w-3.5 accent-[#D97757]"
+                        className="mt-0.5 h-3.5 w-3.5 accent-[#E58F67]"
                       />
                       <span className="text-[#2D2B27] dark:text-zinc-200">其他</span>
                     </label>
@@ -936,7 +936,7 @@ function QuestionPanel({
                         value={otherInputs[q.id] ?? ""}
                         onChange={(e) => setOther(q.id, e.target.value)}
                         placeholder="请输入…"
-                        className="mt-1.5 ml-7 w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-1.5 text-sm focus:border-[#D97757] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
+                        className="mt-1.5 ml-7 w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-1.5 text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
                         autoFocus
                       />
                     )}
@@ -953,7 +953,7 @@ function QuestionPanel({
                       key={opt.id}
                       className={`flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors ${
                         selected
-                          ? "border-[#D97757] bg-[#D97757]/8"
+                          ? "border-[#E58F67] bg-[#E58F67]/8"
                           : "border-[#E5E2D9] bg-[#FAF9F7] hover:border-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-[#52504b]"
                       }`}
                     >
@@ -961,7 +961,7 @@ function QuestionPanel({
                         type="checkbox"
                         checked={selected}
                         onChange={() => toggleOption(q.id, opt.id)}
-                        className="mt-0.5 h-3.5 w-3.5 accent-[#D97757]"
+                        className="mt-0.5 h-3.5 w-3.5 accent-[#E58F67]"
                       />
                       <div>
                         <div className="text-[#2D2B27] dark:text-zinc-200">{opt.label}</div>
@@ -979,7 +979,7 @@ function QuestionPanel({
                         type="checkbox"
                         checked={((answers[q.id] as string[]) ?? []).includes("__other__")}
                         onChange={() => toggleOption(q.id, "__other__")}
-                        className="mt-0.5 h-3.5 w-3.5 accent-[#D97757]"
+                        className="mt-0.5 h-3.5 w-3.5 accent-[#E58F67]"
                       />
                       <span className="text-[#2D2B27] dark:text-zinc-200">其他</span>
                     </label>
@@ -989,7 +989,7 @@ function QuestionPanel({
                         value={otherInputs[q.id] ?? ""}
                         onChange={(e) => setOther(q.id, e.target.value)}
                         placeholder="请输入…"
-                        className="mt-1.5 ml-7 w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-1.5 text-sm focus:border-[#D97757] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
+                        className="mt-1.5 ml-7 w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-1.5 text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
                         autoFocus
                       />
                     )}
@@ -1004,7 +1004,7 @@ function QuestionPanel({
                   onChange={(e) => setAnswer(q.id, e.target.value)}
                   placeholder="请输入…"
                   rows={3}
-                  className="w-full resize-none rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-sm focus:border-[#D97757] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
+                  className="w-full resize-none rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
                 />
               </div>
             )}
@@ -1021,7 +1021,7 @@ function QuestionPanel({
       <div className="border-t border-[#E5E2D9] px-5 py-3 dark:border-[#3a3731]">
         <button
           onClick={handleSubmit}
-          className="rounded-lg bg-[#D97757] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#C66B4A]"
+          className="rounded-lg bg-[#E58F67] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#C66B4A]"
         >
           {panel.submit_label}
         </button>
@@ -1035,24 +1035,24 @@ function QuestionPanel({
 function EmptyState() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 py-12 text-center text-[#8B8884]">
-      <div className="rounded-full border border-[#D97757]/25 bg-gradient-to-b from-[#2a2723] to-[#1c1a17] p-4 shadow-lg shadow-black/20 dark:border-[#D97757]/25 dark:from-[#2a2723] dark:to-[#161512]">
-        <TerminalIcon className="h-7 w-7 text-[#D97757]" />
+      <div className="rounded-full border border-[#E58F67]/25 bg-gradient-to-b from-[#2a2723] to-[#1c1a17] p-4 shadow-lg shadow-black/20 dark:border-[#E58F67]/25 dark:from-[#2a2723] dark:to-[#161512]">
+        <TerminalIcon className="h-7 w-7 text-[#E58F67]" />
       </div>
       <div>
-        <div className="bg-gradient-to-r from-[#F5F3EE] via-[#E8A87C] to-[#D97757] bg-clip-text text-xl font-semibold tracking-tight text-transparent dark:from-zinc-100 dark:via-[#E8A87C] dark:to-[#D97757]">
+        <div className="bg-gradient-to-r from-[#F5F3EE] via-[#E8A87C] to-[#E58F67] bg-clip-text text-xl font-semibold tracking-tight text-transparent dark:from-zinc-100 dark:via-[#E8A87C] dark:to-[#E58F67]">
           Welcome to Open Code Web
         </div>
         <div className="mt-1.5 text-xs text-[#6B6862] dark:text-zinc-400">
           A browser-based, near 1:1 replica of the Open Code CLI.
         </div>
         <div className="mt-1.5 text-xs text-[#6B6862] dark:text-zinc-400">
-          The <span className="font-medium text-[#D97757] dark:text-[#E8A87C]">文件袋</span> on the right is your virtual workspace.
+          The <span className="font-medium text-[#E58F67] dark:text-[#E8A87C]">文件袋</span> on the right is your virtual workspace.
         </div>
       </div>
       <div className="mt-2 grid gap-1.5 text-left text-[length:var(--font-size-ui-sm)] text-[#8B8884] dark:text-zinc-400">
         <div className="flex items-center gap-2">
           <Upload className="h-3.5 w-3.5 shrink-0 text-[#7dd3fc]" />
-          <span>Upload files <span className="text-[#D97757] dark:text-[#E8A87C]">→</span> they appear in the <span className="text-[#8B7355] dark:text-[#E8A87C]">文件袋</span></span>
+          <span>Upload files <span className="text-[#E58F67] dark:text-[#E8A87C]">→</span> they appear in the <span className="text-[#8B7355] dark:text-[#E8A87C]">文件袋</span></span>
         </div>
         <div className="flex items-center gap-2">
           <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#a78bfa]" />
@@ -1076,14 +1076,14 @@ function AgentStatusRow({ status }: { status: string }) {
     <motion.div
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-center gap-2.5 rounded-md border border-[#D97757]/20 bg-gradient-to-r from-emerald-950/20 to-zinc-900/40 px-3 py-2 text-xs dark:border-[#D97757]/25 dark:from-emerald-950/40 dark:to-zinc-900/60"
+      className="flex items-center gap-2.5 rounded-md border border-[#E58F67]/20 bg-gradient-to-r from-[#E58F67]/10 to-zinc-900/40 px-3 py-2 text-xs dark:border-[#E58F67]/25 dark:from-[#E58F67]/15 dark:to-zinc-900/60"
     >
       <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 dark:bg-[#34d399]" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-[#D97757]" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#E58F67] opacity-60" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-[#E58F67]" />
       </span>
-      <Sparkles className="h-3 w-3 text-[#D97757]/70" />
-      <Loader2 className="h-3 w-3 animate-spin text-[#D97757]/70" />
+      <Sparkles className="h-3 w-3 text-[#E58F67]/70" />
+      <Loader2 className="h-3 w-3 animate-spin text-[#E58F67]/70" />
       <span className="text-[#2D2B27] dark:text-zinc-200">{status || "agent is working…"}</span>
     </motion.div>
   );
@@ -1266,18 +1266,18 @@ function StreamingBubble({ text, reasoning }: { text: string; reasoning: string 
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="overflow-hidden rounded-md border border-[#D97757]/20 bg-[#D97757]/5 px-2.5 py-1.5 text-xs dark:border-[#D97757]/25"
+      className="overflow-hidden rounded-md border border-[#E58F67]/20 bg-[#E58F67]/5 px-2.5 py-1.5 text-xs dark:border-[#E58F67]/25"
     >
       <div className="flex items-center gap-1.5 text-[#8B7355] dark:text-[#E8A87C]">
-        <Sparkles className="h-3 w-3 text-[#D97757]/70" />
+        <Sparkles className="h-3 w-3 text-[#E58F67]/70" />
         <span className="font-medium">正在分析…</span>
         <span className="flex gap-0.5 pl-1">
-          <span className="h-1 w-1 animate-bounce rounded-full bg-[#D97757]/70" style={{ animationDelay: "0ms" }} />
-          <span className="h-1 w-1 animate-bounce rounded-full bg-[#D97757]/70" style={{ animationDelay: "120ms" }} />
-          <span className="h-1 w-1 animate-bounce rounded-full bg-[#D97757]/70" style={{ animationDelay: "240ms" }} />
+          <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "0ms" }} />
+          <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "120ms" }} />
+          <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "240ms" }} />
         </span>
       </div>
-      {preview && <div className="mt-1 truncate text-[#A8A29E]">{preview}</div>}
+      {preview && <div className="mt-1 truncate text-[#A8A29E] dark:text-zinc-500">{preview}</div>}
     </motion.div>
   );
 }
@@ -1368,7 +1368,7 @@ function CopyButton({ text }: { text: string }) {
 function UserRow({ text }: { text: string }) {
   return (
     <div className="group flex gap-2">
-      <span className="shrink-0 pt-0.5 text-[#D97757]">&gt;</span>
+      <span className="shrink-0 pt-0.5 text-[#E58F67]">&gt;</span>
       <div className="flex-1 min-w-0 text-[#1A1815] dark:text-zinc-100">
         <CollapsibleText text={text} render={(t) => <MarkdownRenderer text={t} />} />
       </div>
@@ -1396,7 +1396,7 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
       initial={{ opacity: 0, y: 2 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="mb-1.5 overflow-hidden rounded-md border border-[#D97757]/20 bg-[#D97757]/5 dark:border-[#D97757]/25"
+      className="mb-1.5 overflow-hidden rounded-md border border-[#E58F67]/20 bg-[#E58F67]/5 dark:border-[#E58F67]/25"
     >
       <button
         onClick={() => setCollapsed((c) => !c)}
@@ -1404,13 +1404,13 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
         className="flex w-full items-center gap-1.5 px-2.5 py-1 text-left text-xs text-[#8B7355] disabled:cursor-default dark:text-[#E8A87C]"
       >
         <ChevronRight className={cn("h-3 w-3 transition-transform", !collapsed && "rotate-90")} />
-        <Sparkles className="h-3 w-3 text-[#D97757]/70" />
+        <Sparkles className="h-3 w-3 text-[#E58F67]/70" />
         <span className="font-medium">thinking</span>
         {streaming && (
           <span className="flex gap-0.5 pl-1">
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#D97757]/70" style={{ animationDelay: "0ms" }} />
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#D97757]/70" style={{ animationDelay: "120ms" }} />
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#D97757]/70" style={{ animationDelay: "240ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "0ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "120ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "240ms" }} />
           </span>
         )}
         {!streaming && collapsed && <span className="ml-2 truncate text-[#A8A29E]">{preview}</span>}
@@ -1490,31 +1490,31 @@ function SubagentCard({
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="flex w-full items-center gap-2 rounded-md border border-[#0D9488]/25 bg-[#0D9488]/5 px-3 py-2 text-left text-xs transition-colors hover:bg-[#0D9488]/10"
+      className="flex w-full items-center gap-2 rounded-md border border-[#E58F67]/25 bg-[#E58F67]/5 px-3 py-2 text-left text-xs transition-colors hover:bg-[#E58F67]/10"
       title="查看子智能体详情"
     >
       {running ? (
         <span className="relative flex h-2 w-2 shrink-0">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#14B8A6] opacity-75" />
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-[#14B8A6]" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#E58F67] opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-[#E58F67]" />
         </span>
       ) : (
-        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#14B8A6]" />
+        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#34d399]" />
       )}
       <span className="shrink-0 font-semibold text-[#3D3B37]">子智能体</span>
       <span className="shrink-0 rounded bg-[#0D9488]/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0F766E]">
         Explore
       </span>
-      <span className="shrink-0 text-[#A8A29E]">·</span>
-      <span className="min-w-0 flex-1 truncate text-[#6B6862]">
+      <span className="shrink-0 text-[#A8A29E] dark:text-zinc-600">·</span>
+      <span className="min-w-0 flex-1 truncate text-[#6B6862] dark:text-zinc-400">
         {title || "探索任务"}
       </span>
       {running ? (
-        <span className="flex shrink-0 items-center gap-1.5 text-[#0F766E]">
+        <span className="flex shrink-0 items-center gap-1.5 text-[#E58F67]">
           <span className="flex gap-0.5">
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#14B8A6]" style={{ animationDelay: "0ms" }} />
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#14B8A6]" style={{ animationDelay: "120ms" }} />
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#14B8A6]" style={{ animationDelay: "240ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]" style={{ animationDelay: "0ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]" style={{ animationDelay: "120ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]" style={{ animationDelay: "240ms" }} />
           </span>
           <span className="hidden sm:inline">运行中…</span>
         </span>
@@ -1606,7 +1606,7 @@ function ToolGroupRow({
         </span>
         <span className="ml-auto flex items-center gap-1">
           {ok ? (
-            <CheckCircle2 className="h-3.5 w-3.5 text-[#D97757]" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-[#E58F67]" />
           ) : (
             <XCircle className="h-3.5 w-3.5 text-[#E54D2E]" />
           )}
@@ -1662,11 +1662,11 @@ function ToolGroupRow({
 
         {isPlan ? (
           <div className="mt-2 flex items-center gap-2 text-xs">
-            <span className="text-[#D97757]">📋</span>
+            <span className="text-[#E58F67]">📋</span>
             <span className="text-[#6B6862] dark:text-zinc-400">Plan updated. </span>
             <button
               onClick={() => useVfsView.getState().setRightPanelTab("plan")}
-              className="text-[#D97757] underline hover:no-underline"
+              className="text-[#E58F67] underline hover:no-underline"
             >
               Open Plan panel →
             </button>
@@ -1736,7 +1736,7 @@ function ToolResultRow({
     >
       <div className="flex items-center gap-2">
         {ok ? (
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#D97757]" />
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#E58F67]" />
         ) : (
           <XCircle className="h-3.5 w-3.5 shrink-0 text-[#E54D2E]" />
         )}
@@ -1770,11 +1770,11 @@ function ToolResultRow({
 
       {isPlan ? (
         <div className="mt-2 flex items-center gap-2 pl-5 text-xs">
-          <span className="text-[#D97757]">📋</span>
+          <span className="text-[#E58F67]">📋</span>
           <span className="text-[#6B6862] dark:text-zinc-400">Plan updated. </span>
           <button
             onClick={() => useVfsView.getState().setRightPanelTab("plan")}
-            className="text-[#D97757] underline hover:no-underline"
+            className="text-[#E58F67] underline hover:no-underline"
           >
             Open Plan panel →
           </button>
@@ -1813,14 +1813,14 @@ function PlanHeaderBadge() {
   return (
     <button
       onClick={() => useVfsView.getState().setRightPanelTab("plan")}
-      className="flex items-center gap-1.5 rounded-full border border-[#D97757]/20 bg-[#D97757]/8 px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium text-[#B87B5A] hover:bg-[#D97757]/15"
+      className="flex items-center gap-1.5 rounded-full border border-[#E58F67]/20 bg-[#E58F67]/8 px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium text-[#B87B5A] hover:bg-[#E58F67]/15"
       title={`Plan: ${stats.done}/${stats.total} steps done`}
     >
       <span>📋</span>
       <span className="tabular-nums">{stats.done}/{stats.total}</span>
       <div className="h-1.5 w-10 overflow-hidden rounded-full bg-zinc-700">
         <div
-          className="h-full rounded-full bg-[#D97757] transition-all duration-300"
+          className="h-full rounded-full bg-[#E58F67] transition-all duration-300"
           style={{ width: `${stats.pct}%` }}
         />
       </div>
@@ -1867,7 +1867,7 @@ function DiffView({ before, after }: { before: string; after: string }) {
             <tr
               key={i}
               className={cn(
-                row.type === "add" && "bg-[#D97757]/10",
+                row.type === "add" && "bg-[#E58F67]/10",
                 row.type === "del" && "bg-red-950/30",
               )}
             >

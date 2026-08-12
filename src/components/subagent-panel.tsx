@@ -173,9 +173,9 @@ function RunCard({
       {/* Card header */}
       <div className="flex items-center gap-2 border-b border-[#E5E2D9] bg-[#FAF9F7]/60 px-3 py-2 text-xs dark:border-[#3a3731] dark:bg-[#161512]/60">
         {run.running ? (
-          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#14B8A6]" />
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#E58F67]" />
         ) : run.completed ? (
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#14B8A6]" />
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#34d399]" />
         ) : (
           <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
             未完成
@@ -198,7 +198,7 @@ function RunCard({
           </span>
         </div>
         <div className="group flex gap-2 rounded-md bg-[#F5F3EE]/70 px-2.5 py-2 dark:bg-[#262320]/80">
-          <span className="shrink-0 pt-0.5 text-[#D97757]">&gt;</span>
+          <span className="shrink-0 pt-0.5 text-[#E58F67]">&gt;</span>
           <div className="flex-1 min-w-0 text-[#1A1815] dark:text-zinc-100">
             <CollapsibleText text={run.task} threshold={280} />
           </div>
@@ -220,11 +220,11 @@ function RunCard({
             </div>
           </div>
         ) : run.running ? (
-          <div className="flex items-center gap-2 pl-5 text-xs text-[#0F766E] dark:text-[#5eead4]">
+          <div className="flex items-center gap-2 pl-5 text-xs text-[#E58F67]">
             <span className="flex gap-0.5">
-              <span className="h-1 w-1 animate-bounce rounded-full bg-[#14B8A6]" style={{ animationDelay: "0ms" }} />
-              <span className="h-1 w-1 animate-bounce rounded-full bg-[#14B8A6]" style={{ animationDelay: "120ms" }} />
-              <span className="h-1 w-1 animate-bounce rounded-full bg-[#14B8A6]" style={{ animationDelay: "240ms" }} />
+              <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]" style={{ animationDelay: "0ms" }} />
+              <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]" style={{ animationDelay: "120ms" }} />
+              <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]" style={{ animationDelay: "240ms" }} />
             </span>
             子智能体正在工作中…
           </div>

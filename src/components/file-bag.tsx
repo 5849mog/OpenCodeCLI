@@ -166,7 +166,7 @@ function FileBagInner() {
             className={cn(
               "flex items-center gap-1.5 rounded px-2.5 py-1.5 font-medium transition-colors",
               rightPanelTab === "files"
-                ? "bg-[#D97757]/10 text-[#D97757]"
+                ? "bg-[#E58F67]/10 text-[#E58F67]"
                 : "text-[#8B8884] hover:bg-[#F5F3EE] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:bg-[#262320] dark:hover:text-zinc-300",
             )}
           >
@@ -178,7 +178,7 @@ function FileBagInner() {
             className={cn(
               "flex items-center gap-1.5 rounded px-2.5 py-1.5 font-medium transition-colors",
               rightPanelTab === "plan"
-                ? "bg-[#D97757]/10 text-[#D97757]"
+                ? "bg-[#E58F67]/10 text-[#E58F67]"
                 : "text-[#8B8884] hover:bg-[#F5F3EE] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:bg-[#262320] dark:hover:text-zinc-300",
             )}
           >
@@ -957,7 +957,7 @@ function NewFileModal({
           <button
             onClick={() => path.trim() && onCreate(path.trim(), isDir)}
             disabled={!path.trim()}
-            className="ml-auto rounded bg-[#D97757] px-3 py-1.5 text-sm text-white hover:bg-[#C66B4A] disabled:opacity-40"
+            className="ml-auto rounded bg-[#E58F67] px-3 py-1.5 text-sm text-white hover:bg-[#C66B4A] disabled:opacity-40"
           >
             Create
           </button>

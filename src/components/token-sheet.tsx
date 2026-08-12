@@ -49,7 +49,7 @@ export function TokenSheet({ open, onClose }: { open: boolean; onClose: () => vo
       <SheetContent side="right" className="w-[85vw] border-[#E5E2D9] bg-[#FFFFFF] text-[#2D2B27] sm:max-w-md dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-100">
         <SheetHeader className="border-b border-[#E5E2D9] dark:border-[#3a3731]">
           <SheetTitle className="flex items-center gap-2 text-base">
-            <Gauge className="h-4 w-4 text-[#D97757]" />
+            <Gauge className="h-4 w-4 text-[#E58F67]" />
             Token 用量
           </SheetTitle>
           <SheetDescription className="text-xs text-[#8B8884] dark:text-zinc-500">
@@ -76,7 +76,7 @@ export function TokenSheet({ open, onClose }: { open: boolean; onClose: () => vo
                     ? "bg-[#E54D2E]"
                     : occupancyPct > 70
                       ? "bg-[#E8A87C]"
-                      : "bg-[#D97757]",
+                      : "bg-[#E58F67]",
                 )}
                 style={{ width: `${occupancyPct}%` }}
               />
