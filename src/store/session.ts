@@ -709,19 +709,10 @@ export const useSession = create<SessionState>((set, get) => ({
     const current = get().mode;
     const next = current === "bypass" ? "plan" : "bypass";
     set({ mode: next });
-    // Push a system event for UI display
-    const label = next === "plan"
-      ? "Switched to Plan mode — AI can only read and analyze, not modify files. It will propose a plan for your approval."
-      : "Switched to Bypass mode — AI can read, write, and execute freely without confirmation.";
-    const ts = Date.now();
+    // 不再 push system 事件（避免全宽 SystemRow 色块占满屏幕）——
+    // 切换反馈由 terminal 用 toast 轻提示。仅注入 AI 可见的
+    // [Mode Switch] 消息（AI 必须感知模式，否则依赖过期上下文误报）。
     useSession.setState((s) => ({
-      events: [
-        ...s.events,
-        { id: `e${ts}_mode`, kind: "system" as const, text: label, ts },
-      ],
-      // ALSO inject into messages so the AI sees the mode change in its
-      // conversation history. Without this, the AI relies on stale context
-      // and may incorrectly report its current mode.
       messages: [
         ...s.messages,
         {

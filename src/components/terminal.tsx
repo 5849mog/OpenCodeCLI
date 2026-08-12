@@ -75,6 +75,7 @@ import { toast } from "sonner";
 import { ZipDownloadBridge, ZipPickerModal } from "./zip-picker";
 import { PayloadInspector } from "./payload-inspector";
 import { TokenSheet } from "./token-sheet";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { planStats } from "@/lib/plan-utils";
 import { CollapsibleText } from "./collapsible-text";
@@ -535,7 +536,9 @@ export function Terminal() {
     // Shift+Tab toggles between Plan and Bypass mode (like Claude Code)
     if (e.key === "Tab" && e.shiftKey) {
       e.preventDefault();
+      const next = mode === "plan" ? "bypass" : "plan";
       toggleMode();
+      toast(next === "plan" ? "已切换到 Plan 模式 — 只读" : "已切换到 Bypass 模式");
     }
   };
 
@@ -560,19 +563,38 @@ export function Terminal() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Mode toggle — Claude Code style */}
-          <button
-            onClick={toggleMode}
-            className={cn(
-              "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium transition-colors",
-              mode === "plan"
-                ? "border-[#E58F67]/30 bg-[#E58F67]/10 text-[#E58F67]"
-                : "border-[#E5E2D9] bg-[#F5F3EE] text-[#8B8884] hover:text-[#2D2B27] dark:border-[#3a3731] dark:bg-[#262320] dark:text-zinc-500 dark:hover:text-zinc-200",
-            )}
+          {/* Mode toggle — sliding Switch with dual labels (Bypass | Plan) */}
+          <div
+            className="flex items-center gap-1.5 rounded-full border border-[#E5E2D9] bg-[#F5F3EE] px-2.5 py-1 text-[length:var(--font-size-ui-sm)] font-medium dark:border-[#3a3731] dark:bg-[#262320]"
             title="Shift+Tab to toggle"
           >
-            {mode === "plan" ? "📋 Plan" : "⚡ Bypass"}
-          </button>
+            <span
+              className={cn(
+                "transition-colors",
+                mode === "bypass" ? "text-[#2D2B27] dark:text-zinc-100" : "text-[#8B8884] dark:text-zinc-500",
+              )}
+            >
+              ⚡ Bypass
+            </span>
+            <Switch
+              checked={mode === "plan"}
+              onCheckedChange={() => {
+                const next = mode === "plan" ? "bypass" : "plan";
+                toggleMode();
+                toast(next === "plan" ? "已切换到 Plan 模式 — 只读" : "已切换到 Bypass 模式");
+              }}
+              className="scale-[0.85]"
+              aria-label="Toggle Plan mode"
+            />
+            <span
+              className={cn(
+                "transition-colors",
+                mode === "plan" ? "text-[#E58F67]" : "text-[#8B8884] dark:text-zinc-500",
+              )}
+            >
+              📋 Plan
+            </span>
+          </div>
               {/* Plan progress indicator — click opens the Plan tab in the right panel */}
           <PlanHeaderBadge />
           <button
