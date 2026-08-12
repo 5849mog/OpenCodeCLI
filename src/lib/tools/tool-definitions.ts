@@ -747,6 +747,93 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "parse_yaml",
+      description:
+        "解析工作区 YAML 文件，转换为 JSON 输出（保留层级/数组/注释忽略）。用于读取 docker-compose.yml、CI 配置、k8s 清单、前端 i18n 等 YAML 配置——比 bash cat + 手搓字符串处理准确。输出 JSON 文本；解析错误会给出错误位置。",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description:
+              "工作区 YAML 文件路径（相对工作区根，如 'docker-compose.yml'）。",
+          },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "parse_csv",
+      description:
+        "解析工作区 CSV 文件。默认输出对象数组（第一行为表头，JSON 格式）；format 可选 'table'（对齐文本表格）或 'array'（纯二维数组）。用 PapaParse 正确处理引号/转义/空行——比 bash cut/awk 处理带引号 CSV 更可靠。用于表格数据、报表、导出文件分析。",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description:
+              "工作区 CSV 文件路径（如 'data.csv'）。",
+          },
+          format: {
+            type: "string",
+            enum: ["json", "table", "array"],
+            description:
+              "输出格式：json（默认，对象数组）、table（对齐文本表格，便于人读）、array（纯二维数组）。",
+          },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "query_json",
+      description:
+        "用 JSONata 表达式对工作区 JSON 文件做查询/转换。表达式能力：路径访问（$.users）、条件过滤（$.users[age>30]）、字段选取（$.users.name）、聚合（$sum($.sales.price)）、字符串/数字函数、对象重组。用于从大 JSON（API 响应、配置文件、导出数据）提取所需字段——比 read_file + 人工找快得多。expression 用 '$' 读全文；示例：'$.users[age>30].name'、'$sum($.items.price)'。",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description:
+              "工作区 JSON 文件路径（如 'data.json'）。",
+          },
+          expression: {
+            type: "string",
+            description:
+              "JSONata 表达式。示例：'$'（全文）、'$.users[age>30].name'（条件+字段）、'$sum($.items.price)'（聚合）、'{\"total\": $count($.items)}'（重组）。",
+          },
+        },
+        required: ["path", "expression"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "math",
+      description:
+        "用 mathjs 求值数学表达式——比 bc/expr 强：矩阵运算（'[1,2;3,4] * [2;3]'）、单位换算（'5 km + 3 mile'、'2 hours in minutes'）、函数（sqrt/sin/log/round）、统计（mean/median/std）、逻辑/常量。输出 mathjs 格式化结果（矩阵/单位自动格式化）。简单四则用 bash bc 即可，复杂数学用这个。",
+      parameters: {
+        type: "object",
+        properties: {
+          expression: {
+            type: "string",
+            description:
+              "数学表达式，如 'mean([1,2,3,4])'、'[1,2;3,4]*[2;3]'、'5 km + 3 mile'、'sin(pi/2)'、'2^10'。",
+          },
+        },
+        required: ["expression"],
+      },
+    },
+  },
 ];
 
 export function getToolByName(name: string): ToolDefinition | undefined {

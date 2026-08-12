@@ -44,6 +44,7 @@
 |------|-----------|
 | 📁 **文件袋 (VFS)** | 所有文件在浏览器内存 + IndexedDB 中运作，支持快照与一键回滚（`/undo`，含 bash 写入） |
 | 🖥️ **原生引擎** | 真正的 WASM 引擎：Lua 5.4、JavaScript (QuickJS)、POSIX awk (onetrueawk)、GNU sed、bc——不是 JS 模拟，是原生二进制 |
+| 📊 **数据工具** | YAML / CSV 解析、JSONata 查询、mathjs 数学（矩阵/单位/统计）——浏览器内直接处理数据文件 |
 | 🧠 **子智能体 (Explore)** | AI 把多文件探索委派给专用子代理，独立上下文、只回传结论，主对话保持干净 |
 | 🌗 **深色模式** | 黑底白字的 ZCode 风格界面，Markdown 渲染精调（GFM + KaTeX + Mermaid） |
 | 🔒 **密钥自持** | API Key 用 AES-GCM 加密存在 sessionStorage，标签页一关就消失 |
@@ -117,6 +118,7 @@ npm run build
 | 📦 状态 | Zustand 5 |
 | ✏️ 编辑器 | CodeMirror 6 |
 | 🧠 引擎 | Lua 5.4 / JavaScript (QuickJS) / POSIX awk (onetrueawk) / GNU sed / bc — WebAssembly |
+| 📊 数据工具 | YAML / PapaParse (CSV) / JSONata (JSON 查询) / mathjs — 浏览器内纯 JS |
 | 🎯 AI | OpenAI 兼容 API（DeepSeek / OpenRouter / Groq / Ollama…） |
 | 💾 持久化 | IndexedDB + idb |
 | 🎨 样式 | Tailwind CSS 4 + shadcn/ui（深色主题） |

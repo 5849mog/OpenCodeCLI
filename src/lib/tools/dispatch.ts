@@ -7,6 +7,7 @@ import { toolUpdatePlan } from "./plan";
 import { toolAskUserInput } from "./user-input";
 import { toolWebSearch, toolFetchUrl } from "./web";
 import { toolZipArchive, toolUnzipArchive } from "./zip";
+import { toolParseYaml, toolParseCsv, toolQueryJson, toolMath } from "./data-tools";
 import * as luaWasm from "../wasm/lua-wasm";
 import * as jsWasm from "../wasm/js-wasm";
 import { vfs } from "../vfs";
@@ -316,6 +317,14 @@ export async function dispatchTool(
         return await toolRunLua(args, opts?.readOnly ?? false);
       case "run_js":
         return await toolRunJs(args, opts?.readOnly ?? false);
+      case "parse_yaml":
+        return await toolParseYaml(args);
+      case "parse_csv":
+        return await toolParseCsv(args);
+      case "query_json":
+        return await toolQueryJson(args);
+      case "math":
+        return await toolMath(args);
       case "web_search":
         return await toolWebSearch(args);
       case "fetch_url":
