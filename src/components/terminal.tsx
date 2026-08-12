@@ -76,6 +76,7 @@ import { ZipDownloadBridge, ZipPickerModal } from "./zip-picker";
 import { PayloadInspector } from "./payload-inspector";
 import { TokenSheet } from "./token-sheet";
 import { Switch } from "@/components/ui/switch";
+import { FileTypeIcon } from "@/lib/file-icon";
 import { cn } from "@/lib/utils";
 import { planStats } from "@/lib/plan-utils";
 import { CollapsibleText } from "./collapsible-text";
@@ -726,7 +727,7 @@ export function Terminal() {
                     i === mentionIndex ? "bg-[#E58F67]/10 text-[#E58F67]" : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
                   )}
                 >
-                  <FileText className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
+                  <FileTypeIcon path={f.path} className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
                   <span className="truncate">{f.path}</span>
                 </button>
               ))}

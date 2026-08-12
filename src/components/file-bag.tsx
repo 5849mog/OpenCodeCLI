@@ -32,6 +32,7 @@ import {
   PanelLeft,
 } from "lucide-react";
 import JSZip from "jszip";
+import { FileTypeIcon } from "@/lib/file-icon";
 import { vfs, normalizePath, parentPath, basename, onVfsEvent, type VfsNode } from "@/lib/vfs";
 import { extractZipFile } from "@/lib/tools/zip";
 import { useVfsView } from "@/store/vfs-view";
@@ -384,7 +385,7 @@ function FileTree({ onOpen }: { onOpen: (path: string) => void }) {
                 className="flex w-full items-center gap-1.5 px-2 py-1 text-left hover:bg-[#F0EDE5] dark:hover:bg-[#2a2723]"
                 title={f.path}
               >
-                <FileIcon className="h-3.5 w-3.5 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
+                <FileTypeIcon path={f.path} className="h-3.5 w-3.5 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
                 <span className="truncate text-[#3D3B37] dark:text-zinc-300">{f.path}</span>
               </button>
             ))
@@ -497,7 +498,7 @@ function TreeRow({
         ) : (
           <>
             <span className="w-3 shrink-0" />
-            <FileIcon className="h-3.5 w-3.5 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
+            <FileTypeIcon path={node.path} className="h-3.5 w-3.5 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
           </>
         )}
         <span className={cn("truncate", isDir ? "text-[#3D3B37] dark:text-zinc-300" : "text-[#6B6862] dark:text-zinc-400")}>
@@ -763,7 +764,7 @@ function TabbedEditor() {
               style={isActive ? { borderBottom: "2px solid #10b981", marginBottom: "-1px" } : {}}
               title={path}
             >
-              <FileIcon className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
+              <FileTypeIcon path={path} className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
               <span className="max-w-[120px] truncate font-mono">{name}</span>
               {isDirty ? (
                 <span
