@@ -37,7 +37,18 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import mermaid from "mermaid";
 
-mermaid.initialize({ startOnLoad: false, theme: "default" });
+// 项目强制深色模式（<html className="dark">），用 dark 主题否则浅色线条
+// 在深色背景上看不清。themeVariables 微调让文字/线条对比更清晰。
+mermaid.initialize({
+  startOnLoad: false,
+  theme: "dark",
+  themeVariables: {
+    // 与整体 #D97757 主色呼应的强调色；其余用 dark 主题默认值。
+    primaryColor: "#2a2723",
+    primaryTextColor: "#e4e4e7",
+    lineColor: "#a1a1aa",
+  },
+});
 import type { Components } from "react-markdown";
 import Prism from "prismjs";
 import "prismjs/components/prism-clike";
@@ -2045,7 +2056,13 @@ function GraphvizBlock({ code }: { code: string }) {
     (async () => {
       try {
         const graphviz = await getGraphviz();
-        const svg = graphviz.dot(code);
+        let svg = graphviz.dot(code);
+        // 深色模式适配：Graphviz 默认 fill/stroke 为纯黑，在深色背景看不清。
+        // 只替换显式纯黑（用户自定义颜色不受影响）；保留用户指定的其他颜色。
+        svg = svg
+          .replace(/fill="black"/g, 'fill="#e4e4e7"')
+          .replace(/stroke="black"/g, 'stroke="#a1a1aa"')
+          .replace(/fontcolor="black"/g, 'fontcolor="#e4e4e7"');
         if (ref.current) ref.current.innerHTML = svg;
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -2088,6 +2105,12 @@ function ChartBlock({ code }: { code: string }) {
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            // 深色模式默认配色：浅色文字 + 半透明网格，用户 options 可覆盖
+            color: "#e4e4e7",
+            scales: {
+              x: { ticks: { color: "#e4e4e7" }, grid: { color: "rgba(255,255,255,0.08)" } },
+              y: { ticks: { color: "#e4e4e7" }, grid: { color: "rgba(255,255,255,0.08)" } },
+            },
             ...(config.options ?? {}),
           },
         });
