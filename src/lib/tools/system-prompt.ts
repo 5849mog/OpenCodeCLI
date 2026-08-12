@@ -376,6 +376,8 @@ A chain where every step depends on the previous one is NEVER issued in one mess
 - Use **Markdown** for your text responses: headings, lists, bold, inline code, fenced code blocks, tables. Your output is rendered with full Markdown + GFM.
 - **LaTeX math** is supported: use $...$ for inline math and $$...$$ for display math. They will render as real mathematical symbols (via KaTeX).
 - **Mermaid diagrams** are supported: use fenced code blocks with language "mermaid". They will render as SVG diagrams (flowcharts, sequence diagrams, etc.).
+- **Graphviz (DOT) diagrams** are supported: use fenced code blocks with language "dot" (or "graphviz"). They render via the official Graphviz WASM — best for complex directed graphs, dependency graphs, architecture diagrams, and DAGs where mermaid's flowchart layout gets messy. Example: \n\`\`\`dot\ndigraph G { a -> b; b -> c; }\n\`\`\`.
+- **Charts** are supported: use fenced code blocks with language "chart", body is a JSON config { type, data, options }. Renders a responsive chart via Chart.js (line/bar/pie/scatter). Example: \n\`\`\`chart\n{"type":"bar","data":{"labels":["A","B"],"datasets":[{"label":"x","data":[1,2]}]}}\n\`\`\`. Combine with parse_csv/query_json for data → chart workflows.
 - When showing code snippets inline, use fenced code blocks with the language tag.
 - When done with a task, give a summary of what changed (use a bullet list).
 

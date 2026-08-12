@@ -1994,6 +1994,7 @@ let mermaidId = 0;
 function MermaidBlock({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const done = useRef(false);
+  const [error, setError] = useState<string | null>(null);
   const isComplete = code.trim().length > 10 && code.includes('\n');
   useEffect(() => {
     if (done.current || !ref.current || !isComplete) return;
@@ -2004,14 +2005,108 @@ function MermaidBlock({ code }: { code: string }) {
         const { svg } = await mermaid.render('mermaid-' + id, code);
         if (ref.current) ref.current.innerHTML = svg;
       } catch (e) {
-        if (ref.current) ref.current.innerHTML = '';
+        setError(e instanceof Error ? e.message : String(e));
       }
     })();
   }, [code, isComplete]);
+  if (error) {
+    return <pre className="my-2 rounded border border-red-300/40 bg-red-50/50 px-3 py-2 text-xs text-red-600 dark:border-red-500/30 dark:bg-red-950/20 dark:text-red-400">[mermaid 渲染失败] {error}</pre>;
+  }
   if (!isComplete) {
     return <pre className="text-xs text-[#8B8884] italic">[diagram]</pre>;
   }
   return <div ref={ref} className="my-2 flex justify-center" />;
+}
+
+let graphvizId = 0;
+// Graphviz.load() 返回的实例类型签名复杂（Format 枚举等），动态 import +
+// 已 Node 冒烟验证 dot() 用法，此处用 any 保持轻量。
+let graphvizPromise: Promise<any> | null = null;
+async function getGraphviz() {
+  if (!graphvizPromise) {
+    graphvizPromise = import("@hpcc-js/wasm-graphviz").then(({ Graphviz }) => Graphviz.load());
+  }
+  return graphvizPromise;
+}
+
+/** Graphviz / DOT — fenced code block with language "dot".
+ *  Renders DOT source (digraph G { a -> b }) as an SVG via the official
+ *  Graphviz WASM. Handles complex DAGs / dependency graphs / architecture
+ *  diagrams where mermaid's flowchart layout falls short. */
+function GraphvizBlock({ code }: { code: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const done = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+  const isComplete = code.trim().length > 5;
+  useEffect(() => {
+    if (done.current || !ref.current || !isComplete) return;
+    done.current = true;
+    const id = ++graphvizId;
+    (async () => {
+      try {
+        const graphviz = await getGraphviz();
+        const svg = graphviz.dot(code);
+        if (ref.current) ref.current.innerHTML = svg;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    })();
+  }, [code, isComplete]);
+  if (error) {
+    return <pre className="my-2 rounded border border-red-300/40 bg-red-50/50 px-3 py-2 text-xs text-red-600 dark:border-red-500/30 dark:bg-red-950/20 dark:text-red-400">[dot 渲染失败] {error}</pre>;
+  }
+  if (!isComplete) {
+    return <pre className="text-xs text-[#8B8884] italic">[graph]</pre>;
+  }
+  return <div ref={ref} className="my-2 flex justify-center" />;
+}
+
+let chartId = 0;
+/** Chart.js — fenced code block with language "chart".
+ *  Body is a JSON config: { type, data, options }. Renders a responsive
+ *  line/bar/pie/scatter chart from data (e.g. parsed by parse_csv/query_json). */
+function ChartBlock({ code }: { code: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const done = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+  const isComplete = code.trim().length > 5;
+  useEffect(() => {
+    if (done.current || !canvasRef.current || !isComplete) return;
+    done.current = true;
+    const id = ++chartId;
+    (async () => {
+      try {
+        const config = JSON.parse(code);
+        if (!config || typeof config !== "object" || !config.type || !config.data) {
+          throw new Error('chart 配置需为 {type, data, options?}，如 {"type":"bar","data":{"labels":["a","b"],"datasets":[{...}]}}');
+        }
+        const { Chart } = await import("chart.js/auto");
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        new Chart(canvas, {
+          ...config,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            ...(config.options ?? {}),
+          },
+        });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    })();
+  }, [code, isComplete]);
+  if (error) {
+    return <pre className="my-2 rounded border border-red-300/40 bg-red-50/50 px-3 py-2 text-xs text-red-600 dark:border-red-500/30 dark:bg-red-950/20 dark:text-red-400">[chart 渲染失败] {error}</pre>;
+  }
+  if (!isComplete) {
+    return <pre className="text-xs text-[#8B8884] italic">[chart]</pre>;
+  }
+  return (
+    <div className="my-2 flex h-64 items-center justify-center rounded border border-[#E5E2D9] bg-[#FFFFFF] p-3 dark:border-[#3a3731] dark:bg-[#0f0e0b]">
+      <canvas ref={canvasRef} className="max-h-full max-w-full" />
+    </div>
+  );
 }
 
 const markdownComponents: Components = {
@@ -2129,6 +2224,14 @@ const markdownComponents: Components = {
     // Mermaid flowchart — render with mermaid.js
     if (lang === "mermaid") {
       return <MermaidBlock code={codeText} />;
+    }
+    // Graphviz / DOT — official Graphviz WASM (complex DAGs, dependency graphs)
+    if (lang === "dot" || lang === "graphviz") {
+      return <GraphvizBlock code={codeText} />;
+    }
+    // Chart.js — data charts from JSON config
+    if (lang === "chart") {
+      return <ChartBlock code={codeText} />;
     }
     return (
       <div className="my-2 overflow-hidden rounded-md border border-[#E5E2D9] bg-[#FFFFFF] dark:border-[#3a3731] dark:bg-[#0f0e0b]">
