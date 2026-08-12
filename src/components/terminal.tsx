@@ -17,6 +17,7 @@ import {
   ArrowUp,
   Copy,
   Download,
+  Upload,
   Loader2,
   Square,
   Trash2,
@@ -1040,22 +1041,33 @@ function QuestionPanel({
 function EmptyState() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 py-12 text-center text-[#8B8884]">
-      <div className="rounded-full border border-[#E5E2D9] bg-zinc-900/50 p-4 dark:border-[#3a3731] dark:bg-[#262320]">
+      <div className="rounded-full border border-[#D97757]/25 bg-gradient-to-b from-[#2a2723] to-[#1c1a17] p-4 shadow-lg shadow-black/20 dark:border-[#D97757]/25 dark:from-[#2a2723] dark:to-[#161512]">
         <TerminalIcon className="h-7 w-7 text-[#D97757]" />
       </div>
       <div>
-        <div className="text-[#3D3B37]">Welcome to Open Code Web</div>
-        <div className="mt-1 text-xs">
+        <div className="bg-gradient-to-r from-[#F5F3EE] via-[#E8A87C] to-[#D97757] bg-clip-text text-xl font-semibold tracking-tight text-transparent dark:from-zinc-100 dark:via-[#E8A87C] dark:to-[#D97757]">
+          Welcome to Open Code Web
+        </div>
+        <div className="mt-1.5 text-xs text-[#6B6862] dark:text-zinc-400">
           A browser-based, near 1:1 replica of the Open Code CLI.
         </div>
-        <div className="mt-1 text-xs">
-          The <span className="text-[#D97757]">文件袋</span> on the right is your virtual workspace.
+        <div className="mt-1.5 text-xs text-[#6B6862] dark:text-zinc-400">
+          The <span className="font-medium text-[#D97757] dark:text-[#E8A87C]">文件袋</span> on the right is your virtual workspace.
         </div>
       </div>
-      <div className="mt-2 grid gap-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E]">
-        <div>• Upload files → they appear in the 文件袋</div>
-        <div>• Ask the AI to build, edit, or refactor your project</div>
-        <div>• Download the result as a zip when done</div>
+      <div className="mt-2 grid gap-1.5 text-left text-[length:var(--font-size-ui-sm)] text-[#8B8884] dark:text-zinc-400">
+        <div className="flex items-center gap-2">
+          <Upload className="h-3.5 w-3.5 shrink-0 text-[#7dd3fc]" />
+          <span>Upload files <span className="text-[#D97757] dark:text-[#E8A87C]">→</span> they appear in the <span className="text-[#8B7355] dark:text-[#E8A87C]">文件袋</span></span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#a78bfa]" />
+          <span>Ask the AI to <span className="text-zinc-500 dark:text-zinc-300">build, edit, or refactor</span> your project</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Download className="h-3.5 w-3.5 shrink-0 text-[#34d399]" />
+          <span>Download the result as a <span className="font-mono text-[#8B7355] dark:text-[#E8A87C]">zip</span> when done</span>
+        </div>
       </div>
     </div>
   );
