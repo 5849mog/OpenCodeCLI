@@ -208,69 +208,69 @@ pre[class*="language-"],
 }
 
 /* ----- Prism dark overrides (app is forced dark) -----
-   GitHub-Dark-inspired: low-saturation, high-distinction. Each syntax role
-   gets its own soft hue (blue/green/red/purple/orange) so code reads cleanly
-   instead of one warm smudge. Orange accents (number/variable/class) echo the
-   app's primary. */
+   Rosé Pine palette — the warm-rose dark theme. Our code background is a warm
+   near-black, and GitHub-Dark's cool blue/violet hues clashed with it (grey
+   and muddy). Rosé Pine's low-saturation warm hues (rose/gold/foam/iris) sit
+   on the same temperature and read clean, elegant, and distinct. */
 .dark code[class*="language-"],
 .dark pre[class*="language-"] {
-  background: #0f0e0b;
+  background: #191724; /* Rosé Pine base — soft warm violet-black */
 }
 .dark .token.comment,
 .dark .token.prolog,
 .dark .token.doctype,
 .dark .token.cdata {
-  color: #8b949e;
+  color: #6e6a86; /* muted */
   font-style: italic;
 }
 .dark .token.punctuation {
-  color: #848d97;
+  color: #908caa; /* subtle */
 }
 .dark .token.property,
 .dark .token.boolean,
 .dark .token.constant,
-.dark .token.symbol,
+.dark .token.symbol {
+  color: #9ccfd8; /* foam */
+}
 .dark .token.number {
-  color: #79c0ff;
+  color: #c4a7e7; /* iris — distinct from booleans */
 }
 .dark .token.tag,
-.dark .token.inserted {
-  color: #7ee787;
-}
-.dark .token.deleted {
-  color: #ffa198;
-}
 .dark .token.selector,
 .dark .token.attr-name {
-  color: #79c0ff;
+  color: #31748f; /* pine */
+}
+.dark .token.inserted {
+  color: #f6c177; /* gold */
+}
+.dark .token.deleted {
+  color: #eb6f92; /* love */
 }
 .dark .token.string,
 .dark .token.char,
 .dark .token.url,
 .dark .language-css .token.string,
-.dark .style .token.string {
-  color: #a5d6ff;
+.dark .style .token.string,
+.dark .token.regex {
+  color: #f6c177; /* gold — warm strings */
 }
 .dark .token.builtin,
 .dark .token.class-name,
 .dark .token.variable {
-  color: #ffa657;
+  color: #ebbcba; /* rose */
 }
 .dark .token.operator,
 .dark .token.entity {
-  color: #ff7b72;
+  color: #eb6f92; /* love */
 }
 .dark .token.atrule,
 .dark .token.attr-value,
 .dark .token.keyword,
 .dark .token.important {
-  color: #ff7b72;
+  color: #eb6f92; /* love */
 }
 .dark .token.function {
-  color: #d2a8ff;
-}
-.dark .token.regex {
-  color: #a5d6ff;
+  color: #c4a7e7; /* iris */
 }
 
 /* ----- Scrollbars — dark ----- */
