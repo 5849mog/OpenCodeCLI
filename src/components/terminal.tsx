@@ -100,6 +100,10 @@ export function Terminal() {
   const reset = useSession((s) => s.reset);
   const pendingQuestions = useSession((s) => s.pendingQuestions);
   const setPendingQuestions = useSession((s) => s.setPendingQuestions);
+  // 订阅 VFS 就绪状态：@mention 下拉依赖 vfs 缓存，必须等 IndexedDB
+  // hydrate 完成（及后续文件袋增删）触发重渲染，否则下拉永远是空。
+  const vfsHydrated = useVfsView((s) => s.hydrated);
+  const vfsVersion = useVfsView((s) => s.version);
 
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -149,7 +153,9 @@ export function Terminal() {
 
   /** Replace @path/to/file mentions with inline file content. */
   const processMentions = (text: string): string => {
-    return text.replace(/@([\w./_-]+[\w.-]+)/g, (match, filePath) => {
+    // @ 后匹配路径：非空白、非 @ 字符序列（支持中文/点开头/带点目录），
+    // 到空白或行尾为止。找不到文件时原样保留（不报错）。
+    return text.replace(/@([^\s@]+)/g, (match, filePath) => {
       const content = vfs.readFileSync(filePath);
       if (content === null) return match; // leave as-is if not found
       const ext = filePath.split(".").pop() ?? "";
@@ -162,19 +168,23 @@ export function Terminal() {
     });
   };
 
-  /** Detect @mention in the current input and return matching files. */
-  const mentionFiles = mentionQuery
-    ? vfs.listAllFilesSync("").filter((f) =>
-        f.path.toLowerCase().includes(mentionQuery.toLowerCase()),
-      ).slice(0, 8)
-    : [];
+  /** Detect @mention in the current input and return matching files.
+   *  useMemo 显式依赖 vfsHydrated/vfsVersion——VFS hydrate 完成或文件袋
+   *  增删时重算，否则首次加载下拉永远为空（原 bug：没订阅 VFS 状态）。 */
+  const mentionFiles = useMemo(() => {
+    if (!mentionQuery || !vfsHydrated) return [];
+    return vfs
+      .listAllFilesSync("")
+      .filter((f) => f.path.toLowerCase().includes(mentionQuery.toLowerCase()))
+      .slice(0, 8);
+  }, [mentionQuery, vfsHydrated, vfsVersion]);
 
   const onInputChange = (val: string) => {
     setInput(val);
     // Detect @mention: look for @ followed by non-space chars at cursor position
     const cursorPos = textareaRef.current?.selectionStart ?? val.length;
     const beforeCursor = val.substring(0, cursorPos);
-    const atMatch = beforeCursor.match(/@([\w./_-]*)$/);
+    const atMatch = beforeCursor.match(/@([^\s@]*)$/);
     if (atMatch) {
       setMentionQuery(atMatch[1]);
       setMentionIndex(0);
@@ -188,7 +198,7 @@ export function Terminal() {
     const beforeCursor = input.substring(0, cursorPos);
     const afterCursor = input.substring(cursorPos);
     // Replace @query with @filePath
-    const newBefore = beforeCursor.replace(/@[\w./_-]*$/, `@${filePath} `);
+    const newBefore = beforeCursor.replace(/@[^\s@]*$/, `@${filePath} `);
     const newVal = newBefore + afterCursor;
     setInput(newVal);
     setMentionQuery(null);
