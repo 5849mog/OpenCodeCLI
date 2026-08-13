@@ -10,7 +10,7 @@
  *   file / delete file.
  */
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import {
   Upload,
   FolderUp,
@@ -30,16 +30,19 @@ import {
   ClipboardList,
   Menu,
   PanelLeft,
+  Bot,
 } from "lucide-react";
 import JSZip from "jszip";
 import { FileTypeIcon } from "@/lib/file-icon";
 import { vfs, normalizePath, parentPath, basename, onVfsEvent, type VfsNode } from "@/lib/vfs";
 import { extractZipFile } from "@/lib/tools/zip";
 import { useVfsView } from "@/store/vfs-view";
+import { useSession } from "@/store/session";
 import { PlanPanel } from "@/components/plan-panel";
-import { SubagentPanel } from "@/components/subagent-panel";
+import { SubagentPanel, buildRuns } from "@/components/subagent-panel";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 
 export function FileBag() {
   const hydrated = useVfsView((s) => s.hydrated);
@@ -69,6 +72,11 @@ function FileBagInner() {
   const rightPanelTab = useVfsView((s) => s.rightPanelTab);
   const setRightPanelTab = useVfsView((s) => s.setRightPanelTab);
   const vfsVersion = useVfsView((s) => s.version);
+  const sessionEvents = useSession((s) => s.events);
+  // 子智能体角标：计算当前 runs 数量 + 是否有运行中。
+  const subagentRuns = useMemo(() => buildRuns(sessionEvents), [sessionEvents]);
+  const subagentCount = subagentRuns.length;
+  const subagentRunning = subagentRuns.some((r) => r.running);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [newFileModal, setNewFileModal] = useState(false);
@@ -160,44 +168,51 @@ function FileBagInner() {
     <div className="flex h-full flex-col bg-[#FFFFFF] text-[#2D2B27] dark:bg-background dark:text-zinc-100">
       {/* Toolbar + tabs */}
       <div className="flex flex-wrap items-center gap-1 border-b border-[#E5E2D9] px-2 py-2 text-[length:var(--font-size-ui-sm)] dark:border-[#3a3731]">
-        {/* Panel tabs */}
-        <div className="mr-3 flex items-center gap-0.5">
-          <button
-            onClick={() => setRightPanelTab("files")}
-            className={cn(
-              "flex items-center gap-1.5 rounded px-2.5 py-1.5 font-medium transition-colors",
-              rightPanelTab === "files"
-                ? "bg-[#E58F67]/10 text-[#E58F67]"
-                : "text-[#8B8884] hover:bg-[#F5F3EE] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:bg-[#262320] dark:hover:text-zinc-300",
-            )}
-          >
-            <FolderOpen className="h-3.5 w-3.5" />
-            <span>文件袋</span>
-          </button>
-          <button
-            onClick={() => setRightPanelTab("plan")}
-            className={cn(
-              "flex items-center gap-1.5 rounded px-2.5 py-1.5 font-medium transition-colors",
-              rightPanelTab === "plan"
-                ? "bg-[#E58F67]/10 text-[#E58F67]"
-                : "text-[#8B8884] hover:bg-[#F5F3EE] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:bg-[#262320] dark:hover:text-zinc-300",
-            )}
-          >
-            <ClipboardList className="h-3.5 w-3.5" />
-            <span>Plan</span>
-          </button>
-          <button
-            onClick={() => setRightPanelTab("subagents")}
-            className={cn(
-              "flex items-center gap-1.5 rounded px-2.5 py-1.5 font-medium transition-colors",
-              rightPanelTab === "subagents"
-                ? "bg-[#0D9488]/10 text-[#0F766E] dark:bg-[#14B8A6]/20 dark:text-[#5eead4]"
-                : "text-[#8B8884] hover:bg-[#F5F3EE] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:bg-[#262320] dark:hover:text-zinc-300",
-            )}
-          >
-            <span className="h-2 w-2 rounded-full bg-[#14B8A6]" />
-            <span>子智能体</span>
-          </button>
+        {/* Panel tabs — sliding underline indicator */}
+        <div className="mr-3 flex items-center gap-1 border-b border-transparent">
+          {(
+            [
+              { key: "files", label: "文件袋", Icon: FolderOpen },
+              { key: "plan", label: "Plan", Icon: ClipboardList },
+              { key: "subagents", label: "子智能体", Icon: Bot },
+            ] as const
+          ).map(({ key, label, Icon }) => {
+            const active = rightPanelTab === key;
+            return (
+              <button
+                key={key}
+                onClick={() => setRightPanelTab(key)}
+                className={cn(
+                  "relative flex items-center gap-1.5 rounded px-2.5 py-1.5 font-medium transition-colors",
+                  active
+                    ? "text-[#E58F67]"
+                    : "text-[#8B8884] hover:bg-[#F5F3EE] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:bg-[#262320] dark:hover:text-zinc-300",
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{label}</span>
+                {key === "subagents" && subagentCount > 0 && (
+                  <span
+                    className={cn(
+                      "flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold",
+                      subagentRunning
+                        ? "animate-pulse bg-[#E58F67]/20 text-[#E58F67]"
+                        : "bg-[#E58F67]/10 text-[#E58F67]",
+                    )}
+                  >
+                    {subagentCount}
+                  </span>
+                )}
+                {active && (
+                  <motion.span
+                    layoutId="panel-tab-indicator"
+                    className="absolute inset-x-1 -bottom-[5px] h-0.5 rounded-full bg-[#E58F67]"
+                    transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Files toolbar — only show when on files tab */}

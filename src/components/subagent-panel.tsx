@@ -35,6 +35,8 @@ interface SubagentRun {
   ts: number;
 }
 
+export type { SubagentRun };
+
 /** Parse a dispatch_subagent tool-result output into meta + summary text. */
 function parseOutput(output: string): {
   completed: boolean;
@@ -55,7 +57,7 @@ function parseOutput(output: string): {
 }
 
 /** Pair each dispatch_subagent tool-call with its first matching tool-result. */
-function buildRuns(events: SessionEvent[]): SubagentRun[] {
+export function buildRuns(events: SessionEvent[]): SubagentRun[] {
   const claimed = new Set<string>();
   const runs: SubagentRun[] = [];
   for (const ev of events) {
@@ -133,7 +135,12 @@ export function SubagentPanel() {
             </div>
             <div className="text-sm text-[#3D3B37] dark:text-zinc-200">还没有子智能体活动</div>
             <div className="max-w-xs text-xs text-[#8B8884] dark:text-zinc-500">
-              让 AI 派一个 Explore 子智能体去做多文件研究——委派提示词和最终回复都会出现在这里。
+              回到主对话，让 AI 委派一个 Explore 子智能体去做多文件研究（工具名{" "}
+              <span className="font-mono text-[#E58F67]">dispatch_subagent</span>
+              ）——委派提示词和最终回复都会出现在这里。
+            </div>
+            <div className="max-w-xs rounded-md border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-[11px] text-[#6B6862] dark:border-[#3a3731] dark:bg-[#262320] dark:text-zinc-400">
+              提示：像「梳理这个项目的模块结构」「这段代码在哪里被用到」这类需要读多个文件的问题，AI 会自动委派子智能体去查。
             </div>
           </div>
         ) : (
