@@ -45,10 +45,12 @@
 | 📁 **文件袋 (VFS)** | 所有文件在浏览器内存 + IndexedDB 中运作，支持快照与一键回滚（`/undo`，含 bash 写入） |
 | 🖥️ **原生引擎** | 真正的 WASM 引擎：Lua 5.4、JavaScript (QuickJS)、POSIX awk (onetrueawk)、GNU sed、bc——不是 JS 模拟，是原生二进制 |
 | 📊 **数据工具** | YAML / CSV 解析、JSONata 查询、mathjs 数学（矩阵/单位/统计）——浏览器内直接处理数据文件 |
+| 🔧 **代码引擎** | esbuild-wasm 转译 / 语法检查 + 本地 **Git**（isomorphic-git + lightning-fs）——状态/日志/提交，全在浏览器内 |
 | 📈 **可视化** | Mermaid + Graphviz (DOT, WASM) + Chart.js——Markdown 代码块直接渲染流程图/复杂图/数据图表 |
+| 🧩 **Skill 技能** | AI 可浏览、按需加载内置与自定义 Skill，并**自行创建 / 删除**，自定义技能独立持久化 |
 | 🧠 **子智能体 (Explore)** | AI 把多文件探索委派给专用子代理，独立上下文、只回传结论，主对话保持干净 |
 | 🌗 **深色模式** | 黑底白字的 ZCode 风格界面，Markdown 渲染精调（GFM + KaTeX + Mermaid） |
-| 🔒 **密钥自持** | API Key 用 AES-GCM 加密存在 sessionStorage，标签页一关就消失 |
+| 🔒 **密钥自持** | API Key 用 AES-GCM 加密，主密钥持久化到 localStorage，**刷新页面自动恢复、不必重填**；支持一键锁定与空闲自动锁定 |
 | 🗣️ **结构化问答** | AI 可以弹出单选/多选/文本输入面板，等你填完再继续 |
 | 📋 **计划跟踪** | AI 通过 `update_plan` 维护进度，自动注入 System Prompt，永不健忘 |
 | 🌐 **联网搜索** | `web_search` / `fetch_url`（需自配 Tavily 或 Brave Key，均有免费额度） |
@@ -70,7 +72,7 @@ npm install
 
 ### 2. 配置 API Key
 
-启动后会自动弹出设置面板，支持所有 OpenAI 兼容的 API，内置以下预设：
+首次使用时自动弹出设置面板（之后刷新/重开不再弹，Key 本地持久化自动恢复），支持所有 OpenAI 兼容的 API，内置以下预设：
 
 **OpenAI · DeepSeek · 智谱 (Zhipu) · Moonshot (Kimi) · OpenRouter · Groq**
 
@@ -118,11 +120,12 @@ npm run build
 | ⚛️ 框架 | Next.js 16 + React 19 |
 | 📦 状态 | Zustand 5 |
 | ✏️ 编辑器 | CodeMirror 6 |
-| 🧠 引擎 | Lua 5.4 / JavaScript (QuickJS) / POSIX awk (onetrueawk) / GNU sed / bc — WebAssembly |
+| 🧠 引擎 | Lua 5.4 / JavaScript (QuickJS) / POSIX awk (onetrueawk) / GNU sed / bc / esbuild（转译+语法检查）— WebAssembly |
 | 📊 数据工具 | YAML / PapaParse (CSV) / JSONata (JSON 查询) / mathjs — 浏览器内纯 JS |
 | 📈 可视化 | Mermaid / Graphviz (DOT, WASM) / Chart.js — Markdown 代码块直接渲染 |
 | 🎯 AI | OpenAI 兼容 API（DeepSeek / OpenRouter / Groq / Ollama…） |
-| 💾 持久化 | IndexedDB + idb |
+| 💾 持久化 | IndexedDB + idb（文件袋 / 会话 / 自定义 Skill），lightning-fs（本地 Git 底层） |
+| 🧬 版本控制 | isomorphic-git — 本地 init / status / commit / log（无远程） |
 | 🎨 样式 | Tailwind CSS 4 + shadcn/ui（深色主题） |
 | 📎 文件操作 | JSZip（导入/导出） |
 | 📝 Markdown | react-markdown + remark-gfm + KaTeX + Mermaid |
@@ -140,33 +143,36 @@ npm run build
 | `/clear` · `/reset` | 清空会话（保留文件袋） |
 | `/model <name>` | 切换 AI 模型 |
 | `/tokens` | 显示 Token 用量 |
-| `/inspect` | 查看/编辑上次发送给 AI 的完整上下文（Payload） |
 | `/compact` | 用 LLM 压缩旧对话为摘要，释放上下文（带动画） |
 | `/export` | 导出会话为 Markdown（`/export json` 导出为 JSON） |
 | `/cost` | 估算花费（USD） |
 | `/undo` | 撤销上一次 AI 文件编辑 / bash 写入 |
 | `/diff` | 显示所有文件变更 |
-| `/run <command>` | 直接执行 Bash（不经过 AI） |
+| `/skills` | 列出可用的 Skill 技能包 |
 
 ### 图形化入口（不必敲命令）
 
 | 入口 | 位置 | 打开什么 |
 |------|------|----------|
-| 📜 上下文按钮 | Terminal header | Payload 查看器（= `/inspect`） |
+| 📜 上下文按钮 | Terminal header | Payload 查看器（查看/编辑发给 AI 的完整上下文） |
 | 📊 用量按钮 | Terminal header | Token 用量面板（= `/tokens`） |
 | 💬 Token 计数 | 输入区下方，点击 | Token 用量面板 |
+| ✨ 技能按钮 | 侧边栏（Sparkles） | Skills 技能面板（浏览 / 管理 Skill） |
 | ⚙️ 设置 | 侧边栏底部 | Settings（含会话导出/导入） |
 | 📖 帮助 | 侧边栏底部 | Help 对话框（= `/help`） |
+| 👥 子智能体角标 | 右侧栏「文件」Tab | 该次任务已产出的子代理数 |
+
+> 💡 **右侧栏三个面板 Tab**：**文件 / 变更 / 文件袋** 已图形化，带滑动下划线指示当前面板，文件树收进其中，浏览与回溯无需再敲 slash 命令。
 
 ---
 
 ## ⚠️ 诚实说明与已知限制
 
-- **没有真实 OS** — 终端是沙箱模拟的，`awk`/`sed`/`lua`/`js`/`bc` 等是原生编译（Emscripten / WASM），但 `npm install`、`git`、`ps` 等系统级命令不支持
+- **没有真实 OS** — 终端 bash 是沙箱模拟的，`awk`/`sed`/`lua`/`js`/`bc` 等是原生编译（Emscripten / WASM），但 `npm install`、`ps` 等系统级命令不支持；Git 由内置 **isomorphic-git 引擎**提供（非系统 `git`），仅支持 init / status / add / commit / log / diff，**无远程 push / clone**
 - **bash 是"模拟 shell"而非真实 bash** — 无 shell 变量（除 for 循环体内 `$f`）、参数不做 glob 展开（`echo *` 输出字面 `*`）、`2>/dev/null` 静默忽略、`echo`/`printf` 不自动加尾换行、无 heredoc、for 循环仅单层（不支持嵌套 / glob 列表 / break / continue）
 - **大文件（>5 MiB）** 自动转为占位符，防止 AI 消耗过多 Token
 - **纯前端** — 没有后端数据库、没有用户系统，所有数据只在你的浏览器里
-- **API Key 安全** — 密钥用随机**主密钥** AES-GCM 加密，主密钥只存在内存、绝不落盘（sessionStorage 仅有密文+盐+IV），刷新页面后需重新输入；支持一键锁定与可选空闲自动锁定。虽已加密，XSS 攻击仍可能导致泄露。建议用 API 网关代理（如 Cloudflare Workers）做二次保护
+- **API Key 安全** — 密钥用 AES-GCM 加密（密文+盐+IV 存 sessionStorage，主密钥持久化到 localStorage），**刷新页面自动恢复、无需重填**；支持一键锁定与可选空闲自动锁定。这是「刷新不丢」与「本地可解」的权衡：XSS 攻击仍可读主密钥而解密 Key。建议用 API 网关代理（如 Cloudflare Workers）做二次保护
 
 ---
 
