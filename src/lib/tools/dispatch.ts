@@ -8,6 +8,7 @@ import { toolAskUserInput } from "./user-input";
 import { toolWebSearch, toolFetchUrl } from "./web";
 import { toolZipArchive, toolUnzipArchive } from "./zip";
 import { toolParseYaml, toolParseCsv, toolQueryJson, toolMath } from "./data-tools";
+import { listSkills, loadSkill } from "../skills";
 import * as luaWasm from "../wasm/lua-wasm";
 import * as jsWasm from "../wasm/js-wasm";
 import { vfs } from "../vfs";
@@ -325,6 +326,43 @@ export async function dispatchTool(
         return await toolQueryJson(args);
       case "math":
         return await toolMath(args);
+      case "list_skills": {
+        const skills = listSkills();
+        if (skills.length === 0) {
+          return { ok: true, output: "(没有可用的 skill)", tool: "list_skills", args };
+        }
+        const lines = skills.map(
+          (s) => `- ${s.name} ${s.source === "builtin" ? "(内置)" : "(自定义)"} — ${s.description}`,
+        );
+        return {
+          ok: true,
+          output: `可用 Skills（${skills.length} 个）：\n${lines.join("\n")}\n\n用 load_skill(name) 加载某个 skill 的完整指令。`,
+          tool: "list_skills",
+          args,
+        };
+      }
+      case "load_skill": {
+        const name = String(args.name ?? "").trim();
+        if (!name) {
+          return { ok: false, output: "load_skill: missing 'name' — 先用 list_skills 查看可用 skill", tool: "load_skill", args };
+        }
+        const skill = loadSkill(name);
+        if (!skill) {
+          const available = listSkills().map((s) => s.name).join(", ");
+          return {
+            ok: false,
+            output: `load_skill: skill '${name}' 不存在。可用: ${available || "(无)"}`,
+            tool: "load_skill",
+            args,
+          };
+        }
+        return {
+          ok: true,
+          output: `# Skill: ${skill.name} (${skill.source === "builtin" ? "内置" : "自定义"})\n\n${skill.content}`,
+          tool: "load_skill",
+          args,
+        };
+      }
       case "web_search":
         return await toolWebSearch(args);
       case "fetch_url":

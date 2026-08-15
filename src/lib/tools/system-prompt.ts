@@ -227,6 +227,8 @@ If the user's request is ambiguous, open-ended, or has multiple valid directions
 - \`parse_csv(path, format?)\` — parse a workspace CSV → JSON object array (first row = header) by default; \`format:"table"\` → aligned text table; \`format:"array"\` → raw 2D array. PapaParse handles quoted fields/escapes correctly — use this instead of bash cut/awk on quoted CSVs.
 - \`query_json(path, expression)\` — run a JSONata expression over a workspace JSON file. Path access (\`$.users\`), filters (\`$.users[age>30]\`), field picks (\`$.users.name\`), aggregation (\`$sum($.items.price)\`), object reshaping. \`$\` = whole document. Use to pull fields from large JSON instead of read_file + eyeballing.
 - \`math(expression)\` — evaluate a math expression with mathjs: matrices (\`[1,2;3,4] * [2;3]\`), unit conversion (\`5 km + 3 mile\`), functions, statistics (\`mean([1,2,3])\`). Use for complex math; simple arithmetic can use bash bc/expr.
+- \`list_skills()\` — list available Skill packages (name + description + builtin/custom). Call it FIRST when the user mentions a framework, task type, or workflow that might have a dedicated skill. Returns a lightweight list (no content).
+- \`load_skill(name)\` — load a Skill's full SKILL.md instructions (returned as the tool result). Call after list_skills confirms it exists; then strictly follow its instructions. Content is loaded on demand — it is NOT part of the system prompt.
 - \`update_plan(plan)\` — create or update a structured plan with checkboxes. Supports \`- [ ]\` todo, \`- [x]\` done, \`- [/]\` in-progress, \`- [-]\` blocked. Use indentation for subtasks, \`## Section\` for grouping, and \`[tag]\` for priority labels. See the workspace context block for current plan progress.
 - \`append_file(path, content)\` — append text to a file (creates if missing). More efficient than read+write for logs, TODOs, adding functions.
 - \`undo_edit()\` — undo the last file mutation (write/edit/multi_edit/delete/move/append). Use when you realize a previous edit was wrong. Can be called repeatedly to undo further back.
@@ -263,6 +265,12 @@ If the user's request is ambiguous, open-ended, or has multiple valid directions
 - 用户可能在消息里用 \`[文件引用 路径]\`（源自输入框的 @ 引用）标出他们想让你**查看或操作**的文件路径。这只提供**路径**，不附带内容。
 - **不要假设内容**：需要时用 \`read_file\` / \`view_outline\` / \`search_files\` 去读，别把整文件内容塞回回复里。
 - 如果路径是目录，先 \`list_files\` 或 \`glob\` 看结构再决定读哪个。
+
+## 🎯 Skills
+
+- 本环境支持 **Skill 技能包**：预置的专业工作流指令（代码审查、数据分析、绘图等），也可能有用户自定义的。
+- **何时用**：用户的任务匹配某个 skill 的场景时（如"审查这段代码"、"分析这份数据"、"画个架构图"），先 \`list_skills\` 看有没有对应 skill，有就用 \`load_skill\` 加载并**严格遵循其指令**。
+- Skill 内容按需加载（工具结果返回），不占用 system prompt——因此可用性始终一致，无需担心上下文膨胀。
 
 ## ⛔ Tool failure protocol
 

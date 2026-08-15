@@ -387,6 +387,42 @@ function bashCommandMutates(command: string): boolean {
   return /(?<![0-9])>>?(?!&)/.test(command);
 }
 
+/** Skills 目录保护：判断写工具的 args 是否指向 skills/ 下的路径。
+ *  write/edit/append/delete/move/insert/apply_patch 走 path/from/to/edits；
+ *  bash 写命令里出现 skills/ 路径也拦截。 */
+function isToolTargetingSkills(tool: string, args: Record<string, unknown>): boolean {
+  const SKILLS_PREFIX = "skills/";
+  const inSkills = (p: unknown): boolean =>
+    typeof p === "string" && (p.startsWith(SKILLS_PREFIX) || p === "skills");
+  switch (tool) {
+    case "write_file":
+    case "edit_file":
+    case "delete_file":
+    case "append_file":
+    case "insert_at":
+      return inSkills(args.path);
+    case "move_file":
+      return inSkills(args.from) || inSkills(args.to);
+    case "create_dir":
+      return inSkills(args.path);
+    case "multi_edit": {
+      if (!Array.isArray(args.edits)) return false;
+      return args.edits.some((e) => inSkills((e as Record<string, unknown>)?.path));
+    }
+    case "apply_patch": {
+      const patch = typeof args.patch === "string" ? args.patch : "";
+      return /skills\/[^\s"']+/.test(patch);
+    }
+    case "bash": {
+      const cmd = typeof args.command === "string" ? args.command : "";
+      // bash 写操作（含重定向/rm/mkdir/cp/mv 等）指向 skills/ 时保护
+      return bashCommandMutates(cmd) && /\bskills\/|\bskills\b/.test(cmd);
+    }
+    default:
+      return false;
+  }
+}
+
 export const useSession = create<SessionState>((set, get) => ({
   events: [],
   messages: [],
@@ -1327,7 +1363,17 @@ async function executeToolCall(
         "move_file", "append_file", "create_dir",
         "apply_patch", "insert_at", "undo_edit", "unzip_archive",
       ]);
-      if (get().mode === "plan" && mutatingTools.has(tc.function.name)) {
+      // Skills 目录保护：AI 的任何写工具都不可指向 skills/（内置 skill 在代码里，
+      // 自定义 skill 目录受保护，只能由用户通过 zip 导入/文件袋管理）。
+      const skillsProtected = isToolTargetingSkills(tc.function.name, args);
+      if (skillsProtected) {
+        result = {
+          ok: false,
+          output: `[Skills 保护] ${tc.function.name} 的目标路径位于 skills/ 目录——Skills 目录受保护，不可由 AI 修改。用户可通过 zip 导入或文件袋管理自定义 skill。`,
+          tool: tc.function.name,
+          args,
+        };
+      } else if (get().mode === "plan" && mutatingTools.has(tc.function.name)) {
         result = {
           ok: false,
           output: `[Plan mode] This tool (${tc.function.name}) is blocked. In Plan mode you can only READ and ANALYZE files — you cannot modify them. Propose your plan in text, and the user will switch to Bypass mode to let you execute it.`,

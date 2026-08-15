@@ -501,6 +501,16 @@ export function Terminal() {
         break;
       }
 
+      case "skills": {
+        // 列出可用 Skill 技能包（/skills）
+        void import("@/lib/tools").then(({ dispatchTool }) =>
+          dispatchTool("list_skills", {}).then((res) => {
+            pushSystem(res.ok ? res.output : `skills 列表失败: ${res.output}`);
+          }),
+        );
+        break;
+      }
+
       default:
         pushSystem(`Unknown command: /${name}. Try /help.`);
     }

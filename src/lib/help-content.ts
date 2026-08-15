@@ -17,6 +17,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { cmd: "/export", desc: "Download the conversation as a Markdown file" },
   { cmd: "/cost", desc: "Estimate cumulative API cost" },
   { cmd: "/tokens", desc: "Show real token usage from the API" },
+  { cmd: "/skills", desc: "List available Skill packages (技能包)" },
   { cmd: "/undo", desc: "Undo the last AI file edit (restore snapshot)" },
   { cmd: "/diff", desc: "Show all file changes made this session" },
   { cmd: "/help", desc: "Show this help" },

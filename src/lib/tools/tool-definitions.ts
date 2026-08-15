@@ -834,6 +834,37 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "list_skills",
+      description:
+        "列出当前所有可用的 Skill（技能包）：名称 + 一句话描述 + 来源（内置/自定义）。当用户提到某个框架、任务类型或工作流，而你怀疑有对应 skill 可用时，先调用它看看。Skill 内容按需用 load_skill 加载——本工具只返回轻量列表，不含正文。",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "load_skill",
+      description:
+        "加载指定 Skill 的完整 SKILL.md 内容（工具结果返回全文）。在 list_skills 确认存在后调用；加载后严格遵循其中指令执行。名称不存在返回错误。",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description:
+              "Skill 名称（list_skills 返回的 name，如 'code-review'、'data-analysis'）。",
+          },
+        },
+        required: ["name"],
+      },
+    },
+  },
 ];
 
 export function getToolByName(name: string): ToolDefinition | undefined {

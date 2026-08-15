@@ -10,6 +10,7 @@ import { Terminal } from "@/components/terminal";
 import { FileBag } from "@/components/file-bag";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { HelpDialog } from "@/components/help-dialog";
+import { SkillsDialog } from "@/components/skills-dialog";
 import {
   Settings,
   Plus,
@@ -20,6 +21,7 @@ import {
   Pencil,
   Trash2,
   MoreHorizontal,
+  Sparkles,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -164,6 +166,7 @@ function SessionRow({
 export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [skillsOpen, setSkillsOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [panelDirection, setPanelDirection] = useState<"horizontal" | "vertical">("horizontal");
   const init = useSession((s) => s.init);
@@ -267,6 +270,13 @@ export default function Home() {
               >
                 <BookOpen className="h-4 w-4" />
               </button>
+              <button
+                onClick={() => setSkillsOpen(true)}
+                className="touch-target flex items-center justify-center rounded-lg text-[#8B8884] hover:bg-white hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#262320] dark:hover:text-zinc-200"
+                title="Skills 技能包"
+              >
+                <Sparkles className="h-4 w-4" />
+              </button>
             </div>
           </>
         ) : (
@@ -354,6 +364,13 @@ export default function Home() {
                 >
                   <BookOpen className="h-3.5 w-3.5" />
                 </button>
+                <button
+                  onClick={() => setSkillsOpen(true)}
+                  className="flex items-center justify-center rounded-lg px-3 py-2 text-[#8B8884] hover:bg-white hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#262320] dark:hover:text-zinc-200"
+                  title="Skills 技能包"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                </button>
               </div>
               {config.hasApiKey ? (
                 <div className="mt-2 flex items-center gap-1.5 px-3 py-1 text-[10px] text-[#8B7355] dark:text-[#E8A87C]">
@@ -393,6 +410,10 @@ export default function Home() {
       <HelpDialog
         open={helpOpen}
         onOpenChange={setHelpOpen}
+      />
+      <SkillsDialog
+        open={skillsOpen}
+        onClose={() => setSkillsOpen(false)}
       />
     </div>
   );
