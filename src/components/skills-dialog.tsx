@@ -160,8 +160,7 @@ export function SkillsDialog({
             <div className="mb-1">
               <span className="font-semibold text-[#6B6862] dark:text-zinc-400">存储位置：</span>
               <span className="text-[#E58F67]">内置</span> skill 随程序内置，不在文件袋；AI 用{" "}
-              <span className="font-mono text-[#E58F67]">create_skill</span> 创建的自定义 skill 才会出现在文件袋的{" "}
-              <span className="font-mono text-[#E58F67]">skills/&lt;名称&gt;/SKILL.md</span>。
+              <span className="font-mono text-[#E58F67]">create_skill</span> 创建的自定义 skill 存于独立的浏览器存储，与文件袋内容互不影响——清空文件袋不会丢失。
             </div>
             <div>
               AI 可用 <span className="font-mono text-[#E58F67]">delete_skill</span> 删除自定义 skill（移除目录）或隐藏内置 skill。
