@@ -44,23 +44,38 @@ const slots: Record<string, KeySlot> = {
 };
 
 // --- Master key ---
-// Lazily created once, then persisted (Base64) to localStorage so it can be
-// restored across refresh / new tabs. Cached in memory for the page's lifetime.
+// A random 256-bit seed is generated once. Its RAW BYTES are persisted
+// (Base64) to localStorage so a page refresh / new tab can re-derive the SAME
+// PBKDF2 key and decrypt stored ciphertexts. The seed is cached in memory.
+// NOTE: a PBKDF2 CryptoKey cannot be exported (`exportKey` throws "PBKDF2 keys
+// are not extractable"), so we must persist the seed bytes and re-import rather
+// than exporting the key object.
 
 let masterKey: CryptoKey | null = null;
+let masterSeed: Uint8Array<ArrayBuffer> | null = null;
 const MASTER_KEY_STORAGE = "opencode-web.master";
 
-/** 主密钥持久化：存入 localStorage（Base64），刷新后可恢复，让 Key 跨刷新
- *  自动解密。接受本地 XSS 风险（本地工具，用户已接受）。 */
-async function persistMasterKey(): Promise<void> {
+/** 主密钥 seed 持久化：把原始 32 字节写入 localStorage（Base64），刷新后可
+ *  恢复、得到同一个 PBKDF2 主密钥，从而解密存储的密文。接受本地 XSS 风险。 */
+function persistMasterKey(): void {
   try {
-    if (masterKey) {
-      const exported = await crypto.subtle.exportKey("raw", masterKey);
-      localStorage.setItem(MASTER_KEY_STORAGE, arrayBufferToBase64(exported));
+    if (masterSeed) {
+      localStorage.setItem(MASTER_KEY_STORAGE, arrayBufferToBase64(masterSeed));
     }
   } catch {
     /* ignore — 无法持久化则仅内存 */
   }
+}
+
+/** 用给定的原始字节生成 PBKDF2 主密钥并缓存。 */
+async function deriveMasterFromSeed(seed: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "raw",
+    seed,
+    "PBKDF2",
+    false,
+    ["deriveKey"],
+  );
 }
 
 /** Lazily create (and persist) the master key — a random 256-bit PBKDF2 base
@@ -69,30 +84,18 @@ async function persistMasterKey(): Promise<void> {
 async function getMasterKey(): Promise<CryptoKey | null> {
   if (masterKey) return masterKey;
   try {
-    // 先从 localStorage 恢复持久化的主密钥
+    // 先从 localStorage 恢复持久化的 seed
     const stored = localStorage.getItem(MASTER_KEY_STORAGE);
     if (stored) {
-      const rawKey = base64ToArrayBuffer(stored);
-      const restored = await crypto.subtle.importKey(
-        "raw",
-        rawKey,
-        "PBKDF2",
-        false,
-        ["deriveKey"],
-      );
-      masterKey = restored;
-      return restored;
+      // 兼容历史格式：旧实现可能存的是 base64，直接解析字节即可。
+      masterSeed = new Uint8Array(base64ToArrayBuffer(stored));
+      masterKey = await deriveMasterFromSeed(masterSeed);
+      return masterKey;
     }
-    // 无持久化主密钥 → 生成新的并持久化
-    const raw = crypto.getRandomValues(new Uint8Array(32));
-    masterKey = await crypto.subtle.importKey(
-      "raw",
-      raw,
-      "PBKDF2",
-      false,
-      ["deriveKey"],
-    );
-    await persistMasterKey();
+    // 无持久化 seed → 生成新的 32 字节 seed 并持久化。
+    masterSeed = crypto.getRandomValues(new Uint8Array(32));
+    persistMasterKey();
+    masterKey = await deriveMasterFromSeed(masterSeed);
     return masterKey;
   } catch {
     return null;
@@ -161,7 +164,10 @@ async function encryptAndStore(key: string, prefix: string): Promise<void> {
   }
 }
 
-/** Decrypt a key from localStorage using the in-memory master key. */
+/** Decrypt a key from localStorage using the in-memory master key.
+ *  If ciphertext exists but fails to decrypt (stale/corrupt — e.g. written under
+ *  a different ephemeral master key before persistence was fixed), the stored
+ *  blob is cleared so it can't linger and trigger misleading re-entry prompts. */
 async function decryptAndLoad(prefix: string): Promise<string | null> {
   try {
     const master = await getMasterKey();
@@ -173,25 +179,31 @@ async function decryptAndLoad(prefix: string): Promise<string | null> {
     const ivB64 = localStorage.getItem(iv);
     if (!encB64 || !saltB64 || !ivB64) return null;
 
-    const ciphertext = base64ToArrayBuffer(encB64);
-    const saltRaw = new Uint8Array(base64ToArrayBuffer(saltB64));
-    const ivRaw = new Uint8Array(base64ToArrayBuffer(ivB64));
+    try {
+      const ciphertext = base64ToArrayBuffer(encB64);
+      const saltRaw = new Uint8Array(base64ToArrayBuffer(saltB64));
+      const ivRaw = new Uint8Array(base64ToArrayBuffer(ivB64));
 
-    const derivedKey = await crypto.subtle.deriveKey(
-      { name: "PBKDF2", salt: saltRaw, iterations: 310_000, hash: "SHA-256" },
-      master,
-      { name: "AES-GCM", length: 256 },
-      false,
-      ["decrypt"],
-    );
+      const derivedKey = await crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt: saltRaw, iterations: 310_000, hash: "SHA-256" },
+        master,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["decrypt"],
+      );
 
-    const decrypted = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: ivRaw },
-      derivedKey,
-      ciphertext,
-    );
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: ivRaw },
+        derivedKey,
+        ciphertext,
+      );
 
-    return new TextDecoder().decode(decrypted);
+      return new TextDecoder().decode(decrypted);
+    } catch {
+      // Stored data present but undecryptable → wipe the stale blob.
+      clearStored(prefix);
+      return null;
+    }
   } catch {
     return null;
   }
@@ -218,8 +230,8 @@ function clearStored(prefix: string): void {
 
 // --- Helpers ---
 
-function arrayBufferToBase64(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
+function arrayBufferToBase64(buf: ArrayBuffer | Uint8Array<ArrayBufferLike>): string {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
   let binary = "";
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
