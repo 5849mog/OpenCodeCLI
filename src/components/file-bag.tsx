@@ -20,7 +20,6 @@ import {
   RefreshCw,
   Save,
   FolderPlus,
-  File as FileIcon,
   Folder,
   FolderOpen,
   ChevronRight,
@@ -311,17 +310,25 @@ function FileBagInner() {
 
       {/* Body: files tree + editor or Plan / 子智能体 panel */}
       {rightPanelTab === "files" ? (
-        <div className="flex min-h-0 flex-1">
-          <div className={cn(
-            "shrink-0 border-r border-[#E5E2D9] overflow-y-auto transition-all duration-200 ease-in-out",
-            treeCollapsed ? "w-0 overflow-hidden border-r-0" : "w-48"
-          )}>
+        // 有打开文件才分栏（左树 + 右编辑器）；无文件时文件树占满整个右侧栏，
+        // 不显示空编辑器占位（与 VSCode 行为一致）。
+        activeTab ? (
+          <div className="flex min-h-0 flex-1">
+            <div className={cn(
+              "shrink-0 border-r border-[#E5E2D9] overflow-y-auto transition-all duration-200 ease-in-out",
+              treeCollapsed ? "w-0 overflow-hidden border-r-0" : "w-48"
+            )}>
+              <FileTree onOpen={(p) => openTab(p)} />
+            </div>
+            <div className="flex-1 min-w-0 flex flex-col">
+              <TabbedEditor />
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto">
             <FileTree onOpen={(p) => openTab(p)} />
           </div>
-          <div className="flex-1 min-w-0 flex flex-col">
-            {activeTab ? <TabbedEditor /> : <NoTabOpen />}
-          </div>
-        </div>
+        )
       ) : rightPanelTab === "plan" ? (
         <div className="flex min-h-0 flex-1">
           <PlanPanel eventsLen={vfsVersion} />
@@ -617,18 +624,6 @@ function EmptyHint() {
 // ---------------------------------------------------------------------------
 
 /** Empty state shown when no file tab is open. */
-function NoTabOpen() {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-[#A8A29E] dark:text-zinc-500">
-      <FileIcon className="h-8 w-8 text-[#BFB8B0] dark:text-zinc-600" />
-      <div className="text-[length:var(--font-size-base)]">No file open</div>
-      <div className="text-[length:var(--font-size-ui-sm)] text-[#BFB8B0] dark:text-zinc-600">
-        Click a file in the tree, or use the New button.
-      </div>
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Tabbed editor — VSCode-style multi-tab file editing
 // ---------------------------------------------------------------------------
