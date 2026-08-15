@@ -9,7 +9,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { X, Sparkles, ChevronDown, ChevronRight, ShieldCheck } from "lucide-react";
+import { X, Sparkles, ChevronDown, ChevronRight } from "lucide-react";
 import { listSkills, loadSkill, type Skill } from "@/lib/skills";
 import { MarkdownRenderer } from "./terminal";
 import { cn } from "@/lib/utils";
@@ -62,11 +62,7 @@ export function SkillsDialog({
 
         {/* Hint */}
         <div className="border-b border-[#E5E2D9] px-5 py-2 text-[11px] text-[#8B8884] dark:border-[#3a3731] dark:text-zinc-500">
-          预置的专业工作流指令。AI 会在匹配任务时按需加载；点击卡片查看完整内容。
-          <span className="ml-1 inline-flex items-center gap-0.5 text-[#6B6862] dark:text-zinc-400">
-            <ShieldCheck className="h-3 w-3" />
-            内置 skill 受保护，不可由 AI 删改
-          </span>
+          技能包可由 AI 通过 <span className="font-mono text-[#E58F67]">create_skill</span> 创建、<span className="font-mono text-[#E58F67]">delete_skill</span> 删除；点击卡片查看完整内容。
         </div>
 
         {/* Skill list */}
@@ -138,10 +134,17 @@ export function SkillsDialog({
             </div>
           )}
 
-          {/* Custom skill hint */}
+          {/* Storage + 管理说明 */}
           <div className="mt-4 rounded-md border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-[11px] text-[#8B8884] dark:border-[#3a3731] dark:bg-[#262320] dark:text-zinc-500">
-            想要自定义 skill？在文件袋的 <span className="font-mono text-[#E58F67]">skills/&lt;名称&gt;/SKILL.md</span> 放一个
-            Markdown 文件即可（第一行作为描述）。AI 无法修改该目录——只能由你通过 zip 导入或文件袋管理。
+            <div className="mb-1">
+              <span className="font-semibold text-[#6B6862] dark:text-zinc-400">存储位置：</span>
+              <span className="text-[#E58F67]">内置</span> skill 随程序内置，不在文件袋；AI 用{" "}
+              <span className="font-mono text-[#E58F67]">create_skill</span> 创建的自定义 skill 才会出现在文件袋的{" "}
+              <span className="font-mono text-[#E58F67]">skills/&lt;名称&gt;/SKILL.md</span>。
+            </div>
+            <div>
+              AI 可用 <span className="font-mono text-[#E58F67]">delete_skill</span> 删除自定义 skill（移除目录）或隐藏内置 skill。
+            </div>
           </div>
         </div>
       </div>
