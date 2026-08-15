@@ -9,6 +9,7 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev)
 [![Zustand](https://img.shields.io/badge/Zustand-5-673AB8?logo=zustand)](https://github.com/pmndrs/zustand)
 [![Deploy](https://img.shields.io/badge/Deploy-GitHub_Pages-8A2BE2)](.github/workflows/deploy.yml)
+[![Changelog](https://img.shields.io/badge/成长日志-Changelog-E58F67)](CHANGELOG.md)
 
 </div>
 
@@ -22,6 +23,7 @@
 - [Slash 命令与图形入口](#slash-命令与图形入口)
 - [诚实说明与已知限制](#诚实说明与已知限制)
 - [常见问题](#常见问题)
+- [成长日志](#-成长日志)
 - [贡献](#贡献)
 - [许可证](#许可证)
 - [致谢](#致谢)
@@ -205,6 +207,16 @@ npm run build
 目前个人维护，欢迎 Issue 和 PR。
 
 对「浏览器端 Agent」感兴趣？想在任何设备上随时编程？来一起聊。
+
+---
+
+## 🚀 成长日志
+
+这个项目的每一次提交都被记录在 [**CHANGELOG.md**](CHANGELOG.md) —— 从 2026-07-28 立项至今的完整成长轨迹：新功能、缺陷修复、UI 打磨，按日期倒序，每条都可点击跳转到对应的 GitHub commit。点击下方按钮查看：
+
+[![📖 打开完整成长日志](https://img.shields.io/badge/📖_打开_完整_成长日志-CHANGELOG.md-E58F67?style=for-the-badge)](CHANGELOG.md)
+
+> 日志由 `gen-changelog.mjs` 从 Git 历史自动生成，新增提交时可一键重新生成（`node gen-changelog.mjs`）。
 
 ---
 
