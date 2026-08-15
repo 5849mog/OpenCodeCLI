@@ -70,7 +70,7 @@ function rearmIdleLock() {
   const minutes = useSession.getState().config.idleLockMinutes ?? 0;
   if (minutes <= 0) return; // disabled
   idleLockTimer = setTimeout(() => {
-    // Inactive long enough — wipe keys from memory + sessionStorage.
+    // Inactive long enough — wipe keys from memory + localStorage.
     apiKeyVault.lockAll();
     useSession.setState((s) => ({
       config: { ...s.config, hasApiKey: false, hasSearchKey: false },
@@ -464,7 +464,7 @@ export const useSession = create<SessionState>((set, get) => ({
     // Idle auto-lock: attach listeners once, arm the timer per config.
     attachIdleLock();
     rearmIdleLock();
-    // Try to restore API keys from encrypted sessionStorage
+    // Try to restore API keys from encrypted localStorage copy
     void apiKeyVault.tryRestore().then((restored) => {
       set({ config: { ...cfg, hasApiKey: restored || apiKeyVault.hasKey() } });
     });

@@ -123,7 +123,7 @@ export function SettingsDialog({
   };
 
   // ── Session export / import (全量) ──
-  // Export NEVER includes API keys — they live in the encrypted sessionStorage
+  // Export NEVER includes API keys — they live in the encrypted localStorage
   // vault, not in session records; config is exported minus any credential.
   const handleExportAll = async () => {
     try {
@@ -275,7 +275,7 @@ export function SettingsDialog({
           </Field>
 
           {/* API Key */}
-          <Field label="API Key" hint="Encrypted in memory + sessionStorage (AES-GCM). NOT in localStorage. NOT in React state. Cleared when browser closes.">
+          <Field label="API Key" hint="Encrypted with AES-GCM and persisted locally (survives refresh / new tabs). Not stored in React state, not included in session exports.">
             <div className="flex gap-2">
               <input
                 type={showKey ? "text" : "password"}
@@ -296,7 +296,7 @@ export function SettingsDialog({
             </div>
             {config.hasApiKey && !keyDirty && (
               <div className="mt-1 text-[11px] text-[#E58F67]">
-                ✓ API key is set (encrypted in sessionStorage)
+                ✓ API key is set (encrypted & persisted locally)
               </div>
             )}
           </Field>
@@ -451,7 +451,7 @@ export function SettingsDialog({
               </div>
               {apiKeyVault.hasSearchKey() && !searchKeyDirty ? (
                 <div className="mt-1 text-[11px] text-[#E58F67]">
-                  ✓ 已配置自定义 Key（加密存储在 sessionStorage）
+                  ✓ 已配置自定义 Key（加密持久化存储）
                 </div>
               ) : !apiKeyVault.hasSearchKey() && !searchKeyDirty && !searchKeyInput ? (
                 <div className="mt-1 text-[11px] text-[#8B8884] dark:text-zinc-500">
@@ -508,21 +508,21 @@ export function SettingsDialog({
               Security · 密钥安全
             </div>
 
-            {/* Re-entry hint after refresh */}
+            {/* Auto-restore note — key persists locally, normally no re-entry needed */}
             {apiKeyVault.llmNeedsReentry() && (
               <div className="mb-3 rounded border border-amber-300/60 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-300">
-                检测到已配置过 LLM API Key，但主密钥只在内存中、刷新后已失效——请在上方重新输入 Key 以继续使用。
+                检测到 LLM API Key 的加密数据，但未能自动解密（主密钥可能已损坏）——请在上方重新输入 Key。
               </div>
             )}
             {apiKeyVault.searchNeedsReentry() && (
               <div className="mb-3 rounded border border-amber-300/60 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-300">
-                检测到已配置过 Search API Key，但主密钥只在内存中、刷新后已失效——请在上方重新输入。
+                检测到 Search API Key 的加密数据，但未能自动解密——请在上方重新输入。
               </div>
             )}
 
             <div className="rounded border border-[#E5E2D9] bg-[#FAF9F7] px-4 py-3 dark:border-[#3a3731] dark:bg-[#161512]">
               <div className="mb-1.5 text-[11px] text-[#8B8884] dark:text-zinc-500">
-                密钥用随机主密钥 AES-GCM 加密，主密钥只存在内存、绝不落盘——刷新页面后需重新输入。离开设备前可一键清除全部密钥。
+                密钥用 AES-GCM 加密后持久化在本地浏览器存储，刷新 / 关闭重开可自动恢复、无需重填。离开设备前可一键清除密钥。
               </div>
               <button
                 onClick={() => {
@@ -532,7 +532,7 @@ export function SettingsDialog({
                   setSearchKeyInput("");
                   setKeyDirty(false);
                   setSearchKeyDirty(false);
-                  toast.success("已清除全部 API 密钥（内存 + sessionStorage）");
+                  toast.success("已清除全部 API 密钥（内存 + 本地加密存储）");
                 }}
                 className="rounded border border-[#E54D2E]/40 px-3 py-1.5 text-xs font-medium text-[#E54D2E] hover:bg-[#E54D2E]/10"
               >
@@ -620,11 +620,11 @@ export function SettingsDialog({
           {/* Privacy note */}
           <div className="mt-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 text-[11px] text-[#8B8884] dark:text-zinc-500">
             <span className="font-semibold text-[#6B6862] dark:text-zinc-400">Security:</span> Your
-            API key is encrypted with AES-GCM (Web Crypto API) and stored in
-            sessionStorage — it is NEVER in localStorage, NEVER in React state,
-            and NEVER in the Zustand store. The encrypted blob is cleared when
-            the browser tab closes. All API requests go directly from your
-            browser to the provider. The 文件袋 is stored locally in IndexedDB.
+            API key is encrypted with AES-GCM (Web Crypto API) under a master key derived via
+            PBKDF2; both the ciphertext and the master key live in localStorage so keys survive
+            refresh / new tabs without re-entry. The plaintext key is never in React state, never
+            in the Zustand store, and never in session exports. All API requests go directly from
+            your browser to the provider. The 文件袋 is stored locally in IndexedDB.
           </div>
         </div>
 

@@ -18,7 +18,7 @@
  *   previous "XSS cannot decrypt" guarantee for a modern "keys persist
  *   across refreshes" UX; this is a local tool where the user accepted the
  *   local XSS risk as acceptable.
- * - `lock()` / `lockAll()` wipe keys from memory AND sessionStorage (the
+ * - `lock()` / `lockAll()` wipe keys from memory AND localStorage (the
  *   master key stays in localStorage so future keys still persist).
  *
  * What this DOES NOT protect against:
@@ -35,17 +35,17 @@
 
 interface KeySlot {
   key: string | null;
-  sessionPrefix: string;
+  storagePrefix: string;
 }
 
 const slots: Record<string, KeySlot> = {
-  llm: { key: null, sessionPrefix: "opencode-web.key" },
-  search: { key: null, sessionPrefix: "opencode-web.search-key" },
+  llm: { key: null, storagePrefix: "opencode-web.key" },
+  search: { key: null, storagePrefix: "opencode-web.search-key" },
 };
 
-// --- Master key (memory-only) ---
-// Generated once per page load. Never persisted anywhere. When it's gone
-// (refresh / tab close), the sessionStorage ciphertext is undecryptable.
+// --- Master key ---
+// Lazily created once, then persisted (Base64) to localStorage so it can be
+// restored across refresh / new tabs. Cached in memory for the page's lifetime.
 
 let masterKey: CryptoKey | null = null;
 const MASTER_KEY_STORAGE = "opencode-web.master";
@@ -119,8 +119,11 @@ function getStorageKeys(prefix: string) {
 }
 
 /**
- * Encrypt a key with the in-memory master key and store ONLY the ciphertext,
- * salt and IV in sessionStorage. The AES key itself is never exported/saved.
+ * Encrypt a key with the in-memory master key and store the ciphertext, salt
+ * and IV in localStorage (persists across refresh / tabs / restarts). The AES
+ * key itself is never exported/saved. XSS can read both the encrypted blob and
+ * the persisted master key — this is the accepted local-security tradeoff for
+ * the "keys survive refresh" UX.
  */
 async function encryptAndStore(key: string, prefix: string): Promise<void> {
   try {
@@ -150,24 +153,24 @@ async function encryptAndStore(key: string, prefix: string): Promise<void> {
       encoded,
     );
 
-    sessionStorage.setItem(enc, arrayBufferToBase64(ciphertext));
-    sessionStorage.setItem(salt, arrayBufferToBase64(saltRaw.buffer));
-    sessionStorage.setItem(iv, arrayBufferToBase64(ivRaw.buffer));
+    localStorage.setItem(enc, arrayBufferToBase64(ciphertext));
+    localStorage.setItem(salt, arrayBufferToBase64(saltRaw.buffer));
+    localStorage.setItem(iv, arrayBufferToBase64(ivRaw.buffer));
   } catch {
     // If encryption fails, don't persist — key stays in memory only
   }
 }
 
-/** Decrypt a key from sessionStorage using the in-memory master key. */
+/** Decrypt a key from localStorage using the in-memory master key. */
 async function decryptAndLoad(prefix: string): Promise<string | null> {
   try {
     const master = await getMasterKey();
     if (!master) return null;
 
     const { enc, salt, iv } = getStorageKeys(prefix);
-    const encB64 = sessionStorage.getItem(enc);
-    const saltB64 = sessionStorage.getItem(salt);
-    const ivB64 = sessionStorage.getItem(iv);
+    const encB64 = localStorage.getItem(enc);
+    const saltB64 = localStorage.getItem(salt);
+    const ivB64 = localStorage.getItem(iv);
     if (!encB64 || !saltB64 || !ivB64) return null;
 
     const ciphertext = base64ToArrayBuffer(encB64);
@@ -194,24 +197,23 @@ async function decryptAndLoad(prefix: string): Promise<string | null> {
   }
 }
 
-/** Whether ciphertext for a slot exists in sessionStorage (regardless of
- *  whether the master key is still available). Used by the UI to show
- *  "a key was configured but must be re-entered after refresh". */
+/** Whether ciphertext for a slot exists in localStorage (regardless of
+ *  whether the master key is still available). */
 function hasStoredCiphertext(prefix: string): boolean {
   try {
     const { enc } = getStorageKeys(prefix);
-    return !!sessionStorage.getItem(enc);
+    return !!localStorage.getItem(enc);
   } catch {
     return false;
   }
 }
 
-/** Remove encrypted key data from sessionStorage. */
+/** Remove encrypted key data from localStorage. */
 function clearStored(prefix: string): void {
   const { enc, salt, iv } = getStorageKeys(prefix);
-  sessionStorage.removeItem(enc);
-  sessionStorage.removeItem(salt);
-  sessionStorage.removeItem(iv);
+  localStorage.removeItem(enc);
+  localStorage.removeItem(salt);
+  localStorage.removeItem(iv);
 }
 
 // --- Helpers ---
@@ -239,13 +241,13 @@ function base64ToArrayBuffer(b64: string): ArrayBuffer {
 export const apiKeyVault = {
   // ── LLM API key (backward-compatible methods) ──
 
-  /** Set the LLM API key. Stores in memory + encrypted (master-key) in sessionStorage. */
+  /** Set the LLM API key. Stores in memory + encrypted (master-key) in localStorage. */
   async setKey(key: string): Promise<void> {
     slots.llm.key = key;
     if (key) {
-      await encryptAndStore(key, slots.llm.sessionPrefix);
+      await encryptAndStore(key, slots.llm.storagePrefix);
     } else {
-      clearStored(slots.llm.sessionPrefix);
+      clearStored(slots.llm.storagePrefix);
     }
   },
 
@@ -259,24 +261,25 @@ export const apiKeyVault = {
     return !!slots.llm.key;
   },
 
-  /** True if LLM ciphertext exists in sessionStorage but the in-memory key is
-   *  gone (i.e. after a refresh) — the UI should tell the user to re-enter it. */
+  /** True if ciphertext exists in localStorage but the in-memory key is gone —
+   *  normally impossible now since the master key + ciphertext both persist;
+   *  kept as a defensive fallback in case decryption/restore fails. */
   llmNeedsReentry(): boolean {
-    return hasStoredCiphertext(slots.llm.sessionPrefix) && !slots.llm.key;
+    return hasStoredCiphertext(slots.llm.storagePrefix) && !slots.llm.key;
   },
 
-  /** Clear the LLM API key from memory and sessionStorage. */
+  /** Clear the LLM API key from memory and localStorage. */
   clear(): void {
     slots.llm.key = null;
-    clearStored(slots.llm.sessionPrefix);
+    clearStored(slots.llm.storagePrefix);
   },
 
-  /** Restore the LLM key from encrypted sessionStorage (only possible within
-   *  the SAME page load — the master key is memory-only). Returns true if
-   *  successfully restored. */
+  /** Restore the LLM key from the encrypted localStorage copy (works across
+   *  refresh, new tabs, and browser restarts — master key is persisted too).
+   *  Returns true if successfully restored. */
   async tryRestore(): Promise<boolean> {
     if (slots.llm.key) return true; // already in memory
-    const restored = await decryptAndLoad(slots.llm.sessionPrefix);
+    const restored = await decryptAndLoad(slots.llm.storagePrefix);
     if (restored) {
       slots.llm.key = restored;
       return true;
@@ -286,13 +289,13 @@ export const apiKeyVault = {
 
   // ── Search API key ──
 
-  /** Set the search API key. Stores in memory + encrypted (master-key) in sessionStorage. */
+  /** Set the search API key. Stores in memory + encrypted (master-key) in localStorage. */
   async setSearchKey(key: string): Promise<void> {
     slots.search.key = key;
     if (key) {
-      await encryptAndStore(key, slots.search.sessionPrefix);
+      await encryptAndStore(key, slots.search.storagePrefix);
     } else {
-      clearStored(slots.search.sessionPrefix);
+      clearStored(slots.search.storagePrefix);
     }
   },
 
@@ -306,21 +309,21 @@ export const apiKeyVault = {
     return !!slots.search.key;
   },
 
-  /** True if search ciphertext exists but the in-memory key is gone (after refresh). */
+  /** True if search ciphertext exists in localStorage but the in-memory key is gone. */
   searchNeedsReentry(): boolean {
-    return hasStoredCiphertext(slots.search.sessionPrefix) && !slots.search.key;
+    return hasStoredCiphertext(slots.search.storagePrefix) && !slots.search.key;
   },
 
-  /** Clear the search API key from memory and sessionStorage. */
+  /** Clear the search API key from memory and localStorage. */
   clearSearchKey(): void {
     slots.search.key = null;
-    clearStored(slots.search.sessionPrefix);
+    clearStored(slots.search.storagePrefix);
   },
 
-  /** Restore the search key from encrypted sessionStorage (same page load only). */
+  /** Restore the search key from the encrypted localStorage copy (across refresh / tabs). */
   async tryRestoreSearchKey(): Promise<boolean> {
     if (slots.search.key) return true;
-    const restored = await decryptAndLoad(slots.search.sessionPrefix);
+    const restored = await decryptAndLoad(slots.search.storagePrefix);
     if (restored) {
       slots.search.key = restored;
       return true;
@@ -330,17 +333,17 @@ export const apiKeyVault = {
 
   // ── Lock / lifecycle ──
 
-  /** Wipe ALL keys from memory and sessionStorage immediately. */
+  /** Wipe ALL keys from memory and localStorage immediately. */
   lockAll(): void {
     slots.llm.key = null;
     slots.search.key = null;
-    clearStored(slots.llm.sessionPrefix);
-    clearStored(slots.search.sessionPrefix);
+    clearStored(slots.llm.storagePrefix);
+    clearStored(slots.search.storagePrefix);
   },
 
   /** Wipe a single slot. */
   lockSlot(slot: "llm" | "search"): void {
     slots[slot].key = null;
-    clearStored(slots[slot].sessionPrefix);
+    clearStored(slots[slot].storagePrefix);
   },
 };
