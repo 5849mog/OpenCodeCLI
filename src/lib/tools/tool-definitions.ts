@@ -865,6 +865,47 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "create_skill",
+      description:
+        "创建一个 Skill 技能包（写 skills/<name>/SKILL.md）。内容用 Markdown 编写，首行作为 list_skills 显示的描述（若首行不是 # 标题会自动补）。名称只能含字母/数字/点/横线/下划线，不能重复已有名？——同名自定义会覆盖。创建后可被其他会话、子代理通过 load_skill 加载。只读模式（Plan）下被拦截。",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "Skill 唯一名称（写入 skills/<name>/SKILL.md）。",
+          },
+          content: {
+            type: "string",
+            description:
+              "SKILL.md 的 Markdown 内容。首行建议用 '# 名称' 作为描述（list_skills 会显示它）。正文用 ## 分节、- 列表写步骤。",
+          },
+        },
+        required: ["name", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_skill",
+      description:
+        "删除一个 Skill 技能包。自定义 skill 会物理删除其 skills/<name>/ 目录；内置 skill 会被隐藏（从列表和 load_skill 中消失）。删除后该 skill 不再对任何会话可用。只读模式（Plan）下被拦截。",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "要删除的 Skill 名称。",
+          },
+        },
+        required: ["name"],
+      },
+    },
+  },
 ];
 
 export function getToolByName(name: string): ToolDefinition | undefined {

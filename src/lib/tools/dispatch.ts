@@ -8,7 +8,7 @@ import { toolAskUserInput } from "./user-input";
 import { toolWebSearch, toolFetchUrl } from "./web";
 import { toolZipArchive, toolUnzipArchive } from "./zip";
 import { toolParseYaml, toolParseCsv, toolQueryJson, toolMath } from "./data-tools";
-import { listSkills, loadSkill } from "../skills";
+import { listSkills, loadSkill, createSkill, removeSkill } from "../skills";
 import * as luaWasm from "../wasm/lua-wasm";
 import * as jsWasm from "../wasm/js-wasm";
 import { vfs } from "../vfs";
@@ -361,6 +361,56 @@ export async function dispatchTool(
           output: `# Skill: ${skill.name} (${skill.source === "builtin" ? "内置" : "自定义"})\n\n${skill.content}`,
           tool: "load_skill",
           args,
+        };
+      }
+      case "create_skill": {
+        if (opts?.readOnly) {
+          return {
+            ok: false,
+            output: "[Plan mode] create_skill (写 skills/ 目录) is blocked in Plan mode. 切到 Bypass 模式后才能创建 skill。",
+            tool: "create_skill",
+            args,
+          };
+        }
+        const name = String(args.name ?? "").trim();
+        const content = String(args.content ?? "");
+        const res = createSkill(name, content);
+        return {
+          ok: res.ok,
+          output: res.ok
+            ? `✓ 已创建 Skill "${res.name}"（skills/${res.name}/SKILL.md）。首行即描述，AI 可用 load_skill 加载。`
+            : `create_skill 失败: ${res.error ?? "未知错误"}`,
+          tool: "create_skill",
+          args,
+          mutated: res.ok,
+        };
+      }
+      case "delete_skill": {
+        if (opts?.readOnly) {
+          return {
+            ok: false,
+            output: "[Plan mode] delete_skill (删 skills/ 目录) is blocked in Plan mode. 切到 Bypass 模式后才能删除 skill。",
+            tool: "delete_skill",
+            args,
+          };
+        }
+        const name = String(args.name ?? "").trim();
+        if (!name) {
+          return { ok: false, output: "delete_skill: missing 'name'", tool: "delete_skill", args };
+        }
+        const exists = listSkills().some((s) => s.name === name);
+        if (!exists) {
+          return { ok: false, output: `delete_skill: skill '${name}' 不存在`, tool: "delete_skill", args };
+        }
+        const res = removeSkill(name);
+        return {
+          ok: true,
+          output: res.ok
+            ? `✓ 已删除 Skill "${name}"（${res.source === "builtin" ? "内置，已隐藏" : "自定义，目录已移除"}）。`
+            : `delete_skill 失败: ${name}`,
+          tool: "delete_skill",
+          args,
+          mutated: true,
         };
       }
       case "web_search":

@@ -418,6 +418,14 @@ function isToolTargetingSkills(tool: string, args: Record<string, unknown>): boo
       // bash 写操作（含重定向/rm/mkdir/cp/mv 等）指向 skills/ 时保护
       return bashCommandMutates(cmd) && /\bskills\/|\bskills\b/.test(cmd);
     }
+    // run_lua/run_js 的 outputs 写回不在 dispatch 外部校验，会绕过保护——
+    // 这里堵漏：outputs 含 skills/ 路径时也保护。
+    case "run_lua":
+    case "run_js": {
+      const outs = args.outputs;
+      if (Array.isArray(outs)) return outs.some((o) => inSkills(o));
+      return inSkills(outs);
+    }
     default:
       return false;
   }
@@ -1116,6 +1124,7 @@ const MUTATING_TOOLS = new Set([
   "move_file", "append_file", "create_dir", "update_plan",
   "apply_patch", "insert_at", "run_lua", "run_js", // run_lua/run_js 带 outputs 时写回 VFS → 需快照可 undo
   "bash", // bash 的 > / >> / tee / mkdir / rm / rmdir / touch / cp / mv / sed -i 会写 VFS
+  "create_skill", "delete_skill", // 创建/删除 skill（写 skills/ 目录）→ 需快照可 undo
 ]);
 
 /** Wrapper that guarantees a tool result message is ALWAYS added to the
@@ -1362,9 +1371,11 @@ async function executeToolCall(
         "write_file", "edit_file", "multi_edit", "delete_file",
         "move_file", "append_file", "create_dir",
         "apply_patch", "insert_at", "undo_edit", "unzip_archive",
+        "create_skill", "delete_skill",
       ]);
-      // Skills 目录保护：AI 的任何写工具都不可指向 skills/（内置 skill 在代码里，
-      // 自定义 skill 目录受保护，只能由用户通过 zip 导入/文件袋管理）。
+      // Skills 目录保护：普通写工具（write_file 等）不可指向 skills/（防
+      // AI 乱写坏目录结构）；create_skill/delete_skill 是管理 skills/ 的
+      // 法定路径，不受此保护拦截（isToolTargetingSkills 对它们返回 false）。
       const skillsProtected = isToolTargetingSkills(tc.function.name, args);
       if (skillsProtected) {
         result = {

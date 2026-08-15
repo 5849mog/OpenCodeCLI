@@ -229,6 +229,8 @@ If the user's request is ambiguous, open-ended, or has multiple valid directions
 - \`math(expression)\` — evaluate a math expression with mathjs: matrices (\`[1,2;3,4] * [2;3]\`), unit conversion (\`5 km + 3 mile\`), functions, statistics (\`mean([1,2,3])\`). Use for complex math; simple arithmetic can use bash bc/expr.
 - \`list_skills()\` — list available Skill packages (name + description + builtin/custom). Call it FIRST when the user mentions a framework, task type, or workflow that might have a dedicated skill. Returns a lightweight list (no content).
 - \`load_skill(name)\` — load a Skill's full SKILL.md instructions (returned as the tool result). Call after list_skills confirms it exists; then strictly follow its instructions. Content is loaded on demand — it is NOT part of the system prompt.
+- \`create_skill(name, content)\` — create/overwrite a Skill package (writes \`skills/<name>/SKILL.md\`). Use when you see a recurring task worth codifying or the user asks for a new skill. First line of content (a \`# title\`) becomes the description. Blocked in Plan mode.
+- \`delete_skill(name)\` — delete a Skill package. Custom skills are removed from the skills/ dir; builtin skills get hidden. Blocked in Plan mode.
 - \`update_plan(plan)\` — create or update a structured plan with checkboxes. Supports \`- [ ]\` todo, \`- [x]\` done, \`- [/]\` in-progress, \`- [-]\` blocked. Use indentation for subtasks, \`## Section\` for grouping, and \`[tag]\` for priority labels. See the workspace context block for current plan progress.
 - \`append_file(path, content)\` — append text to a file (creates if missing). More efficient than read+write for logs, TODOs, adding functions.
 - \`undo_edit()\` — undo the last file mutation (write/edit/multi_edit/delete/move/append). Use when you realize a previous edit was wrong. Can be called repeatedly to undo further back.
@@ -247,7 +249,7 @@ If the user's request is ambiguous, open-ended, or has multiple valid directions
 
 ## Tool side effects — know what writes before you write
 
-- **These tools WRITE to the workspace (VFS):** \`write_file\`, \`edit_file\`, \`multi_edit\`, \`delete_file\`, \`move_file\`, \`append_file\`, \`create_dir\`, \`apply_patch\`, \`insert_at\`, \`update_plan\` (writes PLAN.md), \`bash\` with \`>\`/\`>>\`/mkdir/rm/touch/cp/mv/\`sed -i\`, \`run_lua\`/\`run_js\` with \`outputs\` (whitelist only), \`unzip_archive\`.
+- **These tools WRITE to the workspace (VFS):** \`write_file\`, \`edit_file\`, \`multi_edit\`, \`delete_file\`, \`move_file\`, \`append_file\`, \`create_dir\`, \`apply_patch\`, \`insert_at\`, \`update_plan\` (writes PLAN.md), \`bash\` with \`>\`/\`>>\`/mkdir/rm/touch/cp/mv/\`sed -i\`, \`run_lua\`/\`run_js\` with \`outputs\` (whitelist only), \`unzip_archive\`, \`create_skill\`/\`delete_skill\` (write \`skills/\`).
 - **These are READ-ONLY:** \`read_file\`, \`list_files\`, \`glob\`, \`search_files\`, \`search_symbols\`, \`view_outline\`, \`project_stats\`, \`bash\` (read-only commands), \`run_lua\`/\`run_js\` without \`outputs\`, \`parse_yaml\`, \`parse_csv\`, \`query_json\`, \`math\`, \`zip_archive\` (downloads, doesn't touch VFS), \`web_search\`, \`fetch_url\`.
 - **In Plan mode** (read-only), all WRITE tools above are BLOCKED — except \`update_plan\` (maintaining the plan is the point of Plan mode) and \`dispatch_subagent\` (its subagent inherits read-only). \`run_lua\`/\`run_js\` with \`outputs\` are also blocked in Plan mode.
 - **Writes are undoable** via \`undo_edit\` (one step back at a time) — including \`bash\` writes (\`>\`/\`>>\`/tee/mkdir/rm/rmdir/touch/cp/mv/\`sed -i\`). If you realize a write was wrong, undo it — don't "fix it forward" with more writes.
@@ -268,9 +270,10 @@ If the user's request is ambiguous, open-ended, or has multiple valid directions
 
 ## 🎯 Skills
 
-- 本环境支持 **Skill 技能包**：预置的专业工作流指令（代码审查、数据分析、绘图等），也可能有用户自定义的。
-- **何时用**：用户的任务匹配某个 skill 的场景时（如"审查这段代码"、"分析这份数据"、"画个架构图"），先 \`list_skills\` 看有没有对应 skill，有就用 \`load_skill\` 加载并**严格遵循其指令**。
-- Skill 内容按需加载（工具结果返回），不占用 system prompt——因此可用性始终一致，无需担心上下文膨胀。
+- 本环境支持 **Skill 技能包**：专业工作流指令（含内置示例，也支持自定义），内容存于文件袋的 \`skills/<name>/SKILL.md\`。
+- **使用时**：任务匹配某个 skill 场景时，先 \`list_skills\` 看有无对应 skill，用 \`load_skill\` 加载并**严格遵循其指令**。
+- **创建/删除**：当你发现某个反复出现的任务值得沉淀成可复用流程，或用户要求你做一个新的 skill，用 \`create_skill(name, content)\` 创建；不再需要时用 \`delete_skill(name)\` 删除。首行为 \`# 名称\` 即描述。
+- Skill 内容按需加载（工具结果返回），不占用 system prompt——可用性始终一致，无需担心上下文膨胀。
 
 ## ⛔ Tool failure protocol
 

@@ -141,6 +141,48 @@ mermaid 在复杂图上会乱，DOT 的 dot/neato 布局引擎更专业。
 // 发现 + 加载
 // ---------------------------------------------------------------------------
 
+/** 内置 skill 的隐藏名单（用户删除内置 skill 后持久化。内置代码不可物理删，
+ *  删除 = 记入此名单，list/load 均过滤）。存 localStorage，按 name 记录。 */
+const HIDDEN_KEY = "opencode-web.hidden-skills";
+
+function hiddenSet(): Set<string> {
+  try {
+    const raw = localStorage.getItem(HIDDEN_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistHidden(set: Set<string>): void {
+  try {
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify([...set]));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 隐藏一个内置 skill（删除语义）。 */
+export function hideSkill(name: string): void {
+  const set = hiddenSet();
+  set.add(name);
+  persistHidden(set);
+}
+
+/** 取消隐藏一个内置 skill。 */
+export function unhideSkill(name: string): void {
+  const set = hiddenSet();
+  set.delete(name);
+  persistHidden(set);
+}
+
+/** 该内置 skill 是否被隐藏。 */
+export function isSkillHidden(name: string): boolean {
+  return hiddenSet().has(name);
+}
+
 /** 扫描 VFS skills/ 目录，发现用户自定义 skill（无 content，省 token）。 */
 function discoverCustomSkills(): SkillMeta[] {
   const metas: SkillMeta[] = [];
@@ -167,20 +209,22 @@ function discoverCustomSkills(): SkillMeta[] {
   return metas;
 }
 
-/** 列出所有可用 skill 的轻量信息（内置 + 自定义）。 */
+/** 列出所有可用 skill 的轻量信息（内置[过滤隐藏] + 自定义）。 */
 export function listSkills(): SkillMeta[] {
-  const builtin = BUILTIN_SKILLS.map(({ name, description, source }) => ({
-    name,
-    description,
-    source,
-  }));
+  const hidden = hiddenSet();
+  const builtin = BUILTIN_SKILLS.filter((s) => !hidden.has(s.name)).map(
+    ({ name, description, source }) => ({ name, description, source }),
+  );
   return [...builtin, ...discoverCustomSkills()];
 }
 
-/** 加载指定 skill 的完整内容（内置或自定义）。不存在返回 null。 */
+/** 加载指定 skill 的完整内容（内置[过滤隐藏] 或自定义）。不存在返回 null。 */
 export function loadSkill(name: string): Skill | null {
   const builtin = BUILTIN_SKILLS.find((s) => s.name === name);
-  if (builtin) return builtin;
+  if (builtin) {
+    if (hiddenSet().has(name)) return null;
+    return builtin;
+  }
   // 自定义：读 VFS skills/<name>/SKILL.md
   try {
     const md = vfs.readFileSync(`skills/${name}/SKILL.md`);
@@ -193,4 +237,46 @@ export function loadSkill(name: string): Skill | null {
   } catch {
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// 创建 / 删除（由 AI 通过 create_skill / delete_skill 工具调用）
+// ---------------------------------------------------------------------------
+
+/** 校验 skill 名称合法：非空、无斜杠/路径分隔、无特殊字符。 */
+export function validateSkillName(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return "skill 名称不能为空";
+  if (trimmed.length > 64) return "skill 名称过长（≤64 字符）";
+  if (/[\/\\\s]/.test(trimmed)) return "skill 名称不能含斜杠 / 反斜杠 / 空格";
+  if (/[^\w.-]/.test(trimmed)) return "skill 名称只能含字母数字、点、横线、下划线";
+  return null;
+}
+
+/** 创建/覆盖一个自定义 skill（VFS skills/<name>/SKILL.md）。若首行不是
+ *  `# 标题`，自动补一行（保证 list_skills 能正确提取描述）。 */
+export function createSkill(name: string, content: string): { ok: boolean; name: string; error?: string } {
+  const err = validateSkillName(name);
+  if (err) return { ok: false, name, error: err };
+  const normalized = name.trim();
+  const trimmed = content.trim();
+  if (!trimmed) return { ok: false, name, error: "SKILL 内容不能为空" };
+  // 若首行不带标题，前置一行标题
+  const firstLine = trimmed.split("\n")[0].trim();
+  const final = firstLine.startsWith("#")
+    ? trimmed
+    : `# ${normalized}\n\n${trimmed}`;
+  vfs.writeFileSync(`skills/${normalized}/SKILL.md`, final);
+  return { ok: true, name: normalized };
+}
+
+/** 删除一个 skill。custom → 物理删 VFS 目录；内置 → 记入隐藏名单。 */
+export function removeSkill(name: string): { ok: boolean; source: "builtin" | "custom"; name: string } {
+  const isBuiltin = BUILTIN_SKILLS.some((s) => s.name === name);
+  if (isBuiltin) {
+    hideSkill(name);
+    return { ok: true, source: "builtin", name };
+  }
+  void vfs.delete(`skills/${name}`);
+  return { ok: true, source: "custom", name };
 }
