@@ -10,17 +10,16 @@
  *   reveal them. React DevTools cannot see them either.
  * - Each key lives in a module-level private variable (closure), accessible
  *   only via `getKey()` / `getSearchKey()`.
- * - **Master-key encryption:** a random 256-bit master key is generated at
- *   module load and held ONLY in memory — it is NEVER written to
- *   sessionStorage / localStorage / IndexedDB. API keys are encrypted with
- *   AES-GCM using an AES key derived from the master key (PBKDF2 + random
- *   salt); only { ciphertext, salt, iv } ever touches sessionStorage.
- *   A page refresh destroys the master key, so the stored ciphertext becomes
- *   undecryptable — the user simply re-enters the API key. This is the point:
- *   even a full dump of sessionStorage (via XSS) yields only ciphertext that
- *   cannot be decrypted without the in-memory master key.
- * - `lock()` / `lockAll()` wipe keys from memory AND sessionStorage, so a
- *   user can immediately invalidate their keys before stepping away.
+ * - **Master-key encryption:** API keys are encrypted with AES-GCM using a
+ *   per-key AES key derived (PBKDF2 + random salt) from a 256-bit master key.
+ *   The master key itself is persisted (Base64) to localStorage so a page
+ *   refresh can restore the in-memory master key and decrypt the stored
+ *   ciphertext — keys survive refreshes without re-entry. This trades the
+ *   previous "XSS cannot decrypt" guarantee for a modern "keys persist
+ *   across refreshes" UX; this is a local tool where the user accepted the
+ *   local XSS risk as acceptable.
+ * - `lock()` / `lockAll()` wipe keys from memory AND sessionStorage (the
+ *   master key stays in localStorage so future keys still persist).
  *
  * What this DOES NOT protect against:
  * - A debugger breakpoint in the fetch function
@@ -49,13 +48,42 @@ const slots: Record<string, KeySlot> = {
 // (refresh / tab close), the sessionStorage ciphertext is undecryptable.
 
 let masterKey: CryptoKey | null = null;
+const MASTER_KEY_STORAGE = "opencode-web.master";
 
-/** Lazily create the in-memory master key: a random 256-bit PBKDF2 base key.
- *  Never persisted anywhere. On refresh / tab close it's gone, so stored
- *  ciphertext becomes undecryptable. Returns null if Web Crypto unavailable. */
+/** 主密钥持久化：存入 localStorage（Base64），刷新后可恢复，让 Key 跨刷新
+ *  自动解密。接受本地 XSS 风险（本地工具，用户已接受）。 */
+async function persistMasterKey(): Promise<void> {
+  try {
+    if (masterKey) {
+      const exported = await crypto.subtle.exportKey("raw", masterKey);
+      localStorage.setItem(MASTER_KEY_STORAGE, arrayBufferToBase64(exported));
+    }
+  } catch {
+    /* ignore — 无法持久化则仅内存 */
+  }
+}
+
+/** Lazily create (and persist) the master key — a random 256-bit PBKDF2 base
+ *  key. On refresh, restored from localStorage so stored ciphertext decrypts.
+ *  Returns null if Web Crypto unavailable. */
 async function getMasterKey(): Promise<CryptoKey | null> {
   if (masterKey) return masterKey;
   try {
+    // 先从 localStorage 恢复持久化的主密钥
+    const stored = localStorage.getItem(MASTER_KEY_STORAGE);
+    if (stored) {
+      const rawKey = base64ToArrayBuffer(stored);
+      const restored = await crypto.subtle.importKey(
+        "raw",
+        rawKey,
+        "PBKDF2",
+        false,
+        ["deriveKey"],
+      );
+      masterKey = restored;
+      return restored;
+    }
+    // 无持久化主密钥 → 生成新的并持久化
     const raw = crypto.getRandomValues(new Uint8Array(32));
     masterKey = await crypto.subtle.importKey(
       "raw",
@@ -64,9 +92,19 @@ async function getMasterKey(): Promise<CryptoKey | null> {
       false,
       ["deriveKey"],
     );
+    await persistMasterKey();
     return masterKey;
   } catch {
     return null;
+  }
+}
+
+/** 判断是否已配置过主密钥（用于决定是否首次弹设置）。 */
+export function hasPersistentMasterKey(): boolean {
+  try {
+    return !!localStorage.getItem(MASTER_KEY_STORAGE);
+  } catch {
+    return false;
   }
 }
 

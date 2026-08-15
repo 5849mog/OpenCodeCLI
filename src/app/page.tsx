@@ -29,6 +29,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { hasPersistentMasterKey } from "@/lib/api-key-vault";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -182,16 +183,9 @@ export default function Home() {
 
   useEffect(() => {
     init();
-    const stored = localStorage.getItem("opencode-web.config");
-    let shouldOpen = !stored;
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        shouldOpen = !parsed.apiKey && !parsed.hasApiKey;
-      } catch {
-        shouldOpen = true;
-      }
-    }
+    // 仅"从未配置过 Key"才首次弹设置；有持久化主密钥/Key → 静默打开
+    // （Key 已在 init 的 tryRestore 中从 localStorage 恢复，无需重填）。
+    const shouldOpen = !hasPersistentMasterKey();
     /* eslint-disable react-hooks/set-state-in-effect */
     if (shouldOpen) setSettingsOpen(true);
     /* eslint-enable react-hooks/set-state-in-effect */
