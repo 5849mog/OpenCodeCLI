@@ -1,10 +1,10 @@
 # 🚀 OpenCodeCLI 成长日志
 
-> 由 Git 历史自动整理，共 **125** 次提交。最新在最上方。
+> 由 Git 历史自动整理，共 **127** 次提交。最新在最上方。
 
 | 日期 | 提交数 | 高亮 |
 |------|--------|------|
-| 2026-08-15 | 13 | 4 个新功能、7 个修复 |
+| 2026-08-15 | 15 | 4 个新功能、8 个修复 |
 | 2026-08-13 | 1 | 1 个新功能 |
 | 2026-08-12 | 14 | 4 个新功能、3 个修复 |
 | 2026-08-11 | 13 | 7 个新功能、4 个修复 |
@@ -23,6 +23,36 @@
 ---
 
 ## 📅 2026-08-15
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/251119d405d2646cffc90f95ff0e00ffd814da23">251119d</a> — fix(keys): 持久化 raw seed 字节 — 真正实现 Key 跨刷新自动恢复</summary>
+
+> 根因：persistMasterKey 用 crypto.subtle.exportKey("raw", masterKey) 导出
+> 主密钥；但 PBKDF2 类型的 CryptoKey 按规范本就不可导出（exportKey 抛
+> "PBKDF2 keys are not extractable"，与 extractable 标志无关），此调用
+> 永远抛错被 catch 吞掉 → 主密钥从未写入 localStorage。于是每次新开页面：
+> getMasterKey 找不到存储 → 生成新的随机主密钥 → 解不开上次密文 → 报
+> "主密钥可能已损坏"；且 hasPersistentMasterKey() 恒为 false → 每次都弹设置。
+> 修复：
+> - 改为持久化主密钥的 raw 32 字节 seed（而非导出 CryptoKey 对象），
+> 刷新/新标签页时用同一 seed 重新 import 成相同的 PBKDF2 主密钥，
+> 从而解开存储密文 —— 这才是持久化能落地的方式。
+> - decryptAndLoad 遇到"有密文但解不开"（历史坏数据）时自动清理该槽位，
+> 避免残留死密文反复触发误导性的"主密钥损坏需重输"提示。
+> - 附运行时验证：同一 seed 跨会话还原后能正确解密、错误 seed 解密失败。
+> 验证：tsc --noEmit + next build 均通过；Node Web Crypto 往返测试 PASS。
+
+</details>
+
+<details open>
+<summary>📝 <a href="https://github.com/5849mog/OpenCodeCLI/commit/0d833bdc41463fd5f5c517ad4329780db8cec648">0d833bd</a> — docs(changelog): 新增完整成长日志 CHANGELOG.md（125 次提交）</summary>
+
+> - 由 Git 历史自动生成，按日期倒序，含每日提交数/新增功能数/修复数摘要表
+> - 每条提交可点击跳转到 GitHub commit（短哈希 + 完整链接）
+> - 附 gen-changelog.mjs 生成器：新增提交后可一键 `node gen-changelog.mjs` 重新生成
+> - README 结尾新增「成长日志」段落 + 徽章，可在目录/文末点击跳转 CHANGELOG.md
+
+</details>
 
 <details open>
 <summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/2da73859cf7a2a7b4fc1a0a0efd1d2bb60ad315b">2da7385</a> — fix(keys): 密文迁移 localStorage — 刷新/换标签页均自动恢复 Key</summary>
