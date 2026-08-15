@@ -183,6 +183,21 @@ export function isSkillHidden(name: string): boolean {
   return hiddenSet().has(name);
 }
 
+/** 从 SKILL.md 提取自定义 skill 的描述：跳过首行标题（# 名称），取其后
+ *  第一个非空段落作为一句话说明（与内置 skill 的 description 语义一致）。 */
+function extractCustomDescription(md: string): string {
+  const lines = md.split("\n");
+  // 跳过头部的空行和标题行（# / ##）
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue; // 空行跳过
+    if (/^#{1,3}\s/.test(line)) continue; // 标题行跳过
+    // 第一个非空非标题行即描述
+    return line.replace(/^[-*+]\s*/, "").slice(0, 120);
+  }
+  return "";
+}
+
 /** 扫描 VFS skills/ 目录，发现用户自定义 skill（无 content，省 token）。 */
 function discoverCustomSkills(): SkillMeta[] {
   const metas: SkillMeta[] = [];
@@ -190,16 +205,12 @@ function discoverCustomSkills(): SkillMeta[] {
     const entries = vfs.listSync("skills");
     for (const entry of entries) {
       if (entry.type !== "dir") continue;
-      const md = vfs.readFileSync(`skills/${entry.path.split("/").pop()}/SKILL.md`);
+      const name = entry.path.split("/").pop() ?? entry.path;
+      const md = vfs.readFileSync(`skills/${name}/SKILL.md`);
       if (md === null) continue;
-      // 从 SKILL.md 首行提取描述（约定第一行是 description）
-      const firstLine = md.split("\n")[0]?.trim() ?? "";
-      const description = firstLine.startsWith("#")
-        ? firstLine.replace(/^#+\s*/, "")
-        : firstLine.slice(0, 120);
       metas.push({
-        name: entry.path.split("/").pop() ?? entry.path,
-        description,
+        name,
+        description: extractCustomDescription(md),
         source: "custom",
       });
     }
@@ -209,34 +220,34 @@ function discoverCustomSkills(): SkillMeta[] {
   return metas;
 }
 
-/** 列出所有可用 skill 的轻量信息（内置[过滤隐藏] + 自定义）。 */
+/** 列出所有可用 skill。同名时自定义覆盖内置（替换语义），source 标 custom。 */
 export function listSkills(): SkillMeta[] {
   const hidden = hiddenSet();
-  const builtin = BUILTIN_SKILLS.filter((s) => !hidden.has(s.name)).map(
-    ({ name, description, source }) => ({ name, description, source }),
-  );
-  return [...builtin, ...discoverCustomSkills()];
+  const custom = discoverCustomSkills();
+  const customNames = new Set(custom.map((s) => s.name));
+  const builtin = BUILTIN_SKILLS
+    .filter((s) => !hidden.has(s.name) && !customNames.has(s.name)) // 同名被自定义替换
+    .map(({ name, description, source }) => ({ name, description, source }));
+  return [...custom, ...builtin];
 }
 
-/** 加载指定 skill 的完整内容（内置[过滤隐藏] 或自定义）。不存在返回 null。 */
+/** 加载指定 skill。同名时自定义优先（替换内置）；内置被隐藏返回 null。 */
 export function loadSkill(name: string): Skill | null {
+  // 自定义优先（同名可覆盖内置）
+  try {
+    const md = vfs.readFileSync(`skills/${name}/SKILL.md`);
+    if (md !== null) {
+      return { name, description: extractCustomDescription(md), source: "custom", content: md };
+    }
+  } catch {
+    /* fall through to builtin */
+  }
   const builtin = BUILTIN_SKILLS.find((s) => s.name === name);
   if (builtin) {
     if (hiddenSet().has(name)) return null;
     return builtin;
   }
-  // 自定义：读 VFS skills/<name>/SKILL.md
-  try {
-    const md = vfs.readFileSync(`skills/${name}/SKILL.md`);
-    if (md === null) return null;
-    const firstLine = md.split("\n")[0]?.trim() ?? "";
-    const description = firstLine.startsWith("#")
-      ? firstLine.replace(/^#+\s*/, "")
-      : firstLine.slice(0, 120);
-    return { name, description, source: "custom", content: md };
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
