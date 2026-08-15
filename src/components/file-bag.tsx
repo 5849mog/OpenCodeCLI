@@ -43,6 +43,16 @@ import { SubagentPanel, buildRuns } from "@/components/subagent-panel";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function FileBag() {
   const hydrated = useVfsView((s) => s.hydrated);
@@ -349,10 +359,23 @@ function FileBagInner() {
 function FileTree({ onOpen }: { onOpen: (path: string) => void }) {
   const expanded = useVfsView((s) => s.expandedDirs);
   const toggleDir = useVfsView((s) => s.toggleDir);
+  const bump = useVfsView((s) => s.bump);
   // Subscribe to version so the tree re-renders when VFS mutates.
   useVfsView((s) => s.version);
   const root = "";
   const [query, setQuery] = useState("");
+  // 删除文件夹：待删目录 + 其下文件数（用于确认框）
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const deleteCount = deleteTarget ? vfs.listAllFilesSync(deleteTarget).length : 0;
+
+  const confirmDeleteFolder = () => {
+    if (!deleteTarget) return;
+    void (async () => {
+      await vfs.delete(deleteTarget);
+      bump();
+      setDeleteTarget(null);
+    })();
+  };
 
   // If there's a search query, show flat filtered list instead of tree
   if (query.trim()) {
@@ -427,9 +450,32 @@ function FileTree({ onOpen }: { onOpen: (path: string) => void }) {
         <div className="px-2 py-1 text-[length:var(--font-size-ui-sm)] uppercase tracking-wider text-[#A8A29E] dark:text-zinc-500">
           workspace
         </div>
-        <TreeChildren dir={root} depth={0} expanded={expanded} toggleDir={toggleDir} onOpen={onOpen} />
+        <TreeChildren dir={root} depth={0} expanded={expanded} toggleDir={toggleDir} onOpen={onOpen} onDelete={setDeleteTarget} />
         <EmptyHint />
       </div>
+
+      {/* 删除文件夹确认框（样式化） */}
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+        <AlertDialogContent className="border-[#E5E2D9] bg-[#FFFFFF] text-[#2D2B27] dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-100">
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除文件夹「{deleteTarget ?? ""}」？</AlertDialogTitle>
+            <AlertDialogDescription className="text-[#6B6862] dark:text-zinc-400">
+              将递归删除该文件夹下所有内容（{deleteCount} 个文件）。此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-[#E5E2D9] text-[#3D3B37] hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:text-zinc-300 dark:hover:bg-[#2a2723]">
+              取消
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteFolder}
+              className="bg-[#E54D2E] text-white hover:bg-[#C43D1F]"
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -440,12 +486,14 @@ function TreeChildren({
   expanded,
   toggleDir,
   onOpen,
+  onDelete,
 }: {
   dir: string;
   depth: number;
   expanded: Set<string>;
   toggleDir: (path: string) => void;
   onOpen: (path: string) => void;
+  onDelete: (path: string) => void;
 }) {
   const children = vfs.listSync(dir);
   if (children.length === 0 && depth === 0) {
@@ -465,6 +513,7 @@ function TreeChildren({
           expanded={expanded}
           toggleDir={toggleDir}
           onOpen={onOpen}
+          onDelete={onDelete}
         />
       ))}
     </div>
@@ -477,23 +526,25 @@ function TreeRow({
   expanded,
   toggleDir,
   onOpen,
+  onDelete,
 }: {
   node: VfsNode;
   depth: number;
   expanded: Set<string>;
   toggleDir: (path: string) => void;
   onOpen: (path: string) => void;
+  onDelete: (path: string) => void;
 }) {
   const name = basename(node.path);
   const isOpen = expanded.has(node.path) || (node.path === "" && expanded.has(""));
   const isDir = node.type === "dir";
 
   return (
-    <div>
+    <div className="group/row relative">
       <button
         onClick={() => (isDir ? toggleDir(node.path) : onOpen(node.path))}
         className={cn(
-          "flex w-full items-center gap-1 px-2 py-1 text-left hover:bg-[#F0EDE5] dark:hover:bg-[#2a2723]",
+          "flex w-full items-center gap-1 py-1 pr-7 text-left hover:bg-[#F0EDE5] dark:hover:bg-[#2a2723]",
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
@@ -521,6 +572,16 @@ function TreeRow({
           {isDir && "/"}
         </span>
       </button>
+      {/* hover 删除按钮 — 仅目录显示（防止误删单文件，单文件仍走编辑器内删除） */}
+      {isDir && (
+        <button
+          onClick={() => onDelete(node.path)}
+          title={`删除文件夹 ${node.path}`}
+          className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 text-[#8B8884] opacity-0 transition-opacity hover:bg-[#E54D2E]/10 hover:text-[#E54D2E] group-hover/row:opacity-100 dark:text-zinc-500 dark:hover:text-[#E54D2E]"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      )}
       {isDir && isOpen && (
         <TreeChildren
           dir={node.path}
@@ -528,6 +589,7 @@ function TreeRow({
           expanded={expanded}
           toggleDir={toggleDir}
           onOpen={onOpen}
+          onDelete={onDelete}
         />
       )}
     </div>

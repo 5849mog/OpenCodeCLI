@@ -327,7 +327,7 @@ export async function dispatchTool(
       case "math":
         return await toolMath(args);
       case "list_skills": {
-        const skills = listSkills();
+        const skills = await listSkills();
         if (skills.length === 0) {
           return { ok: true, output: "(没有可用的 skill)", tool: "list_skills", args };
         }
@@ -346,9 +346,9 @@ export async function dispatchTool(
         if (!name) {
           return { ok: false, output: "load_skill: missing 'name' — 先用 list_skills 查看可用 skill", tool: "load_skill", args };
         }
-        const skill = loadSkill(name);
+        const skill = await loadSkill(name);
         if (!skill) {
-          const available = listSkills().map((s) => s.name).join(", ");
+          const available = (await listSkills()).map((s) => s.name).join(", ");
           return {
             ok: false,
             output: `load_skill: skill '${name}' 不存在。可用: ${available || "(无)"}`,
@@ -374,7 +374,7 @@ export async function dispatchTool(
         }
         const name = String(args.name ?? "").trim();
         const content = String(args.content ?? "");
-        const res = createSkill(name, content);
+        const res = await createSkill(name, content);
         return {
           ok: res.ok,
           output: res.ok
@@ -398,11 +398,11 @@ export async function dispatchTool(
         if (!name) {
           return { ok: false, output: "delete_skill: missing 'name'", tool: "delete_skill", args };
         }
-        const exists = listSkills().some((s) => s.name === name);
+        const exists = (await listSkills()).some((s) => s.name === name);
         if (!exists) {
           return { ok: false, output: `delete_skill: skill '${name}' 不存在`, tool: "delete_skill", args };
         }
-        const res = removeSkill(name);
+        const res = await removeSkill(name);
         return {
           ok: true,
           output: res.ok

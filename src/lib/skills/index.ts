@@ -7,11 +7,113 @@
  *
  * 存储：
  *  - 内置 skills：代码资源（本文件写死），天然不可删改。
- *  - 用户自定义：VFS `skills/<name>/SKILL.md`，通过 zip 导入 / 文件袋上传。
- *    该目录由 session.ts 的写工具拦截保护（AI 不可随意删改）。
+ *  - 用户自定义：独立的 IndexedDB store（`opencode-skills`），与文件袋
+ *    VFS 彻底解耦——清空文件袋 / vfs.clear() 不会影响自定义 skill。
+ *    早期版本存在 VFS `skills/` 的自定义 skill，首次访问时会迁移到独立 store。
  */
 
-import { vfs } from "@/lib/vfs";
+import { openDB, type IDBPDatabase } from "idb";
+import { vfs } from "@/lib/vfs"; // 仅用于旧版本 VFS skills/ 记录的一次性迁移
+
+/** 独立的自定义 skill 存储库（与文件袋 VFS 不同的 database，互不影响）。 */
+const SKILL_DB = "opencode-skills";
+const SKILL_STORE = "skills";
+
+interface StoredSkill {
+  name: string;
+  content: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+let skillDbPromise: Promise<IDBPDatabase> | null = null;
+/** 内存缓存的独立 store（读走 cache，写同步更新 + 后台持久化）。 */
+let skillCache = new Map<string, StoredSkill>();
+let skillHydrated = false;
+
+// --- 变化通知：自定义 skill 增删时 bump，供 UI（SkillsDialog）订阅实时刷新 ---
+let skillVersion = 0;
+const skillListeners = new Set<() => void>();
+
+/** 订阅自定义 skill 变化，返回取消函数。 */
+export function onSkillsChange(fn: () => void): () => void {
+  skillListeners.add(fn);
+  return () => skillListeners.delete(fn);
+}
+
+function bumpSkillVersion(): void {
+  skillVersion++;
+  for (const fn of skillListeners) fn();
+}
+
+/** 当前 skill 版本（UI 订阅用）。 */
+export function getSkillVersion(): number {
+  return skillVersion;
+}
+
+function getSkillDB() {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("skills DB only available in browser"));
+  }
+  if (!skillDbPromise) {
+    skillDbPromise = openDB(SKILL_DB, 1, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains(SKILL_STORE)) {
+          db.createObjectStore(SKILL_STORE, { keyPath: "name" });
+        }
+      },
+    }).catch(() => null as unknown as IDBPDatabase);
+  }
+  return skillDbPromise;
+}
+
+/** 从独立 store 载入全部自定义 skill 到内存缓存。 */
+async function hydrateSkills(): Promise<void> {
+  if (skillHydrated) return;
+  try {
+    const db = await getSkillDB();
+    const migrated = await migrateLegacySkills(db);
+    if (db) {
+      const all = migrated ?? (await db.getAll(SKILL_STORE)) as StoredSkill[];
+      for (const rec of all) skillCache.set(rec.name, rec);
+    }
+    skillHydrated = true;
+  } catch {
+    skillHydrated = true; // 失败也标记，避免反复尝试
+  }
+}
+
+/**
+ * 兼容迁移：早期版本的自定义 skill 存在文件袋 VFS `skills/` 目录。
+ * 独立 store 为空但 VFS 有旧记录时，读入并存独立 store，然后清理 VFS 旧目录。
+ * 返回迁移后的记录（若有）；独立 store 非空则返回 null（已是最新，无需迁移）。
+ */
+async function migrateLegacySkills(db: IDBPDatabase | null): Promise<StoredSkill[] | null> {
+  try {
+    if (db) {
+      const existing = (await db.getAll(SKILL_STORE)) as StoredSkill[];
+      if (existing.length > 0) return null; // 独立 store 已有数据，跳过迁移
+    }
+    const dirs = vfs.listSync("skills");
+    if (dirs.length === 0) return null; // VFS 无旧 skill
+    const migrated: StoredSkill[] = [];
+    for (const dir of dirs) {
+      const name = dir.path.split("/").pop() ?? dir.path;
+      const content = vfs.readFileSync(`skills/${name}/SKILL.md`);
+      if (content === null) continue;
+      const now = Date.now();
+      migrated.push({ name, content, createdAt: now, updatedAt: now });
+      await writeCustomSkill(name, content, now); // 写入独立 store（cache + IDB）
+    }
+    if (migrated.length > 0) {
+      // 清理 VFS 旧 skills/ 目录（避免下次重复迁移）
+      void vfs.delete("skills");
+    }
+    return migrated;
+  } catch {
+    return null;
+  }
+}
 
 export interface Skill {
   /** 唯一名称（list_skills / load_skill 用）。 */
@@ -198,49 +300,65 @@ function extractCustomDescription(md: string): string {
   return "";
 }
 
-/** 扫描 VFS skills/ 目录，发现用户自定义 skill（无 content，省 token）。 */
-function discoverCustomSkills(): SkillMeta[] {
-  const metas: SkillMeta[] = [];
+/** 从独立 store 读取自定义 skill 记录（先 hydrate 内存缓存）。 */
+async function readCustomSkills(): Promise<StoredSkill[]> {
+  await hydrateSkills();
+  return Array.from(skillCache.values());
+}
+
+/** 写入一个自定义 skill 到独立 store（更新内存缓存 + 后台持久化）。 */
+async function writeCustomSkill(name: string, content: string, now: number): Promise<void> {
+  const rec: StoredSkill = {
+    name,
+    content,
+    createdAt: skillCache.get(name)?.createdAt ?? now,
+    updatedAt: now,
+  };
+  skillCache.set(name, rec);
   try {
-    const entries = vfs.listSync("skills");
-    for (const entry of entries) {
-      if (entry.type !== "dir") continue;
-      const name = entry.path.split("/").pop() ?? entry.path;
-      const md = vfs.readFileSync(`skills/${name}/SKILL.md`);
-      if (md === null) continue;
-      metas.push({
-        name,
-        description: extractCustomDescription(md),
-        source: "custom",
-      });
-    }
+    const db = await getSkillDB();
+    if (db) await db.put(SKILL_STORE, rec);
   } catch {
-    /* skills/ 不存在或不可读 — 忽略 */
+    /* 持久化失败 — 仅保留内存 */
   }
-  return metas;
+  bumpSkillVersion();
+}
+
+/** 从独立 store 删除一个自定义 skill。 */
+async function deleteCustomSkill(name: string): Promise<void> {
+  skillCache.delete(name);
+  try {
+    const db = await getSkillDB();
+    if (db) await db.delete(SKILL_STORE, name);
+  } catch {
+    /* ignore */
+  }
+  bumpSkillVersion();
 }
 
 /** 列出所有可用 skill。同名时自定义覆盖内置（替换语义），source 标 custom。 */
-export function listSkills(): SkillMeta[] {
+export async function listSkills(): Promise<SkillMeta[]> {
   const hidden = hiddenSet();
-  const custom = discoverCustomSkills();
+  const custom = await readCustomSkills();
   const customNames = new Set(custom.map((s) => s.name));
   const builtin = BUILTIN_SKILLS
     .filter((s) => !hidden.has(s.name) && !customNames.has(s.name)) // 同名被自定义替换
     .map(({ name, description, source }) => ({ name, description, source }));
-  return [...custom, ...builtin];
+  const customMetas = custom.map(({ name, content }) => ({
+    name,
+    description: extractCustomDescription(content),
+    source: "custom" as const,
+  }));
+  return [...customMetas, ...builtin];
 }
 
 /** 加载指定 skill。同名时自定义优先（替换内置）；内置被隐藏返回 null。 */
-export function loadSkill(name: string): Skill | null {
-  // 自定义优先（同名可覆盖内置）
-  try {
-    const md = vfs.readFileSync(`skills/${name}/SKILL.md`);
-    if (md !== null) {
-      return { name, description: extractCustomDescription(md), source: "custom", content: md };
-    }
-  } catch {
-    /* fall through to builtin */
+export async function loadSkill(name: string): Promise<Skill | null> {
+  // 自定义优先（独立 store，同名可覆盖内置）
+  await hydrateSkills();
+  const custom = skillCache.get(name);
+  if (custom) {
+    return { name, description: extractCustomDescription(custom.content), source: "custom", content: custom.content };
   }
   const builtin = BUILTIN_SKILLS.find((s) => s.name === name);
   if (builtin) {
@@ -264,9 +382,9 @@ export function validateSkillName(name: string): string | null {
   return null;
 }
 
-/** 创建/覆盖一个自定义 skill（VFS skills/<name>/SKILL.md）。若首行不是
+/** 创建/覆盖一个自定义 skill（独立 IndexedDB store，与文件袋解耦）。若首行不是
  *  `# 标题`，自动补一行（保证 list_skills 能正确提取描述）。 */
-export function createSkill(name: string, content: string): { ok: boolean; name: string; error?: string } {
+export async function createSkill(name: string, content: string): Promise<{ ok: boolean; name: string; error?: string }> {
   const err = validateSkillName(name);
   if (err) return { ok: false, name, error: err };
   const normalized = name.trim();
@@ -277,17 +395,17 @@ export function createSkill(name: string, content: string): { ok: boolean; name:
   const final = firstLine.startsWith("#")
     ? trimmed
     : `# ${normalized}\n\n${trimmed}`;
-  vfs.writeFileSync(`skills/${normalized}/SKILL.md`, final);
+  await writeCustomSkill(normalized, final, Date.now());
   return { ok: true, name: normalized };
 }
 
-/** 删除一个 skill。custom → 物理删 VFS 目录；内置 → 记入隐藏名单。 */
-export function removeSkill(name: string): { ok: boolean; source: "builtin" | "custom"; name: string } {
+/** 删除一个 skill。custom → 从独立 store 删除；内置 → 记入隐藏名单。 */
+export async function removeSkill(name: string): Promise<{ ok: boolean; source: "builtin" | "custom"; name: string }> {
   const isBuiltin = BUILTIN_SKILLS.some((s) => s.name === name);
   if (isBuiltin) {
     hideSkill(name);
     return { ok: true, source: "builtin", name };
   }
-  void vfs.delete(`skills/${name}`);
+  await deleteCustomSkill(name);
   return { ok: true, source: "custom", name };
 }

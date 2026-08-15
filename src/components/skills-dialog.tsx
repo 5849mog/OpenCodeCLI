@@ -10,8 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { X, Sparkles, ChevronDown, ChevronRight } from "lucide-react";
-import { listSkills, loadSkill, type Skill, type SkillMeta } from "@/lib/skills";
-import { useVfsView } from "@/store/vfs-view";
+import { listSkills, loadSkill, onSkillsChange, type Skill, type SkillMeta } from "@/lib/skills";
 import { MarkdownRenderer } from "./terminal";
 import { cn } from "@/lib/utils";
 
@@ -27,13 +26,27 @@ export function SkillsDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  // 实时刷新：依赖 VFS 版本（AI create_skill/delete_skill 会 bump）+ 弹窗打开，
-  // 任一变化都重查 skill 列表（自定义 skill 增删、隐藏名单变化都能反映）。
-  const vfsVersion = useVfsView((s) => s.version);
+  // 实时刷新：依赖打开状态 + 自定义 skill 版本（AI create/delete skill 会 bump），
+  // 任一变化都重查列表。
   const [metas, setMetas] = useState<SkillMeta[]>([]);
   useEffect(() => {
-    if (open) setMetas(listSkills());
-  }, [open, vfsVersion]);
+    if (!open) return;
+    let cancelled = false;
+    void listSkills().then((list) => {
+      if (!cancelled) setMetas(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+  // 订阅 skill 变化（AI 创建/删除自定义 skill 时 bump）→ 实时刷新
+  useEffect(() => {
+    if (!open) return;
+    const unsub = onSkillsChange(() => {
+      void listSkills().then(setMetas);
+    });
+    return () => unsub();
+  }, [open]);
   // 展开的 skill 及其完整内容（懒加载）
   const [expanded, setExpanded] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, Skill>>({});
@@ -45,8 +58,9 @@ export function SkillsDialog({
     }
     setExpanded(name);
     if (!details[name]) {
-      const skill = loadSkill(name);
-      if (skill) setDetails((d) => ({ ...d, [name]: skill }));
+      void loadSkill(name).then((skill) => {
+        if (skill) setDetails((d) => ({ ...d, [name]: skill }));
+      });
     }
   };
 
