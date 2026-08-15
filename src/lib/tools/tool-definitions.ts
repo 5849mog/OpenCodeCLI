@@ -906,6 +906,87 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "transpile",
+      description:
+        "用 esbuild 把 TypeScript/TSX/JSX/JavaScript 转译为 JavaScript（含语法校验）。AI 写完 TS 代码后，可用它验证语法是否合法、并得到可运行的 JS。loader 自动推断（ts/tsx/js/jsx），可用 sourcefile 文件名覆盖。输出转译后的 JS。首次调用会惰性加载 ~9MB WASM（稍慢）。只读工具。",
+      parameters: {
+        type: "object",
+        properties: {
+          code: {
+            type: "string",
+            description: "要转译的源代码。",
+          },
+          sourcefile: {
+            type: "string",
+            description: "可选。源码文件名（含扩展名），用于推断 loader 并改善错误信息。如 'src/foo.ts'、'App.tsx'。",
+          },
+        },
+        required: ["code"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "check_syntax",
+      description:
+        "检查源码语法是否合法（esbuild 转译校验，非类型检查）。返回语法是否有效 + 错误位置（行/列），或提示合法。写代码后先 check_syntax 验证，再考虑 run_js 执行。只读工具。",
+      parameters: {
+        type: "object",
+        properties: {
+          code: {
+            type: "string",
+            description: "要检查的源代码。",
+          },
+          lang: {
+            type: "string",
+            enum: ["ts", "tsx", "js", "jsx"],
+            description: "可选。源码语言（自动推断如省略）。",
+          },
+        },
+        required: ["code"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "git_status",
+      description:
+        "查看本地 git 仓库状态（isomorphic-git + lightning-fs，独立于文件袋 VFS 的存储）。返回当前分支 + 文件变更列表（新增/修改/待提交）。仓库不存在时会提示。只读工具。",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "git_log",
+      description:
+        "查看本地 git 提交历史（最多 30 条）。返回 [{oid短, message, author, date}]。只读工具。",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "git_commit",
+      description:
+        "创建一个本地 git 提交：先 git_init（如未初始化）+ git add '.' + commit。所有文件袋外工作区（lightning-fs）文件会被提交。**写操作，Plan 模式下被拦截。** 用于把 AI 在当前会话产生的代码版本化、可回滚。",
+      parameters: {
+        type: "object",
+        properties: {
+          message: {
+            type: "string",
+            description: "提交信息，如 'feat: add parser'。",
+          },
+        },
+        required: ["message"],
+      },
+    },
+  },
 ];
 
 export function getToolByName(name: string): ToolDefinition | undefined {

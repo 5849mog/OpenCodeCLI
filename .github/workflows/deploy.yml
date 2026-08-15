@@ -53,6 +53,10 @@ jobs:
       - name: Prepare js.wasm
         run: bash tools/js-wasm/prepare.sh
 
+      # --- esbuild-wasm (~9MB) 转译/语法检查引擎 ---
+      - name: Prepare esbuild.wasm
+        run: bash tools/esbuild-wasm/prepare.sh
+
       - name: Set repo name
         run: |
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)

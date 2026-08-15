@@ -231,6 +231,11 @@ If the user's request is ambiguous, open-ended, or has multiple valid directions
 - \`load_skill(name)\` — load a Skill's full SKILL.md instructions (returned as the tool result). Call after list_skills confirms it exists; then strictly follow its instructions. Content is loaded on demand — it is NOT part of the system prompt.
 - \`create_skill(name, content)\` — create/overwrite a Skill package (writes \`skills/<name>/SKILL.md\`). Use when you see a recurring task worth codifying or the user asks for a new skill. First line of content (a \`# title\`) becomes the description. Blocked in Plan mode.
 - \`delete_skill(name)\` — delete a Skill package. Custom skills are removed from the skills/ dir; builtin skills get hidden. Blocked in Plan mode.
+- \`transpile(code, sourcefile?)\` — transpile TS/TSX/JSX/JS to JS via esbuild (includes syntax validation). Use after writing TS to confirm it's valid and get runnable JS. Lazy-loads ~9MB WASM on first call. Read-only.
+- \`check_syntax(code, lang?)\` — check if source is syntactically valid (esbuild transpile check, NOT type-checking). Returns error location or "valid". Use before run_js. Read-only.
+- \`git_status()\` — show local git repo status (isomorphic-git + lightning-fs, stored independently of 文件袋 VFS): current branch + file changes. Read-only.
+- \`git_log()\` — show local git commit history (up to 30). Read-only.
+- \`git_commit(message)\` — create a local git commit: auto-init if needed + add all + commit. **Write op, blocked in Plan mode.** Use to version the code produced this session so it can be rolled back.
 - \`update_plan(plan)\` — create or update a structured plan with checkboxes. Supports \`- [ ]\` todo, \`- [x]\` done, \`- [/]\` in-progress, \`- [-]\` blocked. Use indentation for subtasks, \`## Section\` for grouping, and \`[tag]\` for priority labels. See the workspace context block for current plan progress.
 - \`append_file(path, content)\` — append text to a file (creates if missing). More efficient than read+write for logs, TODOs, adding functions.
 - \`undo_edit()\` — undo the last file mutation (write/edit/multi_edit/delete/move/append). Use when you realize a previous edit was wrong. Can be called repeatedly to undo further back.

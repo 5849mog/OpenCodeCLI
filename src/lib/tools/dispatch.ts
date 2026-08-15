@@ -9,6 +9,8 @@ import { toolWebSearch, toolFetchUrl } from "./web";
 import { toolZipArchive, toolUnzipArchive } from "./zip";
 import { toolParseYaml, toolParseCsv, toolQueryJson, toolMath } from "./data-tools";
 import { listSkills, loadSkill, createSkill, removeSkill } from "../skills";
+import { esbuildWasm } from "../wasm/esbuild";
+import { gitEngine } from "../git";
 import * as luaWasm from "../wasm/lua-wasm";
 import * as jsWasm from "../wasm/js-wasm";
 import { vfs } from "../vfs";
@@ -412,6 +414,88 @@ export async function dispatchTool(
           args,
           mutated: true,
         };
+      }
+      case "transpile": {
+        const code = String(args.code ?? "");
+        if (!code.trim()) return { ok: false, output: "transpile: missing 'code'", tool: "transpile", args };
+        const sourcefile = args.sourcefile !== undefined ? String(args.sourcefile) : undefined;
+        const loader = sourcefile
+          ? sourcefile.split(".").pop()?.toLowerCase().replace(/^t/, "t")
+          : undefined;
+        const res = await esbuildWasm.transpile(code, loader);
+        return {
+          ok: res.ok,
+          output: res.ok ? res.code ?? "(empty)" : `transpile 失败: ${res.error}`,
+          tool: "transpile",
+          args,
+        };
+      }
+      case "check_syntax": {
+        const code = String(args.code ?? "");
+        if (!code.trim()) return { ok: false, output: "check_syntax: missing 'code'", tool: "check_syntax", args };
+        const lang = args.lang !== undefined ? String(args.lang) : undefined;
+        const err = await esbuildWasm.checkSyntax(code, lang);
+        return {
+          ok: !err,
+          output: err ? `语法错误: ${err}` : "✓ 语法合法",
+          tool: "check_syntax",
+          args,
+        };
+      }
+      case "git_status": {
+        const dir = "/repo";
+        if (!(await gitEngine.isRepo(dir))) {
+          return { ok: true, output: "尚未初始化 git 仓库。用 git_commit 可自动 init + add + commit 完成首次版本化。", tool: "git_status", args };
+        }
+        const branch = await gitEngine.currentBranch(dir);
+        const status = await gitEngine.status(dir);
+        const lines = status.map((s) => {
+          const label = s.code === 2 || s.code === 3 ? "[新增]" : "[修改]";
+          return `  ${label} ${s.path}`;
+        });
+        return {
+          ok: true,
+          output: `分支: ${branch}\n${status.length === 0 ? "  工作区干净，无未提交变更" : `待提交（${status.length} 个文件）:\n${lines.join("\n")}`}`,
+          tool: "git_status",
+          args,
+        };
+      }
+      case "git_log": {
+        const dir = "/repo";
+        if (!(await gitEngine.isRepo(dir))) {
+          return { ok: true, output: "尚无 git 仓库/提交。用 git_commit 创建首次提交。", tool: "git_log", args };
+        }
+        const log = await gitEngine.log(dir);
+        if (log.length === 0) return { ok: true, output: "(无提交记录)", tool: "git_log", args };
+        const lines = log.map((c) => `  ${c.oid}  ${c.date}  ${c.author}  ${c.message}`);
+        return { ok: true, output: `提交历史（${log.length} 条）:\n${lines.join("\n")}`, tool: "git_log", args };
+      }
+      case "git_commit": {
+        if (opts?.readOnly) {
+          return {
+            ok: false,
+            output: "[Plan mode] git_commit (写 git 仓库) is blocked in Plan mode. 切到 Bypass 模式后才能提交。",
+            tool: "git_commit",
+            args,
+          };
+        }
+        const message = String(args.message ?? "").trim();
+        if (!message) return { ok: false, output: "git_commit: missing 'message'", tool: "git_commit", args };
+        const dir = "/repo";
+        try {
+          await gitEngine.initIfNb(dir);
+          await gitEngine.add(dir, ".");
+          const oid = await gitEngine.commit(dir, message);
+          return {
+            ok: true,
+            output: `✓ 已提交 ${oid}：${message}\n（git 仓库存独立 IndexedDB，与文件袋隔离）`,
+            tool: "git_commit",
+            args,
+            mutated: true,
+          };
+        } catch (e) {
+          return { ok: false, output: `git_commit 失败: ${e instanceof Error ? e.message : String(e)}`, tool: "git_commit", args };
+        }
       }
       case "web_search":
         return await toolWebSearch(args);

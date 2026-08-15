@@ -83,3 +83,6 @@ server.log
 
 # js-wasm (quickjs-emscripten) artifacts — copied by prepare.sh after install
 /public/wasm/js.wasm
+
+# esbuild-wasm artifacts (~9MB, copied by tools/esbuild-wasm/prepare.sh on CI)
+/public/wasm/esbuild.wasm

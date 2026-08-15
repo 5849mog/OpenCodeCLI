@@ -1125,6 +1125,7 @@ const MUTATING_TOOLS = new Set([
   "apply_patch", "insert_at", "run_lua", "run_js", // run_lua/run_js 带 outputs 时写回 VFS → 需快照可 undo
   "bash", // bash 的 > / >> / tee / mkdir / rm / rmdir / touch / cp / mv / sed -i 会写 VFS
   "create_skill", "delete_skill", // 创建/删除 skill（写 skills/ 目录）→ 需快照可 undo
+  "git_commit", // git 提交（写 git 工作区）→ 需快照可 undo
 ]);
 
 /** Wrapper that guarantees a tool result message is ALWAYS added to the
