@@ -8,9 +8,10 @@
  * 数据来自 src/lib/skills 的 listSkills() / loadSkill()。
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Sparkles, ChevronDown, ChevronRight } from "lucide-react";
-import { listSkills, loadSkill, type Skill } from "@/lib/skills";
+import { listSkills, loadSkill, type Skill, type SkillMeta } from "@/lib/skills";
+import { useVfsView } from "@/store/vfs-view";
 import { MarkdownRenderer } from "./terminal";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +27,13 @@ export function SkillsDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const metas = useMemo(() => listSkills(), []);
+  // 实时刷新：依赖 VFS 版本（AI create_skill/delete_skill 会 bump）+ 弹窗打开，
+  // 任一变化都重查 skill 列表（自定义 skill 增删、隐藏名单变化都能反映）。
+  const vfsVersion = useVfsView((s) => s.version);
+  const [metas, setMetas] = useState<SkillMeta[]>([]);
+  useEffect(() => {
+    if (open) setMetas(listSkills());
+  }, [open, vfsVersion]);
   // 展开的 skill 及其完整内容（懒加载）
   const [expanded, setExpanded] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, Skill>>({});
