@@ -699,7 +699,14 @@ export function Terminal() {
                     .map(([qId, val]) => {
                       const q = pendingQuestions.questions.find((q) => q.id === qId);
                       const label = q ? q.question : qId;
-                      const value = Array.isArray(val) ? val.join(", ") : val;
+                      // 选项 id → label：让 AI 看到用户选的真实选项内容，而非随机 opt_xxx id。
+                      const resolve = (oid: string): string => {
+                        if (!q) return oid;
+                        return q.options.find((o) => o.id === oid)?.label ?? oid;
+                      };
+                      const value = Array.isArray(val)
+                        ? val.map(resolve).join(", ")
+                        : resolve(val);
                       return `- ${label}: ${value}`;
                     })
                     .join("\n");
