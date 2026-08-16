@@ -175,6 +175,7 @@ export function SettingsDialog({
         model: config.model,
         temperature: config.temperature,
         maxTokens: config.maxTokens,
+        tokenBudget: config.tokenBudget,
         thinkingEnabled: config.thinkingEnabled,
         reasoningEffort: config.reasoningEffort,
         searchProvider: config.searchProvider,
@@ -243,6 +244,7 @@ export function SettingsDialog({
             model: typeof c.model === "string" ? c.model : config.model,
             temperature: typeof c.temperature === "number" ? c.temperature : config.temperature,
             maxTokens: typeof c.maxTokens === "number" ? c.maxTokens : config.maxTokens,
+            tokenBudget: typeof c.tokenBudget === "number" ? c.tokenBudget : config.tokenBudget,
             thinkingEnabled: typeof c.thinkingEnabled === "boolean" ? c.thinkingEnabled : config.thinkingEnabled,
             reasoningEffort: typeof c.reasoningEffort === "string" ? c.reasoningEffort : config.reasoningEffort,
           });
@@ -396,6 +398,26 @@ export function SettingsDialog({
                 value={config.maxTokens}
                 onChange={(e) =>
                   setConfig({ maxTokens: parseInt(e.target.value, 10) || 1024 })
+                }
+                className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
+              />
+            </Field>
+          </div>
+
+          {/* 上下文发送预算 */}
+          <div className="mt-3">
+            <Field
+              label="上下文发送预算 (token)"
+              hint="单次请求发给模型的上下文上限。超出自动截断旧历史 / 压缩工具结果。默认 60000；高上下文模型（如 DeepSeek 100 万）可调大，但会提高单次成本与延迟。必留输出余量，别贴满模型窗口。"
+            >
+              <input
+                type="number"
+                step="10000"
+                min="4000"
+                max="1000000"
+                value={config.tokenBudget}
+                onChange={(e) =>
+                  setConfig({ tokenBudget: parseInt(e.target.value, 10) || 60_000 })
                 }
                 className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
               />

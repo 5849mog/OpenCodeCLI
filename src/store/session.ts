@@ -32,7 +32,6 @@ import { useVfsView } from "@/store/vfs-view";
 import { compactConversation } from "@/lib/compact";
 import {
   truncateConversation,
-  DEFAULT_TOKEN_BUDGET,
 } from "@/lib/context";
 import {
   createSession,
@@ -139,6 +138,9 @@ export interface AiConfig {
   temperature: number;
   maxTokens: number;
   customInstructions: string;
+  /** 单次请求发送给模型的上下文预算（token）。超出时自动截断/压缩旧历史。
+   *  默认 60000；高上下文模型（如 DeepSeek 1M）可在设置里调大。 */
+  tokenBudget: number;
   /** DeepSeek V4: enable thinking mode */
   thinkingEnabled: boolean;
   /** DeepSeek V4: reasoning effort (low/medium/high/max/xhigh) */
@@ -192,6 +194,7 @@ const DEFAULT_CONFIG: AiConfig = {
   temperature: 0.6,
   maxTokens: 8192,
   customInstructions: "",
+  tokenBudget: 60_000,
   thinkingEnabled: true,
   reasoningEffort: "max",
   searchProvider: "tavily",
@@ -920,7 +923,7 @@ async function runAgentLoop(
     ];
     if (overrideMsgs) set({ pendingOverrideMessages: null, truncated: false });
     const { messages: truncatedMsgs, dropped, tokensBefore, tokensAfter } =
-      truncateConversation(fullMessages, DEFAULT_TOKEN_BUDGET, 10);
+      truncateConversation(fullMessages, config.tokenBudget, 10);
     if (dropped > 0) {
       set({ truncated: true });
       // Surface a system notice the FIRST time we truncate in this turn.
@@ -1271,6 +1274,7 @@ async function executeToolCall(
         const subResult = await runSubagent(aiConfig, {
           task,
           maxIterations: maxIter,
+          tokenBudget: config.tokenBudget,
           onUsage: (usage) => {
             set((s) => ({
               totalTokens: s.totalTokens + usage.total_tokens,

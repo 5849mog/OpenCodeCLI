@@ -21,14 +21,14 @@ import {
 import { cn } from "@/lib/utils";
 import { estimateConversationTokens } from "@/lib/context";
 
-const CONTEXT_BUDGET = 60_000;
-
 export function TokenSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const totalTokens = useSession((s) => s.totalTokens);
   const lastUsage = useSession((s) => s.lastUsage);
   const compactedReleases = useSession((s) => s.compactedReleases ?? 0);
   const compactCount = useSession((s) => s.compactCount ?? 0);
   const lastSentPayload = useSession((s) => s.lastSentPayload);
+  // 单次发送预算 = config.tokenBudget（默认 6 万，可在设置里调大以适配高上下文模型）。
+  const CONTEXT_BUDGET = useSession((s) => s.config.tokenBudget);
 
   // Estimated size of the actual payload sent on the last request (the real
   // per-request context). NOT the cumulative billing tally — that's totalTokens.
