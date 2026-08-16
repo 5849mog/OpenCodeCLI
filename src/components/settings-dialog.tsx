@@ -5,10 +5,10 @@
  * Settings persist to localStorage.
  */
 
-import { useRef, useState } from "react";
-import { X, Settings, Eye, EyeOff, Zap, Download, Upload, Lock } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { X, Settings, Eye, EyeOff, Zap, Download, Upload, Lock, RefreshCw } from "lucide-react";
 import { useSession } from "@/store/session";
-import { fetchModels } from "@/lib/ai-client";
+import { fetchModels, fetchBalance, type BalanceResult } from "@/lib/ai-client";
 import { apiKeyVault } from "@/lib/api-key-vault";
 import {
   loadAllSessions,
@@ -90,6 +90,47 @@ export function SettingsDialog({
   const [searchKeyInput, setSearchKeyInput] = useState(() => apiKeyVault.getSearchKey() ?? "");
   const [searchKeyDirty, setSearchKeyDirty] = useState(false);
 
+  // ── Models fetched live from the provider (merged into the datalist) ──
+  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+  // ── DeepSeek account balance ──
+  const [balance, setBalance] = useState<BalanceResult | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
+
+  // The /user/balance endpoint is DeepSeek-specific — only surface the card
+  // when the configured base URL points at deepseek.com.
+  let isDeepSeek = false;
+  try {
+    isDeepSeek = new URL(config.baseUrl).hostname.includes("deepseek.com");
+  } catch { /* malformed URL → not deepseek */ }
+
+  const queryBalance = async () => {
+    const key = apiKeyVault.getKey();
+    if (!key) {
+      setBalanceError("未配置 LLM API Key，无法查询余额");
+      return;
+    }
+    setBalanceLoading(true);
+    setBalanceError(null);
+    try {
+      const result = await fetchBalance({ baseUrl: config.baseUrl, apiKey: key });
+      setBalance(result);
+    } catch (e) {
+      setBalanceError(e instanceof Error ? e.message : String(e));
+      setBalance(null);
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
+
+  // Auto-query balance when the dialog opens for a DeepSeek base URL.
+  useEffect(() => {
+    if (open && isDeepSeek && apiKeyVault.getKey()) {
+      void queryBalance();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, config.baseUrl]);
+
   if (!open) return null;
 
   const testConnection = async () => {
@@ -105,6 +146,7 @@ export function SettingsDialog({
         baseUrl: config.baseUrl,
         apiKey: apiKeyVault.getKey() ?? "",
       });
+      setFetchedModels(models);
       if (models.length > 0) {
         toast.success(`Connection OK — ${models.length} models available`);
         // Suggest the first model if the current model is empty or invalid
@@ -312,9 +354,12 @@ export function SettingsDialog({
                 className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
               />
               <datalist id="model-suggestions">
-                {PRESETS.find((p) => p.baseUrl === config.baseUrl)?.models.map(
-                  (m) => <option key={m} value={m} />,
-                )}
+                {Array.from(
+                  new Set([
+                    ...(PRESETS.find((p) => p.baseUrl === config.baseUrl)?.models ?? []),
+                    ...fetchedModels,
+                  ]),
+                ).map((m) => <option key={m} value={m} />)}
               </datalist>
               <button
                 onClick={testConnection}
@@ -392,6 +437,52 @@ export function SettingsDialog({
               For DeepSeek V4 models. On sends <code className="text-[#E58F67]">thinking=enabled</code> + <code className="text-[#E58F67]">reasoning_effort</code>; off sends <code className="text-[#E58F67]">thinking=disabled</code>. Valid efforts: low/high/xhigh/max. Note: thinking &amp; answer share the Max tokens budget.
             </div>
           </div>
+
+          {/* ── DeepSeek account balance (provider-specific /user/balance) ── */}
+          {isDeepSeek && (
+            <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+                  DeepSeek · 账户余额
+                </div>
+                <button
+                  onClick={() => void queryBalance()}
+                  disabled={balanceLoading}
+                  className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-2 py-1 text-[11px] text-[#3D3B37] dark:text-zinc-300 hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:hover:bg-[#2a2723] disabled:opacity-40"
+                >
+                  <RefreshCw className={`h-3 w-3 ${balanceLoading ? "animate-spin" : ""}`} />
+                  {balanceLoading ? "查询中…" : "刷新"}
+                </button>
+              </div>
+              {balanceError ? (
+                <div className="text-xs text-[#E54D2E]">{balanceError}</div>
+              ) : balance && balance.balance_infos.length > 0 ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-[#8B8884] dark:text-zinc-500">账户可用</span>
+                    <span className={balance.is_available ? "text-emerald-600 dark:text-emerald-400" : "text-[#E54D2E]"}>
+                      {balance.is_available ? "✓ 可用" : "✗ 不可用"}
+                    </span>
+                  </div>
+                  {balance.balance_infos.map((b) => (
+                    <div key={b.currency} className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="font-mono text-[#8B8884] dark:text-zinc-500">
+                        {b.currency} 总额
+                      </span>
+                      <span className="font-mono text-[#2D2B27] dark:text-zinc-100">
+                        {b.total_balance}
+                        <span className="ml-1.5 text-[10px] text-[#A8A29E] dark:text-zinc-600">
+                          赠送 {b.granted_balance} · 充值 {b.topped_up_balance}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-[#A8A29E] dark:text-zinc-500">正在查询…</div>
+              )}
+            </div>
+          )}
 
           {/* ── Web & Search ── */}
           <div className="mb-4 border-t border-[#E5E2D9] pt-5 dark:border-[#3a3731]">

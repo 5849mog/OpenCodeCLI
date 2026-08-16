@@ -381,3 +381,54 @@ export async function fetchModels(
     .filter((x: unknown): x is string => typeof x === "string")
     .sort();
 }
+
+/** DeepSeek account balance entry (one per currency). */
+export interface BalanceInfo {
+  currency: string;
+  total_balance: string;
+  granted_balance: string;
+  topped_up_balance: string;
+}
+
+/** DeepSeek /user/balance response. */
+export interface BalanceResult {
+  is_available: boolean;
+  balance_infos: BalanceInfo[];
+}
+
+/**
+ * Fetch the account balance from DeepSeek's root endpoint (/user/balance).
+ *
+ * Note: this endpoint lives at the API **origin** (https://api.deepseek.com),
+ * NOT under /v1 — so we derive the origin from baseUrl instead of joinUrl'ing
+ * (joinUrl would produce /v1/user/balance → 404). Provider-specific: only
+ * DeepSeek documents it; other providers will return 404/401, surfaced here.
+ */
+export async function fetchBalance(
+  config: Pick<AiClientConfig, "baseUrl" | "apiKey">,
+): Promise<BalanceResult> {
+  let base: URL;
+  try {
+    base = new URL(config.baseUrl);
+  } catch {
+    throw new Error(`Invalid Base URL: ${config.baseUrl}`);
+  }
+  // Browser-side fetch: only http/https is ever constructed from a URL.
+  if (base.protocol !== "https:" && base.protocol !== "http:") {
+    throw new Error(`Unsupported URL protocol: ${base.protocol}`);
+  }
+  const url = `${base.origin}/user/balance`;
+  const resp = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${config.apiKey}`,
+    },
+  });
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(
+      `Balance API error ${resp.status}: ${text.slice(0, 300) || resp.statusText}`,
+    );
+  }
+  return (await resp.json()) as BalanceResult;
+}
