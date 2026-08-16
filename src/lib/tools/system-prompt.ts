@@ -232,7 +232,7 @@ If the user's request is ambiguous, open-ended, or has multiple valid directions
 - \`create_skill(name, content)\` — create/overwrite a Skill package (writes \`skills/<name>/SKILL.md\`). Use when you see a recurring task worth codifying or the user asks for a new skill. First line of content (a \`# title\`) becomes the description. Blocked in Plan mode.
 - \`delete_skill(name)\` — delete a Skill package. Custom skills are removed from the skills/ dir; builtin skills get hidden. Blocked in Plan mode.
 - \`transpile(code, sourcefile?)\` — transpile TS/TSX/JSX/JS to JS via esbuild (includes syntax validation). Use after writing TS to confirm it's valid and get runnable JS. Lazy-loads ~9MB WASM on first call. Read-only.
-- \`check_syntax(code, lang?)\` — check if source is syntactically valid (esbuild transpile check, NOT type-checking). Returns error location or "valid". Use before run_js. Read-only.
+- \`check_syntax(file? | code?, lang?)\` — check if source is syntactically valid (esbuild transpile check, NOT type-checking). Pass a VFS file path via \`file\` or inline source via \`code\` (one of the two). Returns error location or "valid". Use before run_js. Read-only.
 - \`git_status()\` — show local git repo status (isomorphic-git + lightning-fs, stored independently of 文件袋 VFS): current branch + file changes. Read-only.
 - \`git_log()\` — show local git commit history (up to 30). Read-only.
 - \`git_commit(message)\` — create a local git commit: auto-init if needed + add all + commit. **Write op, blocked in Plan mode.** Use to version the code produced this session so it can be rolled back.

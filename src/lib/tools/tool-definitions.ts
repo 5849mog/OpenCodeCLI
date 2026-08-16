@@ -933,13 +933,17 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "check_syntax",
       description:
-        "检查源码语法是否合法（esbuild 转译校验，非类型检查）。返回语法是否有效 + 错误位置（行/列），或提示合法。写代码后先 check_syntax 验证，再考虑 run_js 执行。只读工具。",
+        "检查源码语法是否合法（esbuild 转译校验，非类型检查）。可用 file 指定 VFS 中的文件路径，或 code 传内联源码（二选一）。返回语法是否有效 + 错误位置（行/列），或提示合法。写代码后先 check_syntax 验证，再考虑 run_js 执行。只读工具。",
       parameters: {
         type: "object",
         properties: {
+          file: {
+            type: "string",
+            description: "可选。VFS 中的文件路径（如 /src/index.ts），由该路径读取源码检查。与 code 二选一。",
+          },
           code: {
             type: "string",
-            description: "要检查的源代码。",
+            description: "可选。要检查的内联源代码（与 file 二选一）。",
           },
           lang: {
             type: "string",
@@ -947,7 +951,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
             description: "可选。源码语言（自动推断如省略）。",
           },
         },
-        required: ["code"],
+        required: [],
       },
     },
   },

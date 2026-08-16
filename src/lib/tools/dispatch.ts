@@ -431,13 +431,23 @@ export async function dispatchTool(
         };
       }
       case "check_syntax": {
-        const code = String(args.code ?? "");
-        if (!code.trim()) return { ok: false, output: "check_syntax: missing 'code'", tool: "check_syntax", args };
+        // 支持两种来源：内联 code，或 VFS 中的 file 路径（二选一）。
+        const p = args.file !== undefined ? String(args.file) : "";
+        let code: string | null;
+        if (p) {
+          code = vfs.readFileSync(p);
+          if (code === null) {
+            return { ok: false, output: `check_syntax: 文件不存在 — ${p}`, tool: "check_syntax", args };
+          }
+        } else {
+          code = String(args.code ?? "");
+        }
+        if (!code.trim()) return { ok: false, output: p ? `check_syntax: 文件为空 — ${p}` : "check_syntax: missing 'code'", tool: "check_syntax", args };
         const lang = args.lang !== undefined ? String(args.lang) : undefined;
         const err = await esbuildWasm.checkSyntax(code, lang);
         return {
           ok: !err,
-          output: err ? `语法错误: ${err}` : "✓ 语法合法",
+          output: err ? `语法错误: ${err}${p ? `（${p}）` : ""}` : `✓ 语法合法${p ? `（${p}）` : ""}`,
           tool: "check_syntax",
           args,
         };
