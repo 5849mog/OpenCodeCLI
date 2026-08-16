@@ -265,6 +265,77 @@ async function toolRunJs(args: Record<string, unknown>, readOnly = false): Promi
   return { ok: result.ok, output: result.output, tool: "run_js", args };
 }
 
+// ── check_syntax 多语言 / 多文件支持 ─────────────────────────────
+
+/** 由路径扩展名推断语言；无扩展名或未知返回 undefined。 */
+function extToLang(path: string): string | undefined {
+  const base = path.split("/").pop() ?? "";
+  const idx = base.lastIndexOf(".");
+  const ext = (idx < 0 ? "" : base.slice(idx + 1)).toLowerCase();
+  const map: Record<string, string> = {
+    ts: "ts", tsx: "tsx", js: "js", jsx: "jsx", mjs: "js", cjs: "js",
+    json: "json", lua: "lua", md: "markdown", markdown: "markdown",
+    css: "css", html: "html", htm: "html", sql: "sql", py: "python",
+    yaml: "yaml", yml: "yaml", toml: "toml", txt: "text",
+    sh: "sh", bash: "bash", zsh: "zsh", csv: "csv",
+  };
+  return map[ext];
+}
+
+/** 暂不支持语法校验的语言（诚实反馈，避免假阳性）。 */
+function isUnsupportedLang(lang: string): boolean {
+  return [
+    "css", "html", "sql", "python", "py", "markdown", "md", "text", "txt",
+    "yaml", "yml", "toml", "sh", "bash", "zsh", "csv",
+  ].includes(lang);
+}
+
+/** JSON 语法校验：返回 {ok, error?}，错误带 JSON 字符位置。 */
+function checkJson(code: string): { ok: boolean; error?: string } {
+  try {
+    JSON.parse(code);
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // V8 错误形如 `Unexpected token } in JSON at position 12`。
+    const pos = msg.match(/in JSON at position (\d+)/);
+    const m = pos ? pos[1] : "";
+    return { ok: false, error: m ? `${msg}（字符 #${m}）` : msg };
+  }
+}
+
+/** Lua 语法校验：复用 luaWasm 的编译错误（Lua 引擎的 syntax error 会进 result.output）。 */
+async function checkLua(code: string): Promise<{ ok: boolean; error?: string }> {
+  // 用 evaluate 触发 Lua 编译：语法错误在编译期抛出、不执行任何副作用。
+  // lua-wasm 把 stderr 合并进 result.output；wasm 不可用时会回退到 JS 解释器。
+  const result = await luaWasm.evaluate({ script: code });
+  if (!result.ok) {
+    // 尽量提取 lua 的报错行（形如 `<...>:1: 'end' expected`）。
+    const m = result.output.match(/(\d+:\s*.+)/m);
+    return { ok: false, error: (m && m[1]) || result.output || "Lua 编译失败" };
+  }
+  return { ok: true };
+}
+
+/**
+ * 校验**单份**源码（按语言路由）。lang 为解析后的语言（显式或扩展名推断）。
+ * path 用于报错回显（可空）。仅 ts/js 系漏过 lang 时由 esbuild 自动推断。
+ */
+async function checkSourceForLang(
+  code: string,
+  lang: string | undefined,
+): Promise<{ ok: boolean; error?: string }> {
+  const l = lang?.toLowerCase();
+  if (l && isUnsupportedLang(l)) {
+    return { ok: false, error: `暂不支持校验 ${l} 语言；请用对应运行工具（run_lua / run_sql / bash 等）自行验证` };
+  }
+  if (l === "json") return checkJson(code);
+  if (l === "lua") return checkLua(code);
+  // 缺省：esbuild 转译校验（js/ts/jsx/tsx；lang 可为空，由 esbuild 自动推断）。
+  const err = await esbuildWasm.checkSyntax(code, l);
+  return err ? { ok: false, error: err } : { ok: true };
+}
+
 export async function dispatchTool(
   name: string,
   args: Record<string, unknown>,
@@ -431,8 +502,45 @@ export async function dispatchTool(
         };
       }
       case "check_syntax": {
-        // 支持两种来源：内联 code，或 VFS 中的 file 路径（二选一）。
+        // 来源三选一：code（内联）| file（单文件）| files（多文件数组）。
         const p = args.file !== undefined ? String(args.file) : "";
+        const batch = args.files;
+        const hasBatch = Array.isArray(batch) && batch.length > 0;
+        const hasCode = args.code !== undefined;
+        const srcCount = (p ? 1 : 0) + (hasCode ? 1 : 0) + (hasBatch ? 1 : 0);
+        if (srcCount > 1) {
+          return { ok: false, output: "check_syntax: code / file / files 只能三选一", tool: "check_syntax", args };
+        }
+
+        const langExplicit = args.lang !== undefined ? String(args.lang).toLowerCase() : undefined;
+
+        // ── 多文件批量：逐个按扩展名推断语言、逐一校验、汇总 ──
+        if (hasBatch) {
+          const maxFiles = 20;
+          if (batch.length > maxFiles) {
+            return { ok: false, output: `check_syntax: 单次最多 ${maxFiles} 个文件，收到 ${batch.length}`, tool: "check_syntax", args };
+          }
+          const lines: string[] = [];
+          let allOk = true;
+          for (const item of batch) {
+            const fp = String(item);
+            const content = vfs.readFileSync(fp);
+            if (content === null) { lines.push(`  ✗ ${fp} — 文件不存在`); allOk = false; continue; }
+            if (!content.trim()) { lines.push(`  ✓ ${fp} — 空文件`); continue; }
+            const lang = langExplicit ?? extToLang(fp);
+            const r = await checkSourceForLang(content, lang);
+            lines.push(r.ok ? `  ✓ ${fp}` : `  ✗ ${fp} — ${r.error}`);
+            if (!r.ok) allOk = false;
+          }
+          return {
+            ok: allOk,
+            output: `${allOk ? "✓ 全部文件语法合法" : "发现语法问题"}\n${lines.join("\n")}`,
+            tool: "check_syntax",
+            args,
+          };
+        }
+
+        // ── 单文件 / 内联代码 ──
         let code: string | null;
         if (p) {
           code = vfs.readFileSync(p);
@@ -443,11 +551,23 @@ export async function dispatchTool(
           code = String(args.code ?? "");
         }
         if (!code.trim()) return { ok: false, output: p ? `check_syntax: 文件为空 — ${p}` : "check_syntax: missing 'code'", tool: "check_syntax", args };
-        const lang = args.lang !== undefined ? String(args.lang) : undefined;
-        const err = await esbuildWasm.checkSyntax(code, lang);
+
+        // 语言决定：显式 lang > 文件扩展名推断 > esbuild 源码特征。
+        const lang = langExplicit ?? (p ? extToLang(p) : undefined);
+        // 显式 lang 与文件扩展名矛盾时提示（避免用错语言产生假阴性）。
+        if (p && langExplicit && extToLang(p) && langExplicit !== extToLang(p)) {
+          return {
+            ok: false,
+            output: `check_syntax: lang='${langExplicit}' 与文件扩展名推断的 '${extToLang(p)}' 不一致（${p}）。请更正 lang 或检查路径。`,
+            tool: "check_syntax",
+            args,
+          };
+        }
+
+        const r = await checkSourceForLang(code, lang);
         return {
-          ok: !err,
-          output: err ? `语法错误: ${err}${p ? `（${p}）` : ""}` : `✓ 语法合法${p ? `（${p}）` : ""}`,
+          ok: r.ok,
+          output: `${r.ok ? "✓ 语法合法" : `语法错误: ${r.error}`}${p ? `（${p}）` : ""}`,
           tool: "check_syntax",
           args,
         };

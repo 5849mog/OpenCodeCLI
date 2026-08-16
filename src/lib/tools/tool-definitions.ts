@@ -933,22 +933,27 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "check_syntax",
       description:
-        "检查源码语法是否合法（esbuild 转译校验，非类型检查）。可用 file 指定 VFS 中的文件路径，或 code 传内联源码（二选一）。返回语法是否有效 + 错误位置（行/列），或提示合法。写代码后先 check_syntax 验证，再考虑 run_js 执行。只读工具。",
+        "检查源码语法是否合法（非类型检查）。来源三选一：file（单文件路径）/ files（多文件路径数组，一次批量校验）/ code（内联源码）。支持 ts/tsx/js/jsx（esbuild）、json（JSON.parse）、lua（Lua 引擎）语法校验；css/html/sql/python/markdown/yaml 等暂不支持会诚实提示。文件语言按扩展名自动推断，也可显式传 lang。只读工具。",
       parameters: {
         type: "object",
         properties: {
           file: {
             type: "string",
-            description: "可选。VFS 中的文件路径（如 /src/index.ts），由该路径读取源码检查。与 code 二选一。",
+            description: "可选。VFS 中的单文件路径（如 /src/index.ts），读取后校验。与 code / files 三选一。",
+          },
+          files: {
+            type: "array",
+            items: { type: "string" },
+            description: "可选。VFS 中的多文件路径数组，一次性批量校验（最多 20 个）。每个文件按各自扩展名推断语言。与 code / file 三选一。",
           },
           code: {
             type: "string",
-            description: "可选。要检查的内联源代码（与 file 二选一）。",
+            description: "可选。要检查的内联源代码（与 file / files 三选一）。",
           },
           lang: {
             type: "string",
-            enum: ["ts", "tsx", "js", "jsx"],
-            description: "可选。源码语言（自动推断如省略）。",
+            enum: ["ts", "tsx", "js", "jsx", "json", "lua"],
+            description: "可选。源码语言（有 file/files 时默认按扩展名推断；内联 code 时省略则由 esbuild 自动识别 JS/TS 变种）。",
           },
         },
         required: [],
