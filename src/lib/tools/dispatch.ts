@@ -527,7 +527,15 @@ export async function dispatchTool(
             const content = vfs.readFileSync(fp);
             if (content === null) { lines.push(`  ✗ ${fp} — 文件不存在`); allOk = false; continue; }
             if (!content.trim()) { lines.push(`  ✓ ${fp} — 空文件`); continue; }
-            const lang = langExplicit ?? extToLang(fp);
+            const langFromExt = extToLang(fp);
+            // 显式 lang 与某文件扩展名矛盾时，对该文件提示而非整体失败（仅受支持 lang 走矛盾；
+            // 不受支持的显式 lang 由 checkSourceForLang 统一报"暂不支持"）。
+            if (langExplicit && langFromExt && !isUnsupportedLang(langExplicit) && langExplicit !== langFromExt) {
+              lines.push(`  ✗ ${fp} — lang='${langExplicit}' 与扩展名推断的 '${langFromExt}' 不一致`);
+              allOk = false;
+              continue;
+            }
+            const lang = langExplicit ?? langFromExt;
             const r = await checkSourceForLang(content, lang);
             lines.push(r.ok ? `  ✓ ${fp}` : `  ✗ ${fp} — ${r.error}`);
             if (!r.ok) allOk = false;
@@ -554,7 +562,17 @@ export async function dispatchTool(
 
         // 语言决定：显式 lang > 文件扩展名推断 > esbuild 源码特征。
         const lang = langExplicit ?? (p ? extToLang(p) : undefined);
-        // 显式 lang 与文件扩展名矛盾时提示（避免用错语言产生假阴性）。
+        // 不支持语言优先：显式 lang 本身就不支持（python/sql/css/md…），
+        // 无论扩展名如何都直接报"暂不支持"，避免矛盾检查掩盖"这语言查不了"。
+        if (langExplicit && isUnsupportedLang(langExplicit)) {
+          return {
+            ok: false,
+            output: `check_syntax: 暂不支持校验 ${langExplicit} 语言；请用对应运行工具（run_lua / run_sql / bash 等）自行验证`,
+            tool: "check_syntax",
+            args,
+          };
+        }
+        // 显式 lang 与文件扩展名矛盾时提示（仅当两边都是受支持语言才会走到，避免用错语言产生假阴性）。
         if (p && langExplicit && extToLang(p) && langExplicit !== extToLang(p)) {
           return {
             ok: false,
