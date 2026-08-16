@@ -409,3 +409,45 @@ export async function removeSkill(name: string): Promise<{ ok: boolean; source: 
   await deleteCustomSkill(name);
   return { ok: true, source: "custom", name };
 }
+
+// ---------------------------------------------------------------------------
+// 导出 / 导入（用于 skill 备份与分享）
+// ---------------------------------------------------------------------------
+
+/** 导出全部**自定义** skill（内置随代码嵌入，不导出）。供 UI「导出」生成备份 JSON。 */
+export async function exportSkills(): Promise<{ name: string; content: string }[]> {
+  const customs = await readCustomSkills();
+  return customs.map(({ name, content }) => ({ name, content }));
+}
+
+/** 单个 skill 导入结果。 */
+export interface ImportedSkill {
+  name: string;
+  status: "added" | "skipped" | "invalid";
+  error?: string;
+}
+
+/**
+ * 批量导入自定义 skill。
+ * - 逐条 validateSkillName 校验名称 → 非法记为 invalid（跳过）
+ * - 内容非空才写，否则 invalid
+ * - 合法则 createSkill 写入（同名覆盖），记为 added
+ * 返回每一条的导入结果，供 UI 展示。对任意伪造的 name/content 都安全（仅写独立 store）。
+ */
+export async function importSkills(
+  list: { name: string; content: string }[],
+): Promise<ImportedSkill[]> {
+  const results: ImportedSkill[] = [];
+  for (const item of list ?? []) {
+    const name = String(item?.name ?? "").trim();
+    if (!name) { results.push({ name, status: "invalid", error: "缺 name" }); continue; }
+    const err = validateSkillName(name);
+    if (err) { results.push({ name, status: "invalid", error: err }); continue; }
+    const content = String(item?.content ?? "").trim();
+    if (!content) { results.push({ name, status: "invalid", error: "内容为空" }); continue; }
+    const res = await createSkill(name, content);
+    if (res.ok) results.push({ name, status: "added" });
+    else results.push({ name, status: "invalid", error: res.error });
+  }
+  return results;
+}
