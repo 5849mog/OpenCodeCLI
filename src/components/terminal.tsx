@@ -775,18 +775,24 @@ export function Terminal() {
         </div>
         <div className="mt-2 flex items-center justify-between px-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
           <span className="flex items-center gap-3">
-            {totalTokens > 0 && (
+            {lastUsage ? (
               <button
                 onClick={() => setTokenSheetOpen(true)}
-                title={
-                  lastUsage
-                    ? `Last: ${lastUsage.prompt_tokens} prompt + ${lastUsage.completion_tokens} completion · 点击查看 Token 面板`
-                    : "Total tokens used this session · 点击查看 Token 面板"
-                }
+                title={`上次请求 ${lastUsage.prompt_tokens.toLocaleString()} prompt + ${lastUsage.completion_tokens.toLocaleString()} completion · 本会话累计 ${totalTokens.toLocaleString()} tokens（账单口径）· 点击查看 Token 面板`}
                 className="cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
               >
-                {totalTokens.toLocaleString()} tokens
+                {lastUsage.total_tokens.toLocaleString()} tokens
               </button>
+            ) : (
+              totalTokens > 0 && (
+                <button
+                  onClick={() => setTokenSheetOpen(true)}
+                  title={`本会话累计 ${totalTokens.toLocaleString()} tokens · 点击查看 Token 面板`}
+                  className="cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+                >
+                  {totalTokens.toLocaleString()} tokens
+                </button>
+              )
             )}
             {isStreaming && (
               <span className="flex items-center gap-1.5">
