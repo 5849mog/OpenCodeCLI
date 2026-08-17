@@ -430,6 +430,11 @@ function splitLines(s: string): string[] {
   return l;
 }
 
+/** 转义正则元字符，使 pattern 作为**固定字符串**字面匹配（grep -F）。 */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, readOnly = false): Promise<{
   ok: boolean;
   output: string;
@@ -903,13 +908,28 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       const ctxB = /B/.test(allFlags);
       const hasCtx = ctxC || ctxA || ctxB;
       const isSingleFile = !!(fileArg && positional.length === 2); // only 1 file given
+      // -F：固定字符串（字面匹配，`|` 等元字符不再特殊）。-E/-G 在本环境同为 ERE，仅用于提示。
+      const fixedString = /F/.test(allFlags);
+      // ERE 路径下若用户误用 BRE 写法 `a\|b`（`\|` 在 ERE 里是"字面 |"，常导致静默无匹配），给个提示。
+      const breStyleEscapedPipe = !fixedString && pattern.includes("\\|");
 
       let re: RegExp;
       try {
-        re = new RegExp(pattern, caseSensitive ? "g" : "gi");
+        re = new RegExp(
+          fixedString ? escapeRegExp(pattern) : pattern,
+          caseSensitive ? "g" : "gi",
+        );
       } catch {
         return { ok: false, output: `grep: invalid pattern: ${pattern}` };
       }
+      // grepSync（目录递归 / 全工作区）也要用同一套字面/正则语义。
+      const syncPattern = fixedString ? escapeRegExp(pattern) : pattern;
+      // ERE 语义提示（仅当用户走了 `a\|b` BRE 误写且没开 -F 时报一次）。
+      const ereHint =
+        breStyleEscapedPipe
+          ? `\n⚠️ grep 用 ERE：\`|\` 是"或"，\`\\|\` 是"字面 |"。写 \`a\\|b\` 会找字面 "a|b"。要"或"请用 \`a|b\`，要字面请用 -F。`
+          : "";
+      const withHint = (out: string): string => (out === "" ? out : out + ereHint);
 
       /** Return whether a line matches (respecting -v). */
       const matchLine = function (line: string): boolean {
@@ -1002,14 +1022,14 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
           for (let i = 0; i < lines.length; i++) { if (matchLine(lines[i])) return { ok: true, output: "" }; }
           return { ok: true, output: "(no matches)" };
         }
-        const matches = grepSync(pattern, { regex: true, caseSensitive, max: 1 });
+        const matches = grepSync(syncPattern, { regex: true, caseSensitive, max: 1 });
         return { ok: true, output: matches.length > 0 ? "" : "(no matches)" };
       }
 
       if (stdin !== undefined) {
         const lines = splitLines(stdin);
         const out = formatMatches(lines, true);
-        return { ok: true, output: out.join("\n") || "" };
+        return { ok: true, output: withHint(out.join("\n") || "") };
       }
       if (fileArg) {
         const content = vfs.readFileSync(fileArg);
@@ -1017,22 +1037,22 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
           // Check if it's a directory — do recursive search if so
           const stat = vfs.statSync(fileArg);
           if (stat && stat.type === "dir") {
-            const matches = grepSync(pattern, { path: fileArg, regex: true, caseSensitive, max: 100 });
+            const matches = grepSync(syncPattern, { path: fileArg, regex: true, caseSensitive, max: 100 });
             if (matches.length === 0) return { ok: true, output: "" };
             const truncated = Boolean((matches as (typeof matches & { truncated?: boolean })).truncated);
             const truncNote = truncated ? `\n⚠️ grep: results TRUNCATED at 100 — there are MORE matches. Narrow the search.` : "";
             if (countOnly) return { ok: true, output: String(matches.length) };
             if (filesOnly) return { ok: true, output: matches.map((m) => m.path).filter((p, i, a) => a.indexOf(p) === i).join("\n") };
-            return { ok: true, output: matches.map((m) => `${m.path}:${m.line}: ${m.text}`).join("\n") + truncNote };
+            return { ok: true, output: withHint(matches.map((m) => `${m.path}:${m.line}: ${m.text}`).join("\n") + truncNote) };
           }
           return { ok: false, output: `grep: ${fileArg}: not found` };
         }
         const lines = splitLines(content);
         const out = formatMatches(lines, false);
-        return { ok: true, output: out.join("\n") || "" };
+        return { ok: true, output: withHint(out.join("\n") || "") };
       }
       // Workspace-wide search (no file arg)
-      const matches = grepSync(pattern, { regex: true, caseSensitive, max: 100 });
+      const matches = grepSync(syncPattern, { regex: true, caseSensitive, max: 100 });
       if (matches.length === 0) return { ok: true, output: "" };
       const truncated = Boolean((matches as (typeof matches & { truncated?: boolean })).truncated);
       const truncNote = truncated ? `\n⚠️ grep: results TRUNCATED at 100 — there are MORE matches. Narrow the search.` : "";
@@ -1040,7 +1060,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       if (filesOnly) return { ok: true, output: matches.map((m) => m.path).filter((p, i, a) => a.indexOf(p) === i).join("\n") };
       return {
         ok: true,
-        output: matches.map((m) => `${m.path}:${m.line}: ${m.text}`).join("\n") + truncNote,
+        output: withHint(matches.map((m) => `${m.path}:${m.line}: ${m.text}`).join("\n") + truncNote),
       };
     }
     case "sed": {

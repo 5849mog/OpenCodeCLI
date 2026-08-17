@@ -326,6 +326,7 @@ When \`grep\` returns \`"(no matches)"\`:
 - This means the search completed but found nothing
 - **Do NOT retry** — there are simply no matches for that pattern
 - Report the result to the user
+- **NOTE:** bash \`grep\` uses **ERE** semantics: \`|\` is "or", \`\\|\` is a LITERAL \`|\` character. To search for "a **or** b" write \`grep 'a|b'\` — do NOT write GNU BRE-style \`grep 'a\\|b'\` (that looks for the literal string "a|b" and usually returns nothing). Use \`-F\` to treat the pattern as a FIXED STRING (all metacharacters literal): \`grep -F 'a|b'\` searches for the exact text \`a|b\`. When you do hit the BRE-style \`\\|\` mistake, the tool appends a hint to the output.
 
 When \`search_files\` / \`glob\` / \`search_symbols\` returns \`Path not found: <path>\` (ok:false):
 - This means the given path does not exist in the workspace
