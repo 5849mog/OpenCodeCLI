@@ -965,7 +965,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "check_types",
       description:
-        "跨文件完整类型检查（基于官方 TypeScript 编译器 tsc，Web Worker 隔离，只读）。对目录或单文件做 Program 级类型诊断——比 check_syntax 更强的语义检查：能发现跨文件 import/导出/接口/类型别名不匹配、缺 export、类型不能赋给等真实类型错误。传 path（目录或 .ts/.tsx 文件）即可，自动收集该范围所有相关文件并解析 tsconfig（有则用，无则用合理默认）。语法问题用 check_syntax（快），类型问题用 check_types（全）。大项目可能需数秒~数十秒（Worker 不卡页面，可取消）。",
+        "跨文件完整类型检查（基于官方 TypeScript 编译器 tsc，Web Worker 隔离，只读）。对目录或单文件做 Program 级类型诊断——比 check_syntax 更强的语义检查：能发现跨文件 import/导出/接口/类型别名不匹配、缺 export、类型不能赋给等真实类型错误。传 path（目录或 .ts/.tsx 文件）即可，自动收集该范围所有相关文件并解析 tsconfig（有则用，无则用合理默认）。⚠️ 环境边界：浏览器里没有 node_modules，第三方依赖（react/zustand 等）类型无法解析，相关 \"Cannot find module / implicit any\" 会降为「提示」而非报错——只有标「错误」的才是可能真实的问题；依赖 node_modules 的现代前端项目请用本地 tsc 做权威类型检查。语法问题用 check_syntax（快），类型问题用 check_types（全）。大项目可能需数秒~数十秒（Worker 不卡页面，可取消）。",
       parameters: {
         type: "object",
         properties: {

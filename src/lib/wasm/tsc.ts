@@ -153,15 +153,27 @@ export async function checkTypes(
           }
           const r = msg.result || {};
           const diags: TscDiagnostic[] = (r.diagnostics || []).map((line: string) => {
-            const m = line.match(/^(.*?):(\d+):(\d+)\s+(.*)$/);
+            const m = line.match(/^(.*?):(\d+):(\d+)\s+\[TS\d+\s+(错误|提示)\]\s+(.*)$/);
             if (m) {
-              return { loc: `${m[1]}:${m[2]}:${m[3]}`, code: "", isError: line.includes("错误"), message: m[4] };
+              return { loc: `${m[1]}:${m[2]}:${m[3]}`, code: "", isError: m[4] === "错误", message: m[5] };
             }
             return { loc: "", code: "", isError: line.includes("错误"), message: line };
           });
-          const summary = `${r.errorCount > 0 ? "发现类型错误" : "✓ 类型检查通过"}：检查 ${r.files ?? 0} 个文件，${r.errorCount ?? 0} 个错误，耗时 ${(r.durationMs ?? 0)}ms。`;
+          const errC = r.errorCount ?? 0;
+          const noteC = r.noteCount ?? 0;
+          const filesN = r.files ?? 0;
+          const ms = r.durationMs ?? 0;
+          let summary = errC > 0
+            ? `发现 ${errC} 个类型错误`
+            : `✓ 类型检查通过（${noteC} 条环境噪声已被列为提示）`;
+          summary += `：检查 ${filesN} 个文件，耗时 ${ms}ms。`;
+          // 环境边界：浏览器无 node_modules，第三方模块解析失败产生的噪声单独说明，
+          // 避免用户误以为是真实代码错误。
+          if (r.envNoise) {
+            summary += `\n  ⚠️ 环境边界：浏览器无法解析第三方模块（react/zustand/…），其中 ${noteC} 条 "Cannot find module / implicit any" 类已被降为「提示」；上方标「错误」的才可能是真实代码问题。有 node_modules 的项目请用本地 \`tsc\` 做权威类型检查。`;
+          }
           const body = summary + "\n" + ((r.diagnostics || []).join("\n") || "");
-          resolve({ ok: r.errorCount === 0, output: body, files: r.files ?? 0, errorCount: r.errorCount ?? 0, diagnostics: diags, durationMs: r.durationMs ?? 0 });
+          resolve({ ok: errC === 0, output: body, files: filesN, errorCount: errC, diagnostics: diags, durationMs: ms });
         };
 
         w.onerror = (err) => {

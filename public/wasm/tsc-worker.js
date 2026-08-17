@@ -218,9 +218,25 @@
     var program = ts.createProgram(rootFiles, options, host);
     var diagnostics = ts.getPreEmitDiagnostics(program);
 
+    // 环境噪声 TS 码：浏览器里没有 node_modules，第三方模块无法解析、泛型推断退化，
+    // 会产生连锁假错误。这些降级为「提示」而非「错误」，避免淹没真实代码问题。
+    var ENV_NOISE = {
+      2307: true, // Cannot find module 'x'
+      2792: true, // Cannot find module 'x' (did you mean 'y'?)
+      7016: true, // Could not find declaration file for module
+      2686: true, // 'x' refers to a value, but is being used as a type
+      7006: true, // Parameter 'x' implicitly has an 'any' type
+      7005: true, // Variable 'x' implicitly has an 'any' type
+      7008: true, // Member 'x' implicitly has an 'any' type
+      18046: true, // 'x' is of type 'unknown'
+      2571: true // Object is of type 'unknown'
+    };
     var lines = [];
     var errCount = 0;
+    var noteCount = 0;
+    var sawNoise = false;
     diagnostics.forEach(function (d) {
+      var isNoise = d.category === ts.DiagnosticCategory.Error && !!ENV_NOISE[d.code];
       var text = ts.flattenDiagnosticMessageText(d.messageText, "\n");
       var loc = "";
       if (d.file && d.start !== undefined) {
@@ -230,11 +246,20 @@
         loc = display + ":" + (pos.line + 1) + ":" + (pos.character + 1) + "  ";
       }
       var code = "TS" + d.code;
-      var cat = d.category === ts.DiagnosticCategory.Error ? "错误" : "提示";
+      var cat;
+      if (isNoise) { cat = "提示"; noteCount++; sawNoise = true; }
+      else if (d.category === ts.DiagnosticCategory.Error) { cat = "错误"; errCount++; }
+      else { cat = "提示"; }
       lines.push((loc || "") + "[" + code + " " + cat + "] " + text);
-      if (d.category === ts.DiagnosticCategory.Error) errCount++;
     });
 
-    return { files: rootFiles.length, diagnostics: lines, errorCount: errCount, durationMs: 0 };
+    return {
+      files: rootFiles.length,
+      diagnostics: lines,
+      errorCount: errCount,
+      noteCount: noteCount,
+      envNoise: sawNoise,
+      durationMs: 0
+    };
   }
 })();
