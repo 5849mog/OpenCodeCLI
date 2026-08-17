@@ -6,10 +6,13 @@
  * 可与 check_syntax（esbuild 语法检查）互补。
  *
  * 关键设计：
- *  - Worker 用 Blob URL 内联（`new Worker(URL.createObjectURL(...))`），绕开
- *    Next static export 对 `new Worker(new URL(import.meta.url))` 的打包限制。
- *  - Worker 里 importScripts 加载 public/wasm/typescript.js（同源绝对 URL，
- *    basePath 已处理）。typescript.js 由构建脚本从 node_modules 复制而来。
+ *  - Worker 用独立静态文件 public/wasm/tsc-worker.js（`new Worker('/wasm/tsc-worker.js')`
+ *    字符串路径，next 把 public/ 原样复制到 out/，不经打包）。初版用 Blob URL 内联
+ *    内 + importScripts 加载**绝对**的 typescript.js URL，浏览器因 Blob 源是 opaque、
+ *    CSP 无权限拉取绝对脚本而报 "The string did not match the expected pattern"——
+ *    改为独立 worker 文件内用**相对** importScripts("./typescript.js")（worker 与
+ *    typescript.js 同目录，天然同源）。
+ *  - typescript.js 由构建脚本（tools/tsc/prepare.sh）从 node_modules 复制到 public/wasm。
  *  - 宿主只把「root + 该范围所有 .ts/.tsx/.json 文件的内容」一次性 postMessage
  *    给 Worker；Worker 内建内存 CompilerHost，全程只读、不回写 VFS。
  *  - 超时用 timer + worker.terminate() 强杀，防 tsc 真卡死标签页；可被 AbortSignal 取消。
@@ -19,7 +22,6 @@
  */
 
 import { vfs } from "../vfs";
-import { tscWorkerSource } from "./tsc-worker-source";
 
 export interface TscCheckOptions {
   /** 目录或单个 .ts/.tsx 文件路径（相对 VFS 根）。 */
@@ -78,23 +80,18 @@ function collectFiles(root: string): Record<string, string> {
   return map;
 }
 
-/** 启动 Blob Worker。typescript.js 每次加载跨 worker 丢失，故每次新建（tsc 重、
- *  单次调用后 terminate 最稳，避免跨消息状态泄漏）。 */
-function spawnWorker(typescriptUrl: string): Worker {
-  const source = tscWorkerSource(typescriptUrl);
-  const blob = new Blob([source], { type: "application/javascript" });
-  const url = URL.createObjectURL(blob);
-  const w = new Worker(url, { type: "classic" });
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  return w;
+/** 启动 Worker（独立静态文件 public/wasm/tsc-worker.js）。每次新建并在调用后
+ *  terminate，避免跨消息状态泄漏；worker 内相对 importScripts("./typescript.js")。 */
+function spawnWorker(workerUrl: string): Worker {
+  return new Worker(workerUrl, { type: "classic" });
 }
 
-/** Worker 生命周期管理：单飞，避免并发建多个 Worker。 */
+/** Worker 生命周期管理：每次调用新建 + 用完即 terminate。 */
 async function withWorker<T>(
-  typescriptUrl: string,
+  workerUrl: string,
   task: (w: Worker) => Promise<T>,
 ): Promise<T> {
-  const w = spawnWorker(typescriptUrl);
+  const w = spawnWorker(workerUrl);
   try {
     return await task(w);
   } finally {
@@ -107,7 +104,8 @@ export async function checkTypes(
   options: TscCheckOptions,
   signal?: AbortSignal,
 ): Promise<TscCheckResult> {
-  const typescriptUrl = wasmUrl("wasm/typescript.js");
+  // worker 静态文件（public/wasm/tsc-worker.js，next 原样复制到 out/），相对 importScripts("./typescript.js")
+  const workerUrl = wasmUrl("wasm/tsc-worker.js");
   const root = options.root.trim();
   if (!root) {
     return { ok: false, output: "check_types: 缺少 path/root", files: 0, errorCount: 0, diagnostics: [], durationMs: 0 };
@@ -128,7 +126,7 @@ export async function checkTypes(
   let worker: Worker | null = null;
 
   try {
-    return await withWorker(typescriptUrl, (w) => {
+    return await withWorker(workerUrl, (w) => {
       worker = w;
       return new Promise<TscCheckResult>((resolve) => {
         let settled = false;
