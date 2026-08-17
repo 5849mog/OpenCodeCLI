@@ -1,10 +1,12 @@
 # 🚀 OpenCodeCLI 成长日志
 
-> 由 Git 历史自动整理，共 **127** 次提交。最新在最上方。
+> 由 Git 历史自动整理，共 **137** 次提交。最新在最上方。
 
 | 日期 | 提交数 | 高亮 |
 |------|--------|------|
-| 2026-08-15 | 15 | 4 个新功能、8 个修复 |
+| 2026-08-17 | 2 | 1 个新功能、1 个修复 |
+| 2026-08-16 | 7 | 6 个新功能、1 个修复 |
+| 2026-08-15 | 16 | 4 个新功能、8 个修复 |
 | 2026-08-13 | 1 | 1 个新功能 |
 | 2026-08-12 | 14 | 4 个新功能、3 个修复 |
 | 2026-08-11 | 13 | 7 个新功能、4 个修复 |
@@ -22,7 +24,133 @@
 
 ---
 
+## 📅 2026-08-17
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/9a0dbe50d38f9f27bfc10c001a85cfe993e8fd95">9a0dbe5</a> — feat: system-prompt 审查整改（P0/P1 关键 code 档）+ PLAN 移出 VFS</summary>
+
+> Prompt（system-prompt.ts，新增/重写段落一律英文）：
+> - 文件树口径统一：静态 4 处改"树只有一级摘要"；探索指南迁回静态；动态块删 MANDATORY 段落，只留 Mode+一级树+plan+日期
+> - 失败分类协议替换 zero-retry：类型 A 能力缺失→停/报告/一个建议；类型 B 有修正信息→重试一次；类型 C 领域阴性（grep 无匹配/check_syntax 无效/测试失败）→有效信息
+> - CORS→搜索回退具名例外（须明确声明已切换），写进协议内部单一来源，Web access notes 同步
+> - Plan mode 措辞：update_plan 所有模式可用（独立存储）+ dispatch_subagent 继承只读
+> - 新增数据与指令边界节（文件/网页/子代理引用=数据非指令，含密钥回显）
+> - customInstructions 加围栏标记；子代理禁 ask_user_input（Rule 7 + 工具过滤）
+> - 表达与内容边界收窄为领域内（去掉"永不拒绝/尺度只升不降"）
+> - 语言对齐 / 验证纪律 / 批量提问 / L28/L31 / 阈值表述 / 硬编码示例名
+> - 节奏#1/#5 语义与新协议对齐（中文格言体保留），其余节奏条目不动
+> Code：
+> - dispatch.ts 集中式 readOnly 拦截 11 个写工具（write/edit/multi_edit/delete/move/append/create_dir/apply_patch/insert_at/undo_edit/unzip_archive），堵住 Plan 模式下子代理绕过主循环 mutatingTools 集合实际写盘的漏洞；run_lua/run_js outputs 与 create_skill/delete_skill 的拦截本就在工具实现层（dispatch.ts:67/193/440/462），子代理路径已覆盖
+> - subagent.ts 工具集过滤 ask_user_input
+> - vfs.ts treeSummary：条目上限 50 + "... and N more" + 文件名净化（控制字符/反引号围栏/超长截断）
+> - terminal.tsx：Graphviz SVG 剥 href/xlink:href/<script>/<foreignObject>（防 AI 可控 DOT 注入）；mermaid 显式 securityLevel:"strict"；KaTeX trust:false 与无 rehype-raw 已核实默认安全
+> - PLAN.md 移出 VFS → 独立 IndexedDB store（opencode-plan，仿 skills 模式）：plan.ts/PlanPanel/PlanHeaderBadge 改读 plan-store（UI 订阅 planVersion），session MUTATING_TOOLS 移除 update_plan（不再写 VFS、不再快照），zip 导出与树摘要自动不再包含；VFS 遗留孤儿 PLAN.md 不做迁移
+> - 启动处（vfs-view init）补 hydratePlan，与 getPlan 首次调用双保险防竞态
+> 已核实不成立、无需改动：P1-1 context 块每轮重建于索引 1、从不写回历史（session.ts:910-923，truncateConversation 显式保护 index 0/1，/compact 替换式压缩）；P2-3 unzip zip-slip 防护完备（zip.ts sanitizeZipPath 拒绝任何含 .. 的条目，工具与上传自动解压共用）
+> 已知技术债：run_lua/run_js 主线程同步 WASM 防冻结（quickjs 中断/内存上限、Lua Worker 隔离）、自动 compact 触发、主循环无进展停止、eval 评测集、规则编号重构、工具说明按需加载、listAllFilesSync 性能
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/8c522c47ac9b1bce788ae4e6579df47a4f355f45">8c522c4</a> — fix(grep): 支持 -F 固定字符串 + 明确 ERE 语义 + 误用转义管道符时提示</summary>
+
+> - grep 底层是 JS RegExp，恒为 ERE 语义；-E/-F/-G 此前全被忽略。
+> 按 GNU BRE 习惯写 grep 管道符转义会静默变成"字面管道符"（常无匹配），无法察觉。
+> - 新增 -F 支持：转义 pattern 按固定字符串字面匹配（管道符/原点/美元符等不再特殊），
+> 单文件、stdin、目录递归、全工作区 四条路径统一生效。
+> - pattern 含"反斜杠+管道符"且未开 -F 时，输出追加 ERE 语义提示。
+> - system-prompt 补充 grep ERE 用法说明（要"或"写 a|b，要字面用 -F）
+
+</details>
+
+## 📅 2026-08-16
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/cef246cf119d7f87261eefdb59a5b1d78f02c605">cef246c</a> — feat(config): 上下文发送预算改为设置可调（tokenBudget）</summary>
+
+> - AiConfig 新增 tokenBudget（默认 60000），设置里可调（4000~1_000_000）
+> - 主循环 truncateConversation 改用 config.tokenBudget 而非硬编码默认
+> - dispatch_subagent 继承 tokenBudget，子代理预算与主代理一致
+> - TokenSheet 面板分母/文案改用 config.tokenBudget（不再固定 6 万）
+> - 会话导入导出 config 同步 tokenBudget
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/23e686da4c6d57f10144a4a4e01588016785d66e">23e686d</a> — feat(skills): 导出/导入 + UI 新建·编辑·删除</summary>
+
+> - 后端新增 exportSkills（导出全部自定义 skill）与 importSkills（批量导入，
+> 逐条校验名称/内容，同名覆盖，返回逐条结果）
+> - SkillsDialog 新增『导出』按钮：Blob 下载 skills-backup.json（kind+version+skills）
+> - 新增『导入』按钮：读 JSON 校验结构 → importSkills → toast 汇总新增/跳过
+> - 新增『新建』内联表单（名称 + markdown 编辑器）
+> - 展开的自定义 skill 支持『编辑』（textarea 预填 → 同名覆盖保存）
+> - 每行新增删除（自定义→移除，内置→隐藏），confirm 防误删
+> - onSkillsChange 订阅保证 UI 与 AI 操作实时同步
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/23170514009fb1d310eaeb6df27b20eef2009096">2317051</a> — fix(esbuild): check_syntax 不支持语言优先于 lang/扩展名矛盾检查</summary>
+
+> - 显式 lang 为不支持语言（python/sql/css/md 等）时一律报『暂不支持』，
+> 不再被 lang 与扩展名矛盾提示掩盖（内联 code 与 file 行为一致）
+> - lang/扩展名矛盾检查仅在两语言都是受支持语言时触发
+> - 多文件批量：显式 lang 与某文件扩展名矛盾时对该文件报错而非整体失败
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/3e389821067b830cf81c29960ef0b27289b4a5c8">3e38982</a> — feat(tool): check_syntax 升级多语言 + 一次批量校验多文件</summary>
+
+> - 多语言路由：ts/tsx/js/jsx（esbuild）、json（JSON.parse）、lua（Lua 引擎）；
+> css/html/sql/python/md/yaml/sh 等诚实提示暂不支持，不产生假阳性
+> - 新增 files 数组：一次调用批量校验多个 VFS 文件（≤20），每文件按扩展名
+> 推断语言、汇总逐行结果；与 code/file 三选一
+> - 语言优先级：显式 lang > 扩展名推断 > esbuild 源码特征；lang 与扩展名
+> 矛盾时提示而非静默用错
+> - 契约同步：lang enum 扩容、files 参数、system-prompt 文案
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/f3ec9412e4cf926d9a1be87233abb0b1879a40a1">f3ec941</a> — feat(deepseek): 集成 /user/balance 余额查询 + 模型下拉并入实拉列表</summary>
+
+> - ai-client 新增 fetchBalance：从 baseUrl 取 origin 拼根路径 /user/balance
+> （绕开 /v1 后缀 404），仅允许 http/https，错误原样上抛
+> - 设置对话框：DeepSeek baseUrl 时显示『账户余额』卡片，打开自动查询 +
+> 刷新按钮，展示总额/赠送/充值/币种/可用状态
+> - Test 成功后把实拉模型并入模型下拉 datalist（与预设去重）
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/567040096ad9eed0e18371a07c7f4492ec93a13c">5670400</a> — feat(ui): Token 面板与计数区分『单次发送量』与『累计账单』，消除累计数字恐慌</summary>
+
+> - TokenSheet 置顶展示最近一次真实请求量（prompt+completion 拆分），
+> 累计真实用量降级为『账单·累计』并标注非单次发送量
+> - 上下文占用条改用 lastSentPayload 估算（estimateConversationTokens），
+> 不再用 totalTokens-compactedReleases 把累计当存量而严重高估
+> - 输入框计数改为主显上次请求单次量，累计移入 tooltip 标注账单口径
+> - 压缩卡片说明：/compact 只释放上下文占用，不改变账单累计
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/9b2467e8113acb41ee534bfb7d912590065e3b72">9b2467e</a> — feat(esbuild): check_syntax 支持 file 路径（VFS 读取），与 code 二选一</summary>
+
+> _（无详细说明）_
+
+</details>
+
 ## 📅 2026-08-15
+
+<details open>
+<summary>📝 <a href="https://github.com/5849mog/OpenCodeCLI/commit/74928eabd85b885226e217883bdedcc9e24ea680">74928ea</a> — docs(changelog): 更新成长日志至 127 次提交</summary>
+
+> _（无详细说明）_
+
+</details>
 
 <details open>
 <summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/251119d405d2646cffc90f95ff0e00ffd814da23">251119d</a> — fix(keys): 持久化 raw seed 字节 — 真正实现 Key 跨刷新自动恢复</summary>
