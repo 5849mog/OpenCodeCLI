@@ -336,12 +336,31 @@ async function checkSourceForLang(
   return err ? { ok: false, error: err } : { ok: true };
 }
 
+/** Plan 模式下在 dispatch 层强制拦截的写工具。主循环另有 session.ts 的
+ *  mutatingTools 集合拦截，但子代理路径绕过主循环——这里集中补上（覆盖
+ *  子代理与任何直接调 dispatchTool 的路径）。update_plan 例外：写独立
+ *  plan store，所有模式可用。run_lua/run_js outputs、create_skill/
+ *  delete_skill、bash 已在各工具实现层各自拦截（readOnly 参数）。 */
+const PLAN_MODE_BLOCKED = new Set([
+  "write_file", "edit_file", "multi_edit", "delete_file",
+  "move_file", "append_file", "create_dir",
+  "apply_patch", "insert_at", "undo_edit", "unzip_archive",
+]);
+
 export async function dispatchTool(
   name: string,
   args: Record<string, unknown>,
   opts?: { readOnly?: boolean },
 ): Promise<ToolResult> {
   try {
+    if (opts?.readOnly && PLAN_MODE_BLOCKED.has(name)) {
+      return {
+        ok: false,
+        output: `[Plan mode] This tool (${name}) is blocked. In Plan mode you can only READ and ANALYZE files — you cannot modify them. Propose your plan in text, and the user will switch to Bypass mode to let you execute it.`,
+        tool: name,
+        args,
+      };
+    }
     switch (name) {
       case "read_file":
         return await toolReadFile(args);

@@ -336,13 +336,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "update_plan",
       description:
-        "Maintain a structured task plan in PLAN.md. The plan is automatically shown in your system prompt every turn — you and the user always see current progress. Best practices: (1) Call this BEFORE starting multi-step work to lay out your approach. (2) Update after each completed step to track progress. (3) Use '- [ ]' / '- [x]' / '- [/]' / '- [-]' for todo/done/in-progress/blocked. (4) Indent with 2 spaces for subtasks. (5) Prefix with '# Title' and use '## Section' for grouping. (6) Add [high] [bug] [feat] tags for priority labels. The current plan summary is always visible in the header and system prompt.",
+        "Maintain a structured task plan. The plan is stored separately from the workspace (not in the file bag) and is automatically shown in your system prompt and the Plan panel every turn — you and the user always see current progress. Best practices: (1) Call this BEFORE starting multi-step work to lay out your approach. (2) Update after each completed step to track progress. (3) Use '- [ ]' / '- [x]' / '- [/]' / '- [-]' for todo/done/in-progress/blocked. (4) Indent with 2 spaces for subtasks. (5) Prefix with '# Title' and use '## Section' for grouping. (6) Add [high] [bug] [feat] tags for priority labels. The current plan summary is always visible in the header and system prompt.",
       parameters: {
         type: "object",
         properties: {
           plan: {
             type: "string",
-            description: "Full Markdown content of the plan. Will overwrite PLAN.md. Use '# Plan' as heading, then '- [ ] step' / '- [x] done step' items.",
+            description: "Full Markdown content of the plan. Will overwrite the current plan in the dedicated plan store. Use '# Plan' as heading, then '- [ ] step' / '- [x] done step' items.",
           },
         },
         required: ["plan"],

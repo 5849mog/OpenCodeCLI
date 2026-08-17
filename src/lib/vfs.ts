@@ -638,16 +638,30 @@ export const vfs = {
     if (children.length === 0) {
       return root ? `(empty directory: ${root})` : "(empty workspace)";
     }
+    // 文件名来自用户上传/解压（用户可控），直接注入 AI 上下文：剥控制字符、
+    // 压缩反引号串（防 markdown 围栏逃逸）、截断超长名。
+    const sanitize = (name: string): string => {
+      const cleaned = name.replace(/[\u0000-\u001F\u007F]/g, "?").replace(/`+/g, "`");
+      return cleaned.length > 120 ? `${cleaned.slice(0, 117)}…` : cleaned;
+    };
+    // 上限：根目录直接子项极多时（如解压扁平大包），摘要每轮重发，无界会烧 token。
+    const MAX_TREE_ENTRIES = 50;
+    const shown = children.slice(0, MAX_TREE_ENTRIES);
     const lines: string[] = [];
-    for (const child of children) {
+    for (const child of shown) {
+      const safeName = sanitize(child.path);
       if (child.type === "dir") {
         const fileCount = vfs.listAllFilesSync(child.path).length;
-        lines.push(`dir   ${child.path}/  (${fileCount} files)`);
+        lines.push(`dir   ${safeName}/  (${fileCount} files)`);
       } else {
-        lines.push(`file  ${child.path}`);
+        lines.push(`file  ${safeName}`);
       }
     }
-    return `${children.length} item(s) in ${root || "/"}:\n${lines.join("\n")}`;
+    const overflow =
+      children.length > MAX_TREE_ENTRIES
+        ? `\n… and ${children.length - MAX_TREE_ENTRIES} more item(s)`
+        : "";
+    return `${children.length} item(s) in ${root || "/"}:\n${lines.join("\n")}${overflow}`;
   },
 
   /** Get all nodes (for export / debugging). */

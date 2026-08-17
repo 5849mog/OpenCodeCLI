@@ -331,7 +331,7 @@ function FileBagInner() {
         )
       ) : rightPanelTab === "plan" ? (
         <div className="flex min-h-0 flex-1">
-          <PlanPanel eventsLen={vfsVersion} />
+          <PlanPanel />
         </div>
       ) : (
         <div className="flex min-h-0 flex-1">

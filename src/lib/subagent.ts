@@ -29,9 +29,13 @@ import { buildWorkspaceContext } from "./tools/system-prompt";
 import { truncateConversation, DEFAULT_TOKEN_BUDGET } from "./context";
 
 /** 子代理不允许再委派子代理（dispatch.ts 无 dispatch_subagent/orchestrate_task
- *  分支，调用必失败）——工具集直接剔除，避免诱导模型调用后吃到 "Unknown tool"。 */
+ *  分支，调用必失败）——工具集直接剔除，避免诱导模型调用后吃到 "Unknown tool"。
+ *  ask_user_input 同样剔除：子代理侧没有用户，禁止弹提问面板（Rule 7）。 */
 const SUBAGENT_TOOLS = TOOL_DEFINITIONS.filter(
-  (t) => t.function.name !== "dispatch_subagent" && t.function.name !== "orchestrate_task",
+  (t) =>
+    t.function.name !== "dispatch_subagent" &&
+    t.function.name !== "orchestrate_task" &&
+    t.function.name !== "ask_user_input",
 );
 
 /** 每请求超时（与主循环 PER_REQUEST_TIMEOUT_MS 一致）——子代理卡死不能无声无息。 */

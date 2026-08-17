@@ -43,6 +43,9 @@ import mermaid from "mermaid";
 mermaid.initialize({
   startOnLoad: false,
   theme: "dark",
+  // 显式声明 securityLevel（mermaid 默认即 strict）——图表源码中的 HTML
+  // 标签会被编码，防止 label 注入；防止未来误改为 loose/antiscript。
+  securityLevel: "strict",
   themeVariables: {
     // 与整体 #E58F67 主色呼应的强调色；其余用 dark 主题默认值。
     primaryColor: "#2a2723",
@@ -71,6 +74,7 @@ import { useSession, type SessionEvent, type QuestionPanelData } from "@/store/s
 import { buildHelpText } from "@/lib/help-content";
 import { useVfsView } from "@/store/vfs-view";
 import { vfs } from "@/lib/vfs";
+import { getPlan, getPlanVersion, onPlanChange } from "@/lib/plan-store";
 import { toast } from "sonner";
 import { ZipDownloadBridge, ZipPickerModal } from "./zip-picker";
 import { PayloadInspector } from "./payload-inspector";
@@ -1842,17 +1846,18 @@ function ToolResultRow({
 
 // ---------------------------------------------------------------------------
 // PlanHeaderBadge — tiny plan progress pill for the header bar
-// Subscribes to VFS version so it updates in real-time whenever the plan
-// file changes (same reactivity as the full PlanPanel).
+// Subscribes to the plan store version so it updates in real-time whenever
+// the plan changes (same reactivity as the full PlanPanel).
 // ---------------------------------------------------------------------------
 
 function PlanHeaderBadge() {
-  const vfsVersion = useVfsView((s) => s.version);
+  // 计划存于独立 plan store（不在 VFS）——订阅 planVersion 实时刷新。
+  const [planVersion, setPlanVersion] = useState(getPlanVersion());
+  useEffect(() => onPlanChange(() => setPlanVersion(getPlanVersion())), []);
   const stats = useMemo(() => {
-    const content = vfs.readFileSync("PLAN.md");
+    const content = getPlan();
     return content ? planStats(content) : null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vfsVersion]);
+  }, [planVersion]);
 
   if (!stats) return null;
 
@@ -2125,6 +2130,13 @@ function GraphvizBlock({ code }: { code: string }) {
           .replace(/fill="black"/g, 'fill="#e4e4e7"')
           .replace(/stroke="black"/g, 'stroke="#a1a1aa"')
           .replace(/fontcolor="black"/g, 'fontcolor="#e4e4e7"');
+        // XSS 面：DOT 源码完全由 AI 控制，输出 SVG 直接 innerHTML——剥掉
+        // 可点击链接（href/xlink:href，来自 DOT 的 URL= 属性）与
+        // <script>/<foreignObject> 标签，防注入可执行内容。
+        svg = svg
+          .replace(/\s(href|xlink:href)="[^"]*"/g, "")
+          .replace(/<script[\s\S]*?<\/script>/gi, "")
+          .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "");
         if (ref.current) ref.current.innerHTML = svg;
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));

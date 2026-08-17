@@ -3,13 +3,13 @@
 /**
  * PlanPanel — a full-height persistent plan panel for the right sidebar.
  * Replaces the inline PlanView that used to live in the event stream.
- * Auto-updates when PLAN.md changes (via eventsLen trigger).
+ * Auto-updates when the plan changes (via planVersion subscription).
  */
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ClipboardList } from "lucide-react";
-import { vfs } from "@/lib/vfs";
+import { getPlan, getPlanVersion, onPlanChange } from "@/lib/plan-store";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/store/session";
 import {
@@ -136,13 +136,16 @@ function PlanNodeRow({ node, depth, currentPath }: { node: PlanNode; depth: numb
 // PlanPanel
 // ---------------------------------------------------------------------------
 
-export function PlanPanel({ eventsLen }: { eventsLen: number }) {
+export function PlanPanel() {
   const mode = useSession((s) => s.mode);
+  // 计划存于独立 plan store（不在 VFS）——订阅 planVersion 而非 VFS version。
+  const [planVersion, setPlanVersion] = useState(getPlanVersion());
+  useEffect(() => onPlanChange(() => setPlanVersion(getPlanVersion())), []);
   const parsed = useMemo(() => {
-    const content = vfs.readFileSync("PLAN.md");
+    const content = getPlan();
     if (!content) return null;
     return parsePlan(content);
-  }, [eventsLen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [planVersion]);
 
   if (!parsed) {
     return (
@@ -177,7 +180,7 @@ export function PlanPanel({ eventsLen }: { eventsLen: number }) {
         </div>
         <div className="text-sm text-[#3D3B37] dark:text-zinc-200">Plan is empty</div>
         <div className="max-w-xs text-xs text-[#8B8884] dark:text-zinc-500">
-          PLAN.md exists but has no checklist items. Use <code className="text-[#E58F67]">- [ ]</code> syntax in Markdown.
+          Plan exists but has no checklist items. Use <code className="text-[#E58F67]">- [ ]</code> syntax in Markdown.
         </div>
       </div>
     );

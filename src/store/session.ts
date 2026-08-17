@@ -1124,7 +1124,7 @@ async function runAgentLoop(
 /** Tools that mutate the VFS. Undo snapshots are taken before these. */
 const MUTATING_TOOLS = new Set([
   "write_file", "edit_file", "multi_edit", "delete_file",
-  "move_file", "append_file", "create_dir", "update_plan",
+  "move_file", "append_file", "create_dir", // update_plan 不在其中：计划存独立 plan store（不在 VFS），无需快照
   "apply_patch", "insert_at", "run_lua", "run_js", // run_lua/run_js 带 outputs 时写回 VFS → 需快照可 undo
   "bash", // bash 的 > / >> / tee / mkdir / rm / rmdir / touch / cp / mv / sed -i 会写 VFS
   "create_skill", "delete_skill", // 创建/删除 skill（写 skills/ 目录）→ 需快照可 undo

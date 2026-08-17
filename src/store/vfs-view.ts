@@ -8,6 +8,7 @@
 
 import { create } from "zustand";
 import { vfs, onHydrate, onVfsEvent } from "@/lib/vfs";
+import { hydratePlan } from "@/lib/plan-store";
 
 interface VfsViewState {
   hydrated: boolean;
@@ -71,6 +72,7 @@ export const useVfsView = create<VfsViewState>((set, get) => ({
 
   init: () => {
     void vfs.hydrate();
+    void hydratePlan(); // 计划存独立 plan store（不在 VFS），启动时一并载入
     onHydrate(() => {
       set({ hydrated: true, version: get().version + 1 });
     });
