@@ -86,3 +86,6 @@ server.log
 
 # esbuild-wasm artifacts (~9MB, copied by tools/esbuild-wasm/prepare.sh on CI)
 /public/wasm/esbuild.wasm
+
+# typescript.js 编译器（check_types 引擎，~9MB, copied by tools/tsc/prepare.sh on CI）
+/public/wasm/typescript.js

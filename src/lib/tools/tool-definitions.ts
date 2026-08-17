@@ -963,6 +963,28 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "check_types",
+      description:
+        "跨文件完整类型检查（基于官方 TypeScript 编译器 tsc，Web Worker 隔离，只读）。对目录或单文件做 Program 级类型诊断——比 check_syntax 更强的语义检查：能发现跨文件 import/导出/接口/类型别名不匹配、缺 export、类型不能赋给等真实类型错误。传 path（目录或 .ts/.tsx 文件）即可，自动收集该范围所有相关文件并解析 tsconfig（有则用，无则用合理默认）。语法问题用 check_syntax（快），类型问题用 check_types（全）。大项目可能需数秒~数十秒（Worker 不卡页面，可取消）。",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "必填。要检查的目录或单个 .ts/.tsx 文件路径（如 /src 或 /src/App.tsx）。目录会递归收集其中所有 .ts/.tsx/.json 并做跨文件类型检查。",
+          },
+          tsconfig: {
+            type: "string",
+            description: "可选。显式指定 tsconfig 路径（如 /tsconfig.json）。缺省自动找 path 下（或根目录）的 tsconfig.json。",
+          },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "git_status",
       description:
         "查看本地 git 仓库状态（isomorphic-git + lightning-fs，独立于文件袋 VFS 的存储）。返回当前分支 + 文件变更列表（新增/修改/待提交）。仓库不存在时会提示。只读工具。",

@@ -13,6 +13,7 @@ import { esbuildWasm } from "../wasm/esbuild";
 import { gitEngine } from "../git";
 import * as luaWasm from "../wasm/lua-wasm";
 import * as jsWasm from "../wasm/js-wasm";
+import { tscChecker } from "../wasm/tsc";
 import { vfs } from "../vfs";
 
 /** run_lua 工具：内存 Lua 计算 + 受限写回。
@@ -347,6 +348,23 @@ const PLAN_MODE_BLOCKED = new Set([
   "apply_patch", "insert_at", "undo_edit", "unzip_archive",
 ]);
 
+/** check_types：基于 tsc 的跨文件类型检查（Worker 隔离，只读）。
+ *  入参 path（目录或单文件，必填）、tsconfig（可选）、maxFiles（可选软上限）。 */
+async function toolCheckTypes(args: Record<string, unknown>): Promise<ToolResult> {
+  const p = args.path !== undefined ? String(args.path) : args.root !== undefined ? String(args.root) : "";
+  if (!p.trim()) {
+    return { ok: false, output: "check_types: 缺少 path（目录或 .ts/.tsx 文件）", tool: "check_types", args };
+  }
+  const tsconfig = args.tsconfig !== undefined && args.tsconfig !== "" ? String(args.tsconfig) : null;
+  const res = await tscChecker.checkTypes({ root: p, tsconfig });
+  return {
+    ok: res.ok,
+    output: res.output,
+    tool: "check_types",
+    args,
+  };
+}
+
 export async function dispatchTool(
   name: string,
   args: Record<string, unknown>,
@@ -519,6 +537,9 @@ export async function dispatchTool(
           tool: "transpile",
           args,
         };
+      }
+      case "check_types": {
+        return await toolCheckTypes(args);
       }
       case "check_syntax": {
         // 来源三选一：code（内联）| file（单文件）| files（多文件数组）。

@@ -57,6 +57,10 @@ jobs:
       - name: Prepare esbuild.wasm
         run: bash tools/esbuild-wasm/prepare.sh
 
+      # --- typescript.js (~9MB) 跨文件类型检查引擎 (check_types) ---
+      - name: Prepare typescript.js
+        run: bash tools/tsc/prepare.sh
+
       - name: Set repo name
         run: |
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
