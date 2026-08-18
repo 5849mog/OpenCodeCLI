@@ -49,6 +49,7 @@ import {
 import { runSubagent } from "@/lib/subagent";
 import { orchestrateTask } from "@/lib/orchestrator";
 import { apiKeyVault } from "@/lib/api-key-vault";
+import { warmup } from "@/lib/wasm/tokenizer";
 import { uuid } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -922,8 +923,11 @@ async function runAgentLoop(
       ...historyMsgs,
     ];
     if (overrideMsgs) set({ pendingOverrideMessages: null, truncated: false });
+    // 预热真分词器（fire-and-forget，不阻塞发送；本轮估算仍走字符启发式，
+    // 下一轮起自动升级为 DeepSeek BPE 精确计数）。
+    warmup();
     const { messages: truncatedMsgs, dropped, tokensBefore, tokensAfter } =
-      truncateConversation(fullMessages, config.tokenBudget, 10);
+      await truncateConversation(fullMessages, config.tokenBudget, 10);
     if (dropped > 0) {
       set({ truncated: true });
       // Surface a system notice the FIRST time we truncate in this turn.

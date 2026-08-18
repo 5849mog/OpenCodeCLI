@@ -131,7 +131,7 @@ ${opts.task}
     // Safety net: keep the subagent's own context under budget. Only triggers
     // when a big tool result blows the budget — do NOT shrink tokenBudget to
     // proactively truncate (it would make the model re-read files, costing more).
-    const { messages: truncated } = truncateConversation(
+    const { messages: truncated } = await truncateConversation(
       messages,
       opts.tokenBudget ?? DEFAULT_TOKEN_BUDGET,
       8,

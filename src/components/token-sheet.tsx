@@ -10,6 +10,7 @@
  */
 
 import { Gauge } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useSession } from "@/store/session";
 import {
   Sheet,
@@ -20,6 +21,11 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { estimateConversationTokens } from "@/lib/context";
+import {
+  countConversationTokensAccurate,
+  onTokenizerStatus,
+  tokenizerStatus,
+} from "@/lib/wasm/tokenizer";
 
 export function TokenSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const totalTokens = useSession((s) => s.totalTokens);
@@ -30,9 +36,26 @@ export function TokenSheet({ open, onClose }: { open: boolean; onClose: () => vo
   // 单次发送预算 = config.tokenBudget（默认 6 万，可在设置里调大以适配高上下文模型）。
   const CONTEXT_BUDGET = useSession((s) => s.config.tokenBudget);
 
+  // 真分词器（DeepSeek BPE）就绪时用精确计数，否则字符估算即时渲染。
+  const [accurateSent, setAccurateSent] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const update = async () => {
+      if (!lastSentPayload || tokenizerStatus() !== "ready") {
+        if (!cancelled) setAccurateSent(null);
+        return;
+      }
+      const n = await countConversationTokensAccurate(lastSentPayload);
+      if (!cancelled) setAccurateSent(n);
+    };
+    void update();
+    const off = onTokenizerStatus(() => void update());
+    return () => { cancelled = true; off(); };
+  }, [lastSentPayload]);
+
   // Estimated size of the actual payload sent on the last request (the real
   // per-request context). NOT the cumulative billing tally — that's totalTokens.
-  const sentContext = lastSentPayload ? estimateConversationTokens(lastSentPayload) : null;
+  const sentContext = accurateSent ?? (lastSentPayload ? estimateConversationTokens(lastSentPayload) : null);
   const occupancyPct = sentContext
     ? Math.min(100, Math.round((sentContext / CONTEXT_BUDGET) * 100))
     : 0;
@@ -88,7 +111,7 @@ export function TokenSheet({ open, onClose }: { open: boolean; onClose: () => vo
           <div className="mb-4 rounded-lg border border-[#E5E2D9] bg-[#FAF9F7] px-4 py-3 dark:border-[#3a3731] dark:bg-[#161512]">
             <div className="mb-1.5 flex items-baseline justify-between">
               <span className="text-[length:var(--font-size-ui-sm)] text-[#8B8884] dark:text-zinc-500">
-                上次发送的上下文估算
+                上次发送的上下文{accurateSent !== null ? "（DeepSeek 精确）" : "（估算）"}
               </span>
               {sentContext !== null ? (
                 <span className="font-mono text-xs text-[#2D2B27] dark:text-zinc-100">

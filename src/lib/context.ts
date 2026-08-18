@@ -1,10 +1,11 @@
 /**
  * Token estimation + context window management.
  *
- * Browsers can't run a real BPE tokenizer without bundling one (~1MB). We
- * approximate with a simple heuristic: ~4 chars per token for English, ~1.5
- * chars per token for CJK. This is accurate within ±15% — good enough for
- * deciding when to truncate.
+ * 估算：默认用字符启发式（CJK ~1.5 字符/token、其他 ~4 字符/token，±15%），
+ * 兜底与即时渲染用。真分词器（src/lib/wasm/tokenizer.ts，DeepSeek-V3 官方词表
+ * 128k BPE，与 Python transformers 同引擎）就绪后，truncateConversation 的
+ * 默认计数器自动切换为精确计数（contextCounter），首次发送零延迟、预热完成后
+ * 升级精度。
  *
  * The truncation strategy preserves:
  *   1. The system message (always)
@@ -14,6 +15,7 @@
  */
 
 import type { ChatMessage } from "./ai-client";
+import { contextCounter } from "./wasm/tokenizer";
 
 /** Rough token estimate for a string. */
 export function estimateTokens(text: string): number {
@@ -80,14 +82,17 @@ export function compressToolResult(msg: ChatMessage): ChatMessage {
  *                 and optionally a workspace context message at index 1.
  * @param maxTokens The token budget (default 60000 — leaves room for response).
  * @param keepRecent How many of the most recent messages to never compress/drop.
+ * @param counter Token counter; default contextCounter = 真分词器就绪时精确计数，
+ *                否则字符估算（首次发送零延迟）。
  * @returns The truncated conversation + a summary of what was dropped.
  */
-export function truncateConversation(
+export async function truncateConversation(
   messages: ChatMessage[],
   maxTokens = 60_000,
   keepRecent = 10,
-): { messages: ChatMessage[]; dropped: number; compressed: number; tokensBefore: number; tokensAfter: number } {
-  const tokensBefore = estimateConversationTokens(messages);
+  counter: (msgs: ChatMessage[]) => number | Promise<number> = contextCounter,
+): Promise<{ messages: ChatMessage[]; dropped: number; compressed: number; tokensBefore: number; tokensAfter: number }> {
+  const tokensBefore = await counter(messages);
   if (tokensBefore <= maxTokens) {
     return { messages, dropped: 0, compressed: 0, tokensBefore, tokensAfter: tokensBefore };
   }
@@ -117,7 +122,7 @@ export function truncateConversation(
 
   let working = [...protectedMsgs, ...compressedMiddle, ...recent];
 
-  let tokensAfter = estimateConversationTokens(working);
+  let tokensAfter = await counter(working);
   if (tokensAfter <= maxTokens) {
     return { messages: working, dropped: 0, compressed, tokensBefore, tokensAfter };
   }
@@ -150,7 +155,7 @@ export function truncateConversation(
     }
     droppedMsgs.push(...workingMiddle.splice(dropIdx, dropCount));
     working = [...protectedMsgs, ...workingMiddle, ...recent];
-    tokensAfter = estimateConversationTokens(working);
+    tokensAfter = await counter(working);
   }
 
   return {
