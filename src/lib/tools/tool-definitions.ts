@@ -957,32 +957,10 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           lang: {
             type: "string",
             enum: ["ts", "tsx", "js", "jsx", "json", "lua"],
-            description: "可选。源码语言（有 file/files/path 时默认按扩展名推断；内联 code 时省略则由 esbuild 自动识别 JS/TS 变种）。",
+            description: "可选。源码语言（有 file/files 时默认按扩展名推断；内联 code 时省略则由 esbuild 自动识别 JS/TS 变种）。",
           },
         },
         required: [],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "check_types",
-      description:
-        "跨文件完整类型检查（基于官方 TypeScript 编译器 tsc，Web Worker 隔离，只读）。对目录或单文件做 Program 级类型诊断——比 check_syntax 更强的语义检查：能发现跨文件 import/导出/接口/类型别名不匹配、缺 export、类型不能赋给等真实类型错误。传 path（目录或 .ts/.tsx 文件）即可，自动收集该范围所有相关文件并解析 tsconfig（有则用，无则用合理默认）。⚠️ 重要边界：浏览器里没有 node_modules——若项目依赖第三方模块（react/zustand 等），工具会返回「无法权威检查」的说明且**不列出任何诊断**（避免连锁假错误误导），此时不要据此修改代码，请本地 tsc 权威检查；仅对自包含（无第三方依赖）的 TS/TSX 项目，本工具结果才可信。语法问题用 check_syntax（快），类型问题用 check_types（全）。大项目可能需数秒~数十秒（Worker 不卡页面，可取消）。",
-      parameters: {
-        type: "object",
-        properties: {
-          path: {
-            type: "string",
-            description: "必填。要检查的目录或单个 .ts/.tsx 文件路径（如 /src 或 /src/App.tsx）。目录会递归收集其中所有 .ts/.tsx/.json 并做跨文件类型检查。",
-          },
-          tsconfig: {
-            type: "string",
-            description: "可选。显式指定 tsconfig 路径（如 /tsconfig.json）。缺省自动找 path 下（或根目录）的 tsconfig.json。",
-          },
-        },
-        required: ["path"],
       },
     },
   },
