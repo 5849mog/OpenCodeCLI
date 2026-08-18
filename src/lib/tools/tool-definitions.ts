@@ -969,7 +969,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "check_types",
       description:
-        "跨文件完整类型检查（基于官方 TypeScript 编译器 tsc，Web Worker 隔离，只读）。对目录或单文件做 Program 级类型诊断——比 check_syntax 更强的语义检查：能发现跨文件 import/导出/接口/类型别名不匹配、缺 export、类型不能赋给等真实类型错误。传 path（目录或 .ts/.tsx 文件）即可，自动收集该范围所有相关文件并解析 tsconfig（有则用，无则用合理默认）。⚠️ 环境边界：浏览器里没有 node_modules，第三方依赖（react/zustand 等）类型无法解析，相关 \"Cannot find module / implicit any\" 会降为「提示」而非报错；若项目大量依赖第三方模块，工具会降级为一句说明 + 只列可能真实的少数错误，而非几百条噪声——此时请用本地 tsc 做权威检查。语法问题用 check_syntax（快），类型问题用 check_types（全）。大项目可能需数秒~数十秒（Worker 不卡页面，可取消）。",
+        "跨文件完整类型检查（基于官方 TypeScript 编译器 tsc，Web Worker 隔离，只读）。对目录或单文件做 Program 级类型诊断——比 check_syntax 更强的语义检查：能发现跨文件 import/导出/接口/类型别名不匹配、缺 export、类型不能赋给等真实类型错误。传 path（目录或 .ts/.tsx 文件）即可，自动收集该范围所有相关文件并解析 tsconfig（有则用，无则用合理默认）。⚠️ 重要边界：浏览器里没有 node_modules——若项目依赖第三方模块（react/zustand 等），工具会返回「无法权威检查」的说明且**不列出任何诊断**（避免连锁假错误误导），此时不要据此修改代码，请本地 tsc 权威检查；仅对自包含（无第三方依赖）的 TS/TSX 项目，本工具结果才可信。语法问题用 check_syntax（快），类型问题用 check_types（全）。大项目可能需数秒~数十秒（Worker 不卡页面，可取消）。",
       parameters: {
         type: "object",
         properties: {

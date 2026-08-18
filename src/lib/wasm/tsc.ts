@@ -164,15 +164,15 @@ export async function checkTypes(
           const filesN = r.files ?? 0;
           const ms = r.durationMs ?? 0;
           // 缺依赖检测：依赖 node_modules 的项目（react/zustand/next…）浏览器无法权威解析。
-          // 降级为一句说明 + 只列真实错误，不再逐条列几百条噪声/提示。
+          // 软封锁——此时不列任何诊断（连锁传播产生的 2339/2322 等"看着像真错的假错"会
+          // 误导 AI 去复核、白烧 token），只返回一句说明，请用户本地 tsc。
           if (r.depMissing) {
-            const allLines: string[] = r.diagnostics || [];
-            const errorLines = allLines.filter((l) => /\[TS\d+\s+错误\]/.test(l));
-            let body = `⚠️ 该项目疑似依赖 \`node_modules\`（第三方模块无法在浏览器解析），浏览器无法进行权威的完整类型检查。`;
-            body += `\n  检查 ${filesN} 个文件 / 耗时 ${ms}ms；约 ${noteC} 条为「模块/全局缺失」类噪声（已被列为提示），${errC} 条才是疑真实类型错误。`;
-            body += `\n  建议在本地装好 \`node_modules\` 后运行 \`npx tsc --noEmit\` 获取权威结果。`;
-            body += `\n以下为可能真实的类型错误（${errorLines.length} 条）：\n` + (errorLines.join("\n") || "(无)");
-            resolve({ ok: errC === 0, output: body, files: filesN, errorCount: errC, diagnostics: diags, durationMs: ms });
+            const body =
+              `⚠️ 该项目依赖 \`node_modules\`（第三方模块无法在浏览器解析），浏览器无法进行权威的类型检查。\n` +
+              `  为免误导，本工具不列出诊断（约 ${noteC} 条为模块/全局缺失类噪声，其余多为连锁传播的假错误）。\n` +
+              `  请在本地装好 \`node_modules\` 后运行 \`npx tsc --noEmit\` 获取权威结果。\n` +
+              `  提示：对自包含（无第三方依赖）的 TS/TSX 项目，check_types 结果才是可信的。`;
+            resolve({ ok: true, output: body, files: filesN, errorCount: 0, diagnostics: [], durationMs: ms });
             return;
           }
           let summary = errC > 0
