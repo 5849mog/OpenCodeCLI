@@ -18,10 +18,13 @@
  *  - 超时用 timer + worker.terminate() 强杀，防 tsc 真卡死标签页；可被 AbortSignal 取消。
  *
  * 性能预期（诚实告知）：tsc 在浏览器仍较慢，几百文件需数秒~数十秒，Worker 保证
- * 主线程不冻结；首版惰性加载 9MB，只在真正调用 check_types 时发生。
+ * 主线程不冻结；typescript.js 惰性加载 9MB，只在真正调用 check_types 时发生。
+ * Worker 经 worker-client 池化复用：常驻单例，typescript.js/tslib.js 只会话首次
+ * 解析一次；每次调用仍重建 CompilerHost + Program（文件内容每次不同，无法缓存）。
  */
 
 import { vfs } from "../vfs";
+import { createWorkerClient } from "./worker-client";
 
 export interface TscCheckOptions {
   /** 目录或单个 .ts/.tsx 文件路径（相对 VFS 根）。 */
@@ -52,6 +55,21 @@ export interface TscCheckResult {
   error?: string;
 }
 
+/** tsc Worker 回包（池化客户端路由后的完整消息）。 */
+interface TscWorkerMsg {
+  ok: boolean;
+  error?: string;
+  result?: {
+    files?: number;
+    diagnostics?: string[];
+    errorCount?: number;
+    noteCount?: number;
+    envNoise?: boolean;
+    depMissing?: boolean;
+    durationMs?: number;
+  };
+}
+
 /** GitHub Pages basePath 兼容（复用 js-wasm 的 wasmUrl 逻辑）。 */
 function wasmUrl(file: string): string {
   if (typeof window === "undefined") return `/${file}`;
@@ -80,32 +98,15 @@ function collectFiles(root: string): Record<string, string> {
   return map;
 }
 
-/** 启动 Worker（独立静态文件 public/wasm/tsc-worker.js）。每次新建并在调用后
- *  terminate，避免跨消息状态泄漏；worker 内相对 importScripts("./typescript.js")。 */
-function spawnWorker(workerUrl: string): Worker {
-  return new Worker(workerUrl, { type: "classic" });
-}
-
-/** Worker 生命周期管理：每次调用新建 + 用完即 terminate。 */
-async function withWorker<T>(
-  workerUrl: string,
-  task: (w: Worker) => Promise<T>,
-): Promise<T> {
-  const w = spawnWorker(workerUrl);
-  try {
-    return await task(w);
-  } finally {
-    w.terminate();
-  }
-}
+/** tsc Worker 池化单例（首次 request 才创建；常驻复用，typescript.js/tslib.js
+ *  只会话首次 importScripts 解析一次）。 */
+const tscClient = createWorkerClient(wasmUrl("wasm/tsc-worker.js"));
 
 /** 对指定根做跨文件类型检查。 */
 export async function checkTypes(
   options: TscCheckOptions,
   signal?: AbortSignal,
 ): Promise<TscCheckResult> {
-  // worker 静态文件（public/wasm/tsc-worker.js，next 原样复制到 out/），相对 importScripts("./typescript.js")
-  const workerUrl = wasmUrl("wasm/tsc-worker.js");
   const root = options.root.trim();
   if (!root) {
     return { ok: false, output: "check_types: 缺少 path/root", files: 0, errorCount: 0, diagnostics: [], durationMs: 0 };
@@ -123,93 +124,59 @@ export async function checkTypes(
   }
 
   const timeoutMs = options.timeoutMs ?? 120_000;
-  let worker: Worker | null = null;
+  const fileCount = Object.keys(files).length;
 
   try {
-    return await withWorker(workerUrl, (w) => {
-      worker = w;
-      return new Promise<TscCheckResult>((resolve) => {
-        let settled = false;
-        const timer = setTimeout(() => {
-          if (settled) return;
-          settled = true;
-          if (worker) worker.terminate();
-          resolve({
-            ok: false,
-            output: `check_types: 超时（${Math.round(timeoutMs / 1000)}s）。tsc 对大项目较慢——可收缩 root 范围，或用 check_syntax 抽检。`,
-            files: Object.keys(files).length,
-            errorCount: 0, diagnostics: [], durationMs: timeoutMs,
-          });
-        }, timeoutMs);
-
-        w.onmessage = (e) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          const msg = e.data;
-          if (!msg.ok) {
-            resolve({ ok: false, output: msg.error || "类型检查失败", files: Object.keys(files).length, errorCount: 0, diagnostics: [], durationMs: 0, error: msg.error });
-            return;
-          }
-          const r = msg.result || {};
-          const diags: TscDiagnostic[] = (r.diagnostics || []).map((line: string) => {
-            const m = line.match(/^(.*?):(\d+):(\d+)\s+\[TS\d+\s+(错误|提示)\]\s+(.*)$/);
-            if (m) {
-              return { loc: `${m[1]}:${m[2]}:${m[3]}`, code: "", isError: m[4] === "错误", message: m[5] };
-            }
-            return { loc: "", code: "", isError: line.includes("错误"), message: line };
-          });
-          const errC = r.errorCount ?? 0;
-          const noteC = r.noteCount ?? 0;
-          const filesN = r.files ?? 0;
-          const ms = r.durationMs ?? 0;
-          // 缺依赖检测：依赖 node_modules 的项目（react/zustand/next…）浏览器无法权威解析。
-          // 软封锁——此时不列任何诊断（连锁传播产生的 2339/2322 等"看着像真错的假错"会
-          // 误导 AI 去复核、白烧 token），只返回一句说明，请用户本地 tsc。
-          if (r.depMissing) {
-            const body =
-              `⚠️ 该项目依赖 \`node_modules\`（第三方模块无法在浏览器解析），浏览器无法进行权威的类型检查。\n` +
-              `  为免误导，本工具不列出诊断（约 ${noteC} 条为模块/全局缺失类噪声，其余多为连锁传播的假错误）。\n` +
-              `  请在本地装好 \`node_modules\` 后运行 \`npx tsc --noEmit\` 获取权威结果。\n` +
-              `  提示：对自包含（无第三方依赖）的 TS/TSX 项目，check_types 结果才是可信的。`;
-            resolve({ ok: true, output: body, files: filesN, errorCount: 0, diagnostics: [], durationMs: ms });
-            return;
-          }
-          let summary = errC > 0
-            ? `发现 ${errC} 个类型错误`
-            : `✓ 类型检查通过（${noteC} 条环境噪声已被列为提示）`;
-          summary += `：检查 ${filesN} 个文件，耗时 ${ms}ms。`;
-          // 环境边界：浏览器无 node_modules，第三方模块解析失败产生的噪声单独说明，
-          // 避免用户误以为是真实代码错误。
-          if (r.envNoise) {
-            summary += `\n  ⚠️ 环境边界：浏览器无法解析第三方模块（react/zustand/…），其中 ${noteC} 条 "Cannot find module / implicit any" 类已被降为「提示」；上方标「错误」的才可能是真实代码问题。有 node_modules 的项目请用本地 \`tsc\` 做权威类型检查。`;
-          }
-          const body = summary + "\n" + ((r.diagnostics || []).join("\n") || "");
-          resolve({ ok: errC === 0, output: body, files: filesN, errorCount: errC, diagnostics: diags, durationMs: ms });
-        };
-
-        w.onerror = (err) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          resolve({ ok: false, output: `check_types: Worker 错误 — ${err.message || "未知"}`, files: Object.keys(files).length, errorCount: 0, diagnostics: [], durationMs: 0, error: err.message });
-        };
-
-        if (signal) {
-          signal.addEventListener("abort", () => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(timer);
-            if (worker) worker.terminate();
-            resolve({ ok: false, output: "check_types: 已取消", files: Object.keys(files).length, errorCount: 0, diagnostics: [], durationMs: 0, error: "aborted" });
-          });
-        }
-
-        w.postMessage({ files, root: root.startsWith("/") ? root : `/${root}`, tsconfig: options.tsconfig ?? null, defaultOptions: {} });
-      });
+    const msg = await tscClient.request<TscWorkerMsg>(
+      { files, root: root.startsWith("/") ? root : `/${root}`, tsconfig: options.tsconfig ?? null, defaultOptions: {} },
+      { timeoutMs, signal },
+    );
+    if (!msg.ok) {
+      return { ok: false, output: msg.error || "类型检查失败", files: fileCount, errorCount: 0, diagnostics: [], durationMs: 0, error: msg.error };
+    }
+    const r = msg.result || {};
+    const diags: TscDiagnostic[] = (r.diagnostics || []).map((line: string) => {
+      const m = line.match(/^(.*?):(\d+):(\d+)\s+\[TS\d+\s+(错误|提示)\]\s+(.*)$/);
+      if (m) {
+        return { loc: `${m[1]}:${m[2]}:${m[3]}`, code: "", isError: m[4] === "错误", message: m[5] };
+      }
+      return { loc: "", code: "", isError: line.includes("错误"), message: line };
     });
+    const errC = r.errorCount ?? 0;
+    const noteC = r.noteCount ?? 0;
+    const filesN = r.files ?? 0;
+    const ms = r.durationMs ?? 0;
+    // 缺依赖检测：依赖 node_modules 的项目（react/zustand/next…）浏览器无法权威解析。
+    // 软封锁——此时不列任何诊断（连锁传播产生的 2339/2322 等"看着像真错的假错"会
+    // 误导 AI 去复核、白烧 token），只返回一句说明，请用户本地 tsc。
+    if (r.depMissing) {
+      const body =
+        `⚠️ 该项目依赖 \`node_modules\`（第三方模块无法在浏览器解析），浏览器无法进行权威的类型检查。\n` +
+        `  为免误导，本工具不列出诊断（约 ${noteC} 条为模块/全局缺失类噪声，其余多为连锁传播的假错误）。\n` +
+        `  请在本地装好 \`node_modules\` 后运行 \`npx tsc --noEmit\` 获取权威结果。\n` +
+        `  提示：对自包含（无第三方依赖）的 TS/TSX 项目，check_types 结果才是可信的。`;
+      return { ok: true, output: body, files: filesN, errorCount: 0, diagnostics: [], durationMs: ms };
+    }
+    let summary = errC > 0
+      ? `发现 ${errC} 个类型错误`
+      : `✓ 类型检查通过（${noteC} 条环境噪声已被列为提示）`;
+    summary += `：检查 ${filesN} 个文件，耗时 ${ms}ms。`;
+    // 环境边界：浏览器无 node_modules，第三方模块解析失败产生的噪声单独说明，
+    // 避免用户误以为是真实代码错误。
+    if (r.envNoise) {
+      summary += `\n  ⚠️ 环境边界：浏览器无法解析第三方模块（react/zustand/…），其中 ${noteC} 条 "Cannot find module / implicit any" 类已被降为「提示」；上方标「错误」的才可能是真实代码问题。有 node_modules 的项目请用本地 \`tsc\` 做权威类型检查。`;
+    }
+    const body = summary + "\n" + ((r.diagnostics || []).join("\n") || "");
+    return { ok: errC === 0, output: body, files: filesN, errorCount: errC, diagnostics: diags, durationMs: ms };
   } catch (e) {
-    return { ok: false, output: `check_types: ${e instanceof Error ? e.message : String(e)}`, files: Object.keys(files).length, errorCount: 0, diagnostics: [], durationMs: 0, error: String(e) };
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.startsWith("worker 请求超时")) {
+      return { ok: false, output: `check_types: 超时（${Math.round(timeoutMs / 1000)}s）。tsc 对大项目较慢——可收缩 root 范围，或用 check_syntax 抽检。`, files: fileCount, errorCount: 0, diagnostics: [], durationMs: timeoutMs, error: msg };
+    }
+    if (signal?.aborted) {
+      return { ok: false, output: "check_types: 已取消", files: fileCount, errorCount: 0, diagnostics: [], durationMs: 0, error: "aborted" };
+    }
+    return { ok: false, output: `check_types: ${msg}`, files: fileCount, errorCount: 0, diagnostics: [], durationMs: 0, error: msg };
   }
 }
 

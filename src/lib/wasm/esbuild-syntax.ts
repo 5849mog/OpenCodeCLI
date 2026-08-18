@@ -14,9 +14,11 @@
  *
  * Worker: public/wasm/esbuild-syntax-worker.js（静态文件，importScripts 加载
  * esbuild-browser.js → self.esbuild → fetch esbuild.wasm，worker 线程实例化）。
+ * 经 worker-client 池化复用：常驻单例，esbuild.initialize 只会话首次一次。
  */
 
 import { vfs } from "../vfs";
+import { createWorkerClient } from "./worker-client";
 
 export interface SyntaxDirOptions {
   /** VFS 中的目录（或单文件）路径。 */
@@ -117,106 +119,48 @@ export interface TranspileDirResult {
   error?: string;
 }
 
-/** 对指定目录做转译（Worker 隔离），产物写入 VFS。 */
-export async function transpileDir(
-  options: TranspileDirOptions,
-  signal?: AbortSignal,
-): Promise<TranspileDirResult> {
-  const p = options.path.trim();
-  if (!p) {
-    return { ok: false, output: "transpile: 缺少 path（目录）", totalFiles: 0, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: 0 };
-  }
-  const st = vfs.statSync(p);
-  if (!st) {
-    return { ok: false, output: `transpile: 路径不存在 — ${p}`, totalFiles: 0, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: 0 };
-  }
-  const files = collectFiles(p);
-  const fileCount = Object.keys(files).length;
-  if (fileCount === 0) {
-    return { ok: false, output: `transpile: "${p}" 下没有可转译的源文件`, totalFiles: 0, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: 0 };
-  }
-
-  const workerUrl = wasmUrl("wasm/esbuild-syntax-worker.js");
-  const timeoutMs = options.timeoutMs ?? 120_000;
-
-  try {
-    return await new Promise<TranspileDirResult>((resolve) => {
-      const w = new Worker(workerUrl, { type: "classic" });
-      let settled = false;
-      const timer = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        w.terminate();
-        resolve({ ok: false, output: `transpile: 超时（${Math.round(timeoutMs / 1000)}s）。目录过大或 esbuild 未就绪，可收缩目录或分批。`, totalFiles: fileCount, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: timeoutMs });
-      }, timeoutMs);
-
-      w.onmessage = (e) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        const msg = e.data;
-        if (!msg.ok) {
-          resolve({ ok: false, output: msg.error || "转译失败", totalFiles: fileCount, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: 0, error: msg.error });
-          return;
-        }
-        const r = msg.result || {};
-        // 写回 VFS：worker 返回每文件 JS，host 计算目标路径并写入（自动建目录）。
-        const written: string[] = [];
-        let writtenBytes = 0;
-        let writtenFiles = 0;
-        const outputs: { base: string; js: string }[] = r.outputs || [];
-        const outDir = options.outDir && options.outDir.trim() ? options.outDir.trim() : undefined;
-        for (const o of outputs) {
-          const rel = transpileDestRel(o.base);
-          if (!rel) continue;
-          const dest = outDir ? joinOutDir(outDir, rel) : `/${rel}`;
-          vfs.writeFileSync(dest, o.js);
-          writtenFiles++;
-          writtenBytes += o.js.length;
-          written.push(`  ✓ ${o.base} → ${dest}（${fmtSize(o.js.length)}）`);
-        }
-        // 防爆：写入清单与错误都只列前 30 + "还有 X 个"。
-        const CAP = 30;
-        const diags: string[] = r.diagnostics || [];
-        const shown = diags.slice(0, CAP);
-        const more = diags.length - shown.length;
-        const writtenShown = written.slice(0, CAP);
-        const moreWritten = written.length - writtenShown.length;
-        let body = r.summary || "";
-        body += `\n产物已写入 VFS：${writtenFiles} 个文件，共 ${fmtSize(writtenBytes)}`;
-        if (writtenShown.length) body += `\n${writtenShown.join("\n")}`;
-        if (moreWritten > 0) body += `\n… 还有 ${moreWritten} 个已写入（用 ls/cat 查看具体产物）`;
-        if (shown.length) body += `\n${shown.join("\n")}`;
-        if (more > 0) body += `\n… 还有 ${more} 个转译失败文件`;
-        resolve({ ok: r.ok !== false, output: body, totalFiles: r.totalFiles ?? fileCount, supported: r.supported ?? 0, skipCount: r.skipCount ?? 0, writtenFiles, errorFiles: r.errorFiles || [], durationMs: r.durationMs ?? 0 });
-      };
-
-      w.onerror = (err) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        w.terminate();
-        resolve({ ok: false, output: `transpile: Worker 错误 — ${err.message || "未知"}`, totalFiles: fileCount, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: 0, error: err.message });
-      };
-
-      if (signal) {
-        signal.addEventListener("abort", () => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          w.terminate();
-          resolve({ ok: false, output: "transpile: 已取消", totalFiles: fileCount, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: 0, error: "aborted" });
-        });
-      }
-
-      w.postMessage({ root: p.startsWith("/") ? p : `/${p}`, files, mode: "transpile" });
-    });
-  } catch (e) {
-    return { ok: false, output: `transpile: ${e instanceof Error ? e.message : String(e)}`, totalFiles: fileCount, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: 0, error: String(e) };
-  }
+/** esbuild Worker 回包（池化客户端路由后的完整消息）。 */
+interface EsbuildWorkerMsg {
+  ok: boolean;
+  error?: string;
+  result?: {
+    ok?: boolean;
+    totalFiles?: number;
+    supported?: number;
+    okFiles?: number;
+    skipCount?: number;
+    errorFiles?: string[];
+    diagnostics?: string[];
+    summary?: string;
+    durationMs?: number;
+    outputs?: { base: string; js: string }[];
+    totalJsBytes?: number;
+  };
 }
 
-/** 对指定目录做语法检查（Worker 隔离）。 */
+/** esbuild Worker 池化单例（首次 request 才创建；常驻复用，initialize 只一次）。 */
+const esbuildClient = createWorkerClient(wasmUrl("wasm/esbuild-syntax-worker.js"));
+
+/** 统一异常出口：超时/取消映射回既有文案，其余原样透出。 */
+function errResult(
+  e: unknown,
+  signal: AbortSignal | undefined,
+  timeoutMs: number,
+  fileCount: number,
+  tool: "check_syntax" | "transpile",
+  timeoutHint: string,
+): { ok: boolean; output: string; totalFiles: number; supported: number; skipCount: number; writtenFiles: number; errorFiles: string[]; durationMs: number; error: string } {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.startsWith("worker 请求超时")) {
+    return { ok: false, output: `${tool}: 超时（${Math.round(timeoutMs / 1000)}s）。${timeoutHint}`, totalFiles: fileCount, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: timeoutMs, error: msg };
+  }
+  if (signal?.aborted) {
+    return { ok: false, output: `${tool}: 已取消`, totalFiles: fileCount, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: 0, error: "aborted" };
+  }
+  return { ok: false, output: `${tool}: ${msg}`, totalFiles: fileCount, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: 0, error: msg };
+}
+
+/** 对指定目录做语法检查（常驻 Worker 隔离）。 */
 export async function checkSyntaxDir(
   options: SyntaxDirOptions,
   signal?: AbortSignal,
@@ -235,63 +179,92 @@ export async function checkSyntaxDir(
     return { ok: false, output: `check_syntax: "${p}" 下没有可检查的源文件`, totalFiles: 0, supported: 0, skipCount: 0, errorFiles: [], durationMs: 0 };
   }
 
-  const workerUrl = wasmUrl("wasm/esbuild-syntax-worker.js");
   const timeoutMs = options.timeoutMs ?? 120_000;
 
   try {
-    return await new Promise<SyntaxDirResult>((resolve) => {
-      const w = new Worker(workerUrl, { type: "classic" });
-      let settled = false;
-      const timer = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        w.terminate();
-        resolve({ ok: false, output: `check_syntax: 超时（${Math.round(timeoutMs / 1000)}s）。目录过大或 esbuild 未就绪，可收缩目录或分批。`, totalFiles: fileCount, supported: 0, skipCount: 0, errorFiles: [], durationMs: timeoutMs });
-      }, timeoutMs);
-
-      w.onmessage = (e) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        const msg = e.data;
-        if (!msg.ok) {
-          resolve({ ok: false, output: msg.error || "语法检查失败", totalFiles: fileCount, supported: 0, skipCount: 0, errorFiles: [], durationMs: 0, error: msg.error });
-          return;
-        }
-        const r = msg.result || {};
-        // 防爆：错误文件超上限只列前 30 + "还有 X 个"；OK 文件已由 worker 汇总为 okFiles。
-        const ERROR_LINE_CAP = 30;
-        const diags: string[] = r.diagnostics || [];
-        const shown = diags.slice(0, ERROR_LINE_CAP);
-        const more = diags.length - shown.length;
-        let body = r.summary || "";
-        body += "\n" + shown.join("\n");
-        if (more > 0) body += `\n… 还有 ${more} 个含错文件（用 check_syntax 单个文件精查）`;
-        resolve({ ok: r.ok !== false, output: body, totalFiles: r.totalFiles ?? fileCount, supported: r.supported ?? 0, skipCount: r.skipCount ?? 0, errorFiles: r.errorFiles || [], durationMs: r.durationMs ?? 0 });
-      };
-
-      w.onerror = (err) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        w.terminate();
-        resolve({ ok: false, output: `check_syntax: Worker 错误 — ${err.message || "未知"}`, totalFiles: fileCount, supported: 0, skipCount: 0, errorFiles: [], durationMs: 0, error: err.message });
-      };
-
-      if (signal) {
-        signal.addEventListener("abort", () => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          w.terminate();
-          resolve({ ok: false, output: "check_syntax: 已取消", totalFiles: fileCount, supported: 0, skipCount: 0, errorFiles: [], durationMs: 0, error: "aborted" });
-        });
-      }
-
-      w.postMessage({ root: p.startsWith("/") ? p : `/${p}`, files });
-    });
+    const msg = await esbuildClient.request<EsbuildWorkerMsg>(
+      { root: p.startsWith("/") ? p : `/${p}`, files, mode: "syntax" },
+      { timeoutMs, signal },
+    );
+    if (!msg.ok) {
+      return { ok: false, output: msg.error || "语法检查失败", totalFiles: fileCount, supported: 0, skipCount: 0, errorFiles: [], durationMs: 0, error: msg.error };
+    }
+    const r = msg.result || {};
+    // 防爆：错误文件超上限只列前 30 + "还有 X 个"；OK 文件已由 worker 汇总为 okFiles。
+    const ERROR_LINE_CAP = 30;
+    const diags: string[] = r.diagnostics || [];
+    const shown = diags.slice(0, ERROR_LINE_CAP);
+    const more = diags.length - shown.length;
+    let body = r.summary || "";
+    body += "\n" + shown.join("\n");
+    if (more > 0) body += `\n… 还有 ${more} 个含错文件（用 check_syntax 单个文件精查）`;
+    return { ok: r.ok !== false, output: body, totalFiles: r.totalFiles ?? fileCount, supported: r.supported ?? 0, skipCount: r.skipCount ?? 0, errorFiles: r.errorFiles || [], durationMs: r.durationMs ?? 0 };
   } catch (e) {
-    return { ok: false, output: `check_syntax: ${e instanceof Error ? e.message : String(e)}`, totalFiles: fileCount, supported: 0, skipCount: 0, errorFiles: [], durationMs: 0, error: String(e) };
+    return errResult(e, signal, timeoutMs, fileCount, "check_syntax", "目录过大或 esbuild 未就绪，可收缩目录或分批。");
+  }
+}
+
+/** 对指定目录做转译（常驻 Worker 隔离），产物写入 VFS。 */
+export async function transpileDir(
+  options: TranspileDirOptions,
+  signal?: AbortSignal,
+): Promise<TranspileDirResult> {
+  const p = options.path.trim();
+  if (!p) {
+    return { ok: false, output: "transpile: 缺少 path（目录）", totalFiles: 0, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: 0 };
+  }
+  const st = vfs.statSync(p);
+  if (!st) {
+    return { ok: false, output: `transpile: 路径不存在 — ${p}`, totalFiles: 0, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: 0 };
+  }
+  const files = collectFiles(p);
+  const fileCount = Object.keys(files).length;
+  if (fileCount === 0) {
+    return { ok: false, output: `transpile: "${p}" 下没有可转译的源文件`, totalFiles: 0, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: 0 };
+  }
+
+  const timeoutMs = options.timeoutMs ?? 120_000;
+
+  try {
+    const msg = await esbuildClient.request<EsbuildWorkerMsg>(
+      { root: p.startsWith("/") ? p : `/${p}`, files, mode: "transpile" },
+      { timeoutMs, signal },
+    );
+    if (!msg.ok) {
+      return { ok: false, output: msg.error || "转译失败", totalFiles: fileCount, supported: 0, skipCount: 0, writtenFiles: 0, errorFiles: [], durationMs: 0, error: msg.error };
+    }
+    const r = msg.result || {};
+    // 写回 VFS：worker 返回每文件 JS，host 计算目标路径并写入（自动建目录）。
+    const written: string[] = [];
+    let writtenBytes = 0;
+    let writtenFiles = 0;
+    const outputs: { base: string; js: string }[] = r.outputs || [];
+    const outDir = options.outDir && options.outDir.trim() ? options.outDir.trim() : undefined;
+    for (const o of outputs) {
+      const rel = transpileDestRel(o.base);
+      if (!rel) continue;
+      const dest = outDir ? joinOutDir(outDir, rel) : `/${rel}`;
+      vfs.writeFileSync(dest, o.js);
+      writtenFiles++;
+      writtenBytes += o.js.length;
+      written.push(`  ✓ ${o.base} → ${dest}（${fmtSize(o.js.length)}）`);
+    }
+    // 防爆：写入清单与错误都只列前 30 + "还有 X 个"。
+    const CAP = 30;
+    const diags: string[] = r.diagnostics || [];
+    const shown = diags.slice(0, CAP);
+    const more = diags.length - shown.length;
+    const writtenShown = written.slice(0, CAP);
+    const moreWritten = written.length - writtenShown.length;
+    let body = r.summary || "";
+    body += `\n产物已写入 VFS：${writtenFiles} 个文件，共 ${fmtSize(writtenBytes)}`;
+    if (writtenShown.length) body += `\n${writtenShown.join("\n")}`;
+    if (moreWritten > 0) body += `\n… 还有 ${moreWritten} 个已写入（用 ls/cat 查看具体产物）`;
+    if (shown.length) body += `\n${shown.join("\n")}`;
+    if (more > 0) body += `\n… 还有 ${more} 个转译失败文件`;
+    return { ok: r.ok !== false, output: body, totalFiles: r.totalFiles ?? fileCount, supported: r.supported ?? 0, skipCount: r.skipCount ?? 0, writtenFiles, errorFiles: r.errorFiles || [], durationMs: r.durationMs ?? 0 };
+  } catch (e) {
+    return errResult(e, signal, timeoutMs, fileCount, "transpile", "目录过大或 esbuild 未就绪，可收缩目录或分批。");
   }
 }
 

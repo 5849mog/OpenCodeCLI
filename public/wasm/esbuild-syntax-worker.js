@@ -20,8 +20,11 @@
 "use strict";
 
 (function () {
-  function postErr(msg) {
-    try { self.postMessage({ ok: false, error: String(msg) }); }
+  // reqId 为请求 id（宿主池化路由用）；加载期致命错误不传 reqId（无 id 回包 = 致命）。
+  function postErr(msg, reqId) {
+    var payload = { ok: false, error: String(msg) };
+    if (typeof reqId === "number") payload.id = reqId;
+    try { self.postMessage(payload); }
     catch (_) { /* ignore */ }
   }
 
@@ -51,15 +54,16 @@
 
   self.onmessage = function (ev) {
     var req = ev.data || {};
+    var reqId = typeof req.id === "number" ? req.id : null;
     var mode = req.mode === "transpile" ? "transpile" : "syntax";
     var t0 = Date.now();
     ensureInit().then(function () {
       return runCheck(req.files || {}, req.root || "", mode);
     }).then(function (result) {
       result.durationMs = Date.now() - t0;
-      self.postMessage({ ok: true, result: result });
+      self.postMessage({ id: reqId, ok: true, result: result });
     }).catch(function (e) {
-      postErr((mode === "transpile" ? "转译" : "语法检查") + "失败: " + (e && (e.stack || e.message) || e));
+      postErr((mode === "transpile" ? "转译" : "语法检查") + "失败: " + (e && (e.stack || e.message) || e), reqId);
     });
   };
 

@@ -6,15 +6,19 @@
  * importScripts 在浏览器报 "The string did not match the expected pattern"）。
  *
  * 主线程用 new Worker('/wasm/tsc-worker.js')（字符串路径，next 会原样复制
- * public/ → out/）。Worker 接收 { root, tsconfig, defaultOptions, files }，
- * 建内存 CompilerHost → ts.Program → PreEmit 诊断 → postMessage 返回。
+ * public/ → out/）。Worker 接收 { id, root, tsconfig, defaultOptions, files }，
+ * 建内存 CompilerHost → ts.Program → PreEmit 诊断 → postMessage 返回（回包带
+ * id，宿主 worker-client 池化路由用；加载期致命错误不带 id）。
  * 全程只读（writeFile no-op），绝不动 VFS。
  */
 "use strict";
 
 (function () {
-  function postErr(msg) {
-    try { self.postMessage({ ok: false, error: String(msg) }); }
+  // reqId 为请求 id（宿主池化路由用）；加载期致命错误不传 reqId（无 id 回包 = 致命）。
+  function postErr(msg, reqId) {
+    var payload = { ok: false, error: String(msg) };
+    if (typeof reqId === "number") payload.id = reqId;
+    try { self.postMessage(payload); }
     catch (_) { /* ignore */ }
   }
 
@@ -31,6 +35,7 @@
 
   self.onmessage = function (ev) {
     var req = ev.data || {};
+    var reqId = typeof req.id === "number" ? req.id : null;
     var t0 = Date.now();
     try {
       var result = runCheck(
@@ -40,9 +45,9 @@
         req.defaultOptions || {}
       );
       result.durationMs = Date.now() - t0;
-      self.postMessage({ ok: true, result: result });
+      self.postMessage({ id: reqId, ok: true, result: result });
     } catch (e) {
-      postErr("类型检查失败: " + (e && (e.stack || e.message) || e));
+      postErr("类型检查失败: " + (e && (e.stack || e.message) || e), reqId);
     }
   };  function normalize(p) {
     if (!p) return "/";
