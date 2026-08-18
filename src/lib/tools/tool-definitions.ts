@@ -933,27 +933,31 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "check_syntax",
       description:
-        "检查源码语法是否合法（非类型检查）。来源三选一：file（单文件路径）/ files（多文件路径数组，一次批量校验）/ code（内联源码）。支持 ts/tsx/js/jsx（esbuild）、json（JSON.parse）、lua（Lua 引擎）语法校验；css/html/sql/python/markdown/yaml 等暂不支持会诚实提示。文件语言按扩展名自动推断，也可显式传 lang。只读工具。",
+        "检查源码语法是否合法（非类型检查）。来源四选一：file（单文件路径）/ files（多文件路径数组，一次批量校验）/ path（目录，遍历目录下所有测试源文件）/ code（内联源码）。支持 ts/tsx/js/jsx（esbuild）、json（JSON.parse）、lua（Lua 引擎）语法校验；css/html/sql/python/markdown/yaml 等暂不支持会诚实提示。文件语言按扩展名自动推断，也可显式传 lang。path 目录遍历在 Web Worker 里跑（不卡页面）、只回错误文件 + 汇总（正常文件不逐行回，不占上下文）。只读工具。",
       parameters: {
         type: "object",
         properties: {
           file: {
             type: "string",
-            description: "可选。VFS 中的单文件路径（如 /src/index.ts），读取后校验。与 code / files 三选一。",
+            description: "可选。VFS 中的单文件路径（如 /src/index.ts），读取后校验。与 code / files / path 四选一。",
           },
           files: {
             type: "array",
             items: { type: "string" },
-            description: "可选。VFS 中的多文件路径数组，一次性批量校验（最多 20 个）。每个文件按各自扩展名推断语言。与 code / file 三选一。",
+            description: "可选。VFS 中的多文件路径数组，一次性批量校验（最多 20 个）。每个文件按各自扩展名推断语言。与 code / file / path 四选一。",
+          },
+          path: {
+            type: "string",
+            description: "可选。VFS 中的目录（或单文件）路径，遍历该目录下所有测试源文件逐个体检语法（Web Worker 隔离，不卡页面）。只回错误文件 + 汇总，正常文件不逐行回。与 code / file / files 四选一。",
           },
           code: {
             type: "string",
-            description: "可选。要检查的内联源代码（与 file / files 三选一）。",
+            description: "可选。要检查的内联源代码（与 file / files / path 四选一）。",
           },
           lang: {
             type: "string",
             enum: ["ts", "tsx", "js", "jsx", "json", "lua"],
-            description: "可选。源码语言（有 file/files 时默认按扩展名推断；内联 code 时省略则由 esbuild 自动识别 JS/TS 变种）。",
+            description: "可选。源码语言（有 file/files/path 时默认按扩展名推断；内联 code 时省略则由 esbuild 自动识别 JS/TS 变种）。",
           },
         },
         required: [],
@@ -965,7 +969,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "check_types",
       description:
-        "跨文件完整类型检查（基于官方 TypeScript 编译器 tsc，Web Worker 隔离，只读）。对目录或单文件做 Program 级类型诊断——比 check_syntax 更强的语义检查：能发现跨文件 import/导出/接口/类型别名不匹配、缺 export、类型不能赋给等真实类型错误。传 path（目录或 .ts/.tsx 文件）即可，自动收集该范围所有相关文件并解析 tsconfig（有则用，无则用合理默认）。⚠️ 环境边界：浏览器里没有 node_modules，第三方依赖（react/zustand 等）类型无法解析，相关 \"Cannot find module / implicit any\" 会降为「提示」而非报错——只有标「错误」的才是可能真实的问题；依赖 node_modules 的现代前端项目请用本地 tsc 做权威类型检查。语法问题用 check_syntax（快），类型问题用 check_types（全）。大项目可能需数秒~数十秒（Worker 不卡页面，可取消）。",
+        "跨文件完整类型检查（基于官方 TypeScript 编译器 tsc，Web Worker 隔离，只读）。对目录或单文件做 Program 级类型诊断——比 check_syntax 更强的语义检查：能发现跨文件 import/导出/接口/类型别名不匹配、缺 export、类型不能赋给等真实类型错误。传 path（目录或 .ts/.tsx 文件）即可，自动收集该范围所有相关文件并解析 tsconfig（有则用，无则用合理默认）。⚠️ 环境边界：浏览器里没有 node_modules，第三方依赖（react/zustand 等）类型无法解析，相关 \"Cannot find module / implicit any\" 会降为「提示」而非报错；若项目大量依赖第三方模块，工具会降级为一句说明 + 只列可能真实的少数错误，而非几百条噪声——此时请用本地 tsc 做权威检查。语法问题用 check_syntax（快），类型问题用 check_types（全）。大项目可能需数秒~数十秒（Worker 不卡页面，可取消）。",
       parameters: {
         type: "object",
         properties: {

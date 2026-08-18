@@ -163,6 +163,18 @@ export async function checkTypes(
           const noteC = r.noteCount ?? 0;
           const filesN = r.files ?? 0;
           const ms = r.durationMs ?? 0;
+          // 缺依赖检测：依赖 node_modules 的项目（react/zustand/next…）浏览器无法权威解析。
+          // 降级为一句说明 + 只列真实错误，不再逐条列几百条噪声/提示。
+          if (r.depMissing) {
+            const allLines: string[] = r.diagnostics || [];
+            const errorLines = allLines.filter((l) => /\[TS\d+\s+错误\]/.test(l));
+            let body = `⚠️ 该项目疑似依赖 \`node_modules\`（第三方模块无法在浏览器解析），浏览器无法进行权威的完整类型检查。`;
+            body += `\n  检查 ${filesN} 个文件 / 耗时 ${ms}ms；约 ${noteC} 条为「模块/全局缺失」类噪声（已被列为提示），${errC} 条才是疑真实类型错误。`;
+            body += `\n  建议在本地装好 \`node_modules\` 后运行 \`npx tsc --noEmit\` 获取权威结果。`;
+            body += `\n以下为可能真实的类型错误（${errorLines.length} 条）：\n` + (errorLines.join("\n") || "(无)");
+            resolve({ ok: errC === 0, output: body, files: filesN, errorCount: errC, diagnostics: diags, durationMs: ms });
+            return;
+          }
           let summary = errC > 0
             ? `发现 ${errC} 个类型错误`
             : `✓ 类型检查通过（${noteC} 条环境噪声已被列为提示）`;

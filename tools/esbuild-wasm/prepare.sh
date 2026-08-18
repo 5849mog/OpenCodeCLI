@@ -28,4 +28,15 @@ fi
 echo "=== esbuild-wasm prepare ==="
 cp "$WASM_SRC" "$OUT_DIR/esbuild.wasm"
 echo "  esbuild.wasm ← $WASM_SRC ($(du -h "$OUT_DIR/esbuild.wasm" | cut -f1))"
+
+# esbuild-browser.js：自包含 UMD（无 module 时挂 self.esbuild），供 check_syntax 目录
+# 遍历的 Web Worker（public/wasm/esbuild-syntax-worker.js）用 importScripts 加载，
+# initialize({ wasmURL, worker:false }) 在当前 worker 线程实例化 esbuild.wasm。
+BROWSER_SRC="$PROJECT_ROOT/node_modules/esbuild-wasm/lib/browser.js"
+if [ -f "$BROWSER_SRC" ]; then
+  cp "$BROWSER_SRC" "$OUT_DIR/esbuild-browser.js"
+  echo "  esbuild-browser.js ← $BROWSER_SRC ($(du -h "$OUT_DIR/esbuild-browser.js" | cut -f1))"
+else
+  echo "  WARN: esbuild-browser.js not found (skip; check_syntax 目录 worker 不可用)"
+fi
 echo "=== esbuild-wasm prepare complete ==="

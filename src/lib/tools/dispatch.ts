@@ -14,6 +14,7 @@ import { gitEngine } from "../git";
 import * as luaWasm from "../wasm/lua-wasm";
 import * as jsWasm from "../wasm/js-wasm";
 import { tscChecker } from "../wasm/tsc";
+import { esbuildSyntax } from "../wasm/esbuild-syntax";
 import { vfs } from "../vfs";
 
 /** run_lua 工具：内存 Lua 计算 + 受限写回。
@@ -542,14 +543,21 @@ export async function dispatchTool(
         return await toolCheckTypes(args);
       }
       case "check_syntax": {
-        // 来源三选一：code（内联）| file（单文件）| files（多文件数组）。
+        // 来源四选一：code（内联）| file（单文件）| files（多文件数组）| path（目录遍历）。
         const p = args.file !== undefined ? String(args.file) : "";
+        const dirPath = args.path !== undefined ? String(args.path) : "";
         const batch = args.files;
         const hasBatch = Array.isArray(batch) && batch.length > 0;
         const hasCode = args.code !== undefined;
-        const srcCount = (p ? 1 : 0) + (hasCode ? 1 : 0) + (hasBatch ? 1 : 0);
+        const srcCount = (p ? 1 : 0) + (hasCode ? 1 : 0) + (hasBatch ? 1 : 0) + (dirPath ? 1 : 0);
         if (srcCount > 1) {
-          return { ok: false, output: "check_syntax: code / file / files 只能三选一", tool: "check_syntax", args };
+          return { ok: false, output: "check_syntax: code / file / files / path 只能四选一", tool: "check_syntax", args };
+        }
+
+        // ── 目录遍历（Worker 隔离）：只回错误文件 + 汇总，不爆上下文 ──
+        if (dirPath) {
+          const r = await esbuildSyntax.checkSyntaxDir({ path: dirPath });
+          return { ok: r.ok, output: r.output, tool: "check_syntax", args };
         }
 
         const langExplicit = args.lang !== undefined ? String(args.lang).toLowerCase() : undefined;

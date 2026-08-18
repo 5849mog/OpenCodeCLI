@@ -229,15 +229,30 @@
       7005: true, // Variable 'x' implicitly has an 'any' type
       7008: true, // Member 'x' implicitly has an 'any' type
       18046: true, // 'x' is of type 'unknown'
-      2571: true // Object is of type 'unknown'
+      2571: true, // Object is of type 'unknown'
+      7015: true, // Property 'x' implicitly has an 'any' type (interface/alias)
+      7023: true, // Property 'x' implicitly has type 'any' (variable)
+      7007: true, // Narrowed destructuring implicit any
+      2769: true, // No overload matches (泛型退化为 any/unknown)
+      2580: true // Cannot find name 'process' 等 Node 全局（缺 @types/node）
     };
+    // 2304 Cannot find name：只有命中已知 Node/浏览器全局名（缺 @types 环境下必然假阳性）
+    // 才降噪；其余 Cannot find name 保留为错误（可能是真拼写错）。
+    var NODE_GLOBAL_NAMES = /^(process|Buffer|global|__dirname|__filename|require|module|exports|console|setImmediate|clearImmediate|queueMicrotask|URL|URLSearchParams|TextEncoder|TextDecoder|fetch|AbortController|Performance|structuredClone)$/;
+    // 归因到"缺依赖/module"的降噪码（用于缺依赖检测的统计口径）。
+    var MODULE_MISS_CODES = { 2307: true, 2792: true, 7016: true, 2580: true };
     var lines = [];
     var errCount = 0;
     var noteCount = 0;
     var sawNoise = false;
+    var moduleMissing = 0;
     diagnostics.forEach(function (d) {
-      var isNoise = d.category === ts.DiagnosticCategory.Error && !!ENV_NOISE[d.code];
+      var codeNum = d.code;
       var text = ts.flattenDiagnosticMessageText(d.messageText, "\n");
+      // 2304 → 命中 Node/浏览器全局名才降噪。
+      var nameNoise = codeNum === 2304 && /^Cannot find name '([^']+)'/.test(text) &&
+        NODE_GLOBAL_NAMES.test(text.replace(/^Cannot find name '([^']+)'.*/, "$1"));
+      var isNoise = d.category === ts.DiagnosticCategory.Error && (!!ENV_NOISE[codeNum] || nameNoise);
       var loc = "";
       if (d.file && d.start !== undefined) {
         var pos = d.file.getLineAndCharacterOfPosition(d.start);
@@ -245,13 +260,21 @@
         var display = fname.replace(/^\//, "");
         loc = display + ":" + (pos.line + 1) + ":" + (pos.character + 1) + "  ";
       }
-      var code = "TS" + d.code;
+      var code = "TS" + codeNum;
       var cat;
-      if (isNoise) { cat = "提示"; noteCount++; sawNoise = true; }
+      if (isNoise) {
+        cat = "提示"; noteCount++; sawNoise = true;
+        if (MODULE_MISS_CODES[codeNum] || nameNoise) moduleMissing++;
+      }
       else if (d.category === ts.DiagnosticCategory.Error) { cat = "错误"; errCount++; }
       else { cat = "提示"; }
       lines.push((loc || "") + "[" + code + " " + cat + "] " + text);
     });
+
+    // 缺依赖检测：若 module/全局缺失类噪声占错误级诊断（真错误+module缺失）比例过高，
+    // 判定项目依赖 node_modules、浏览器无法权威检查，host 据此降级输出。
+    var errTotal = errCount + moduleMissing;
+    var depMissing = moduleMissing > 0 && errTotal > 0 && moduleMissing / errTotal > 0.3;
 
     return {
       files: rootFiles.length,
@@ -259,6 +282,8 @@
       errorCount: errCount,
       noteCount: noteCount,
       envNoise: sawNoise,
+      moduleMissing: moduleMissing,
+      depMissing: depMissing,
       durationMs: 0
     };
   }
