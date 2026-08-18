@@ -176,6 +176,53 @@ const cache = new Map<string, VfsNode>();
 let hydrated = false;
 const hydrateListeners = new Set<() => void>();
 
+// ---------------------------------------------------------------------------
+// 有序文件路径索引（listAllFilesSync 加速）
+// 与 cache 严格同步：文件写入/删除/改名时增量维护（二分插入/移除），
+// 全量重建只在 hydrate / 快照恢复时发生一次。listAllFilesSync 用二分
+// 区间取（O(log N + M)），替代此前的全量扫描 + 全排序（O(N log N)）。
+// 排序口径与旧实现一致（localeCompare），保证调用方顺序不变。
+// ---------------------------------------------------------------------------
+
+const filePaths: string[] = [];
+
+/** 二分查找第一个 >= path 的位置（lower bound）。 */
+function lowerBoundPath(arr: string[], path: string): number {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid].localeCompare(path) < 0) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/** 文件路径插入索引（已存在则跳过）。 */
+function indexInsert(path: string): void {
+  const i = lowerBoundPath(filePaths, path);
+  if (filePaths[i] === path) return;
+  filePaths.splice(i, 0, path);
+}
+
+/** 文件路径从索引移除（不存在则忽略）。 */
+function indexRemove(path: string): void {
+  const i = lowerBoundPath(filePaths, path);
+  if (filePaths[i] === path) filePaths.splice(i, 1);
+}
+
+function indexClear(): void {
+  filePaths.length = 0;
+}
+
+/** 从 cache 全量重建索引（hydrate / 快照恢复后调用一次）。 */
+function indexRebuild(): void {
+  indexClear();
+  for (const [p, node] of cache.entries()) {
+    if (node.type === "file") indexInsert(p);
+  }
+}
+
 async function hydrateFromIDB() {
   if (hydrated) return;
   try {
@@ -183,6 +230,7 @@ async function hydrateFromIDB() {
     const all = (await db.getAll(STORE)) as VfsNode[];
     cache.clear();
     for (const node of all) cache.set(node.path, node);
+    indexRebuild();
   } catch (e) {
     console.warn("[vfs] hydrate failed, starting empty:", e);
   }
@@ -285,6 +333,7 @@ function restoreLastSnapshot(): string | null {
     // Re-create ancestor directory nodes (they were destroyed by the wipe)
     ensureAncestorsSync(path);
   }
+  indexRebuild();
   // Persist: clear IDB and re-write all (fire-and-forget to not block UX,
   // but with error logging)
   getDB()
@@ -368,6 +417,7 @@ export const vfs = {
       updatedAt: now,
     };
     cache.set(norm, node);
+    indexInsert(norm);
     void persist(node);
     emit({ type: "write", path: norm });
     return node;
@@ -390,6 +440,7 @@ export const vfs = {
       updatedAt: now,
     };
     cache.set(norm, node);
+    indexInsert(norm);
     void persist(node);
     emit({ type: "write", path: norm });
   },
@@ -507,6 +558,7 @@ export const vfs = {
     }
     for (const p of targets) {
       cache.delete(p);
+      indexRemove(p);
       await removePersisted(p);
       count++;
     }
@@ -534,6 +586,8 @@ export const vfs = {
       const newNode: VfsNode = { ...node, path: dst, updatedAt: now };
       cache.delete(src);
       cache.set(dst, newNode);
+      indexRemove(src);
+      indexInsert(dst);
       await removePersisted(src);
       await persist(newNode);
     }
@@ -559,6 +613,8 @@ export const vfs = {
       const newNode: VfsNode = { ...node, path: dst, updatedAt: now };
       cache.delete(src);
       cache.set(dst, newNode);
+      indexRemove(src);
+      indexInsert(dst);
       void removePersisted(src);
       void persist(newNode);
     }
@@ -594,17 +650,31 @@ export const vfs = {
     return vfs.listSync(path);
   },
 
-  /** List ALL files recursively under a path. */
+  /** List ALL files recursively under a path (ordered, index-backed O(log N + M)). */
   listAllFilesSync(path?: string): VfsNode[] {
     const root = path ? normalizePath(path) : "";
-    const prefix = root ? root + "/" : "";
     const result: VfsNode[] = [];
-    for (const [p, node] of cache.entries()) {
-      if (node.type !== "file") continue;
-      if (root && !p.startsWith(prefix) && p !== root) continue;
-      result.push(node);
+    if (!root) {
+      // 全量：索引即有序全集，直接映射（不再全量扫描 + 排序）。
+      for (const p of filePaths) {
+        const node = cache.get(p);
+        if (node) result.push(node);
+      }
+      return result;
     }
-    return result.sort((a, b) => a.path.localeCompare(b.path));
+    // root 本身可能是文件（旧语义：p === root 也包含）。
+    const selfNode = cache.get(root);
+    if (selfNode && selfNode.type === "file") result.push(selfNode);
+    // 二分区间 [lo, …)：所有以 root + "/" 开头的文件路径（天然有序）。
+    const prefix = root + "/";
+    const lo = lowerBoundPath(filePaths, prefix);
+    for (let i = lo; i < filePaths.length; i++) {
+      const p = filePaths[i];
+      if (!p.startsWith(prefix)) break;
+      const node = cache.get(p);
+      if (node) result.push(node);
+    }
+    return result;
   },
 
   /** Build a tree representation for display. */
@@ -674,6 +744,7 @@ export const vfs = {
     await hydrateFromIDB();
     const all = Array.from(cache.keys());
     cache.clear();
+    indexClear();
     const db = await getDB();
     const tx = db.transaction(STORE, "readwrite");
     for (const p of all) await tx.store.delete(p);
