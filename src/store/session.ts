@@ -49,7 +49,7 @@ import {
 import { runSubagent } from "@/lib/subagent";
 import { orchestrateTask } from "@/lib/orchestrator";
 import { apiKeyVault } from "@/lib/api-key-vault";
-import { warmup } from "@/lib/wasm/tokenizer";
+import { warmup, tokenizerStatus, countConversationTokensAccurate } from "@/lib/wasm/tokenizer";
 import { uuid } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -142,6 +142,9 @@ export interface AiConfig {
   /** 单次请求发送给模型的上下文预算（token）。超出时自动截断/压缩旧历史。
    *  默认 60000；高上下文模型（如 DeepSeek 1M）可在设置里调大。 */
   tokenBudget: number;
+  /** 自动压缩：真分词器就绪且估算超预算 85% 时自动 LLM 摘要压缩历史
+   *  （距上次压缩 ≥10 条新消息才再触发，防抖）。关闭则只 truncate（丢旧消息）。 */
+  autoCompact: boolean;
   /** DeepSeek V4: enable thinking mode */
   thinkingEnabled: boolean;
   /** DeepSeek V4: reasoning effort (low/medium/high/max/xhigh) */
@@ -196,6 +199,7 @@ const DEFAULT_CONFIG: AiConfig = {
   maxTokens: 8192,
   customInstructions: "",
   tokenBudget: 60_000,
+  autoCompact: true,
   thinkingEnabled: true,
   reasoningEffort: "max",
   searchProvider: "tavily",
@@ -275,6 +279,8 @@ interface SessionState {
    *  decreases; lets the UI show how much context pressure compacting has
    *  relieved, without changing totalTokens' "real API usage" meaning. */
   compactedReleases: number;
+  /** 上次压缩时的消息条数（auto-compact 节流：距上次 ≥10 条新消息才再触发）。 */
+  lastCompactMsgCount: number;
   /** How many times /compact successfully ran in this session. */
   compactCount: number;
   /** True if the last send truncated history to fit the token budget. */
@@ -435,6 +441,115 @@ function isToolTargetingSkills(tool: string, args: Record<string, unknown>): boo
   }
 }
 
+/* ────────────────────────── auto-compact ────────────────────────── */
+
+type SessionSet = (partial: Partial<SessionState> | ((s: SessionState) => Partial<SessionState>)) => void;
+type SessionGet = () => SessionState;
+
+/**
+ * auto-compact 触发判定（纯函数，可测）：
+ * 开关开启 + 未在压缩中 + 真分词器估算超预算 85% + 距上次压缩 ≥10 条新消息。
+ */
+export function shouldAutoCompact(opts: {
+  autoCompact: boolean;
+  isCompacting: boolean;
+  estimatedTokens: number;
+  tokenBudget: number;
+  messagesSinceLastCompact: number;
+}): boolean {
+  return (
+    opts.autoCompact &&
+    !opts.isCompacting &&
+    opts.estimatedTokens > opts.tokenBudget * 0.85 &&
+    opts.messagesSinceLastCompact >= 10
+  );
+}
+
+/**
+ * 压缩会话历史（手动 /compact 与 auto-compact 共用）。
+ * - 对话太短 / 未配置 API Key：manual 推事件提示；auto 静默跳过（truncate 兜底）。
+ * - 成功：写回 messages + 累计 compactedReleases/compactCount + lastCompactMsgCount
+ *   （auto-compact 节流基准）+ 立即持久化 + 推 system 事件（触发方式标注）。
+ * - 失败：manual 推 error 事件；auto 静默（truncate 兜底）。
+ */
+async function doCompact(trigger: "manual" | "auto", set: SessionSet, get: SessionGet): Promise<void> {
+  const { messages } = get();
+  if (messages.length < 4) {
+    if (trigger === "manual") {
+      set((s) => ({
+        events: [
+          ...s.events,
+          { id: nextId(), kind: "system", text: "对话太短，无需压缩（至少需要 4 条消息）。", ts: Date.now() },
+        ],
+      }));
+    }
+    return;
+  }
+  if (!apiKeyVault.hasKey()) {
+    if (trigger === "manual") {
+      set((s) => ({
+        events: [
+          ...s.events,
+          { id: nextId(), kind: "error", text: "无法压缩：未配置 API Key。压缩需要调用模型生成摘要。", ts: Date.now() },
+        ],
+      }));
+    }
+    return;
+  }
+  const config = get().config;
+  const aiConfig: AiClientConfig = {
+    baseUrl: config.baseUrl,
+    apiKey: apiKeyVault.getKey() ?? "",
+    model: config.model,
+    temperature: config.temperature,
+    maxTokens: config.maxTokens,
+    thinkingEnabled: config.thinkingEnabled,
+    reasoningEffort: config.reasoningEffort,
+  };
+  set({ isCompacting: true, agentStatus: "正在压缩对话历史…" });
+  try {
+    const result = await compactConversation(messages, aiConfig);
+    // 真写回 store——后续每一轮请求都发送压缩后的历史
+    const released = result.tokensBefore - result.tokensAfter;
+    set((s) => ({
+      messages: result.messages,
+      truncated: false,
+      // 累计本次释放的 token 数与压缩次数（压缩感知面板用）
+      compactedReleases: (s.compactedReleases ?? 0) + (released > 0 ? released : 0),
+      compactCount: (s.compactCount ?? 0) + 1,
+      lastCompactMsgCount: result.messages.length,
+    }));
+    // 立即持久化压缩后的历史——否则刷新页面后 IndexedDB 里还是
+    // 未压缩的完整对话，压缩效果丢失（send 里下一次 schedulePersist
+    // 才会覆盖，但刷新前这个窗口期内持久化层是旧数据）。
+    void flushPersist(get);
+    const modeLabel = result.mode === "llm" ? "LLM 摘要" : "启发式压缩（摘要调用失败，已降级）";
+    set((s) => ({
+      events: [
+        ...s.events,
+        {
+          id: nextId(),
+          kind: "system",
+          text: `${trigger === "auto" ? "已自动压缩对话历史" : "已压缩对话历史"}（${modeLabel}）：${messages.length} 条消息 → ${result.messages.length} 条，释放约 ${((result.tokensBefore - result.tokensAfter) / 1000).toFixed(1)}K token（${result.tokensBefore.toLocaleString()} → ${result.tokensAfter.toLocaleString()}）。旧对话已浓缩为摘要。`,
+          ts: Date.now(),
+        },
+      ],
+    }));
+  } catch (e) {
+    if (trigger === "manual") {
+      set((s) => ({
+        events: [
+          ...s.events,
+          { id: nextId(), kind: "error", text: `压缩失败：${e instanceof Error ? e.message : String(e)}。对话历史保持不变。`, ts: Date.now() },
+        ],
+      }));
+    }
+  } finally {
+    // 无论成功失败都清除压缩状态——UI 的"压缩中"动画随之消失
+    set({ isCompacting: false, agentStatus: "" });
+  }
+}
+
 export const useSession = create<SessionState>((set, get) => ({
   events: [],
   messages: [],
@@ -454,6 +569,7 @@ export const useSession = create<SessionState>((set, get) => ({
   lastUsage: null,
   compactedReleases: 0,
   compactCount: 0,
+  lastCompactMsgCount: 0,
   truncated: false,
   mode: "bypass",
   pendingQuestions: null,
@@ -494,6 +610,9 @@ export const useSession = create<SessionState>((set, get) => ({
           lastUsage: persisted.lastUsage,
           compactedReleases: persisted.compactedReleases ?? 0,
           compactCount: persisted.compactCount ?? 0,
+          // 恢复的会话视作"刚压缩过"：auto-compact 需再累积 10 条新消息才触发，
+          // 避免恢复长会话时意外多花一次摘要调用。
+          lastCompactMsgCount: persisted.messages.length,
         });
       }
       void get().refreshSessionList();
@@ -544,6 +663,7 @@ export const useSession = create<SessionState>((set, get) => ({
       lastUsage: null,
       compactedReleases: 0,
       compactCount: 0,
+      lastCompactMsgCount: 0,
       truncated: false,
       pendingQuestions: null,
       pendingDownload: null,
@@ -584,6 +704,7 @@ export const useSession = create<SessionState>((set, get) => ({
       lastUsage: null,
       compactedReleases: 0,
       compactCount: 0,
+      lastCompactMsgCount: 0,
       truncated: false,
       pendingQuestions: null,
       pendingDownload: null,
@@ -668,89 +789,7 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 
   compact: async () => {
-    const { messages } = get();
-    if (messages.length < 4) {
-      useSession.setState((s) => ({
-        events: [
-          ...s.events,
-          {
-            id: nextId(),
-            kind: "system",
-            text: "对话太短，无需压缩（至少需要 4 条消息）。",
-            ts: Date.now(),
-          },
-        ],
-      }));
-      return;
-    }
-    if (!apiKeyVault.hasKey()) {
-      useSession.setState((s) => ({
-        events: [
-          ...s.events,
-          {
-            id: nextId(),
-            kind: "error",
-            text: "无法压缩：未配置 API Key。压缩需要调用模型生成摘要。",
-            ts: Date.now(),
-          },
-        ],
-      }));
-      return;
-    }
-    const config = get().config;
-    const aiConfig: AiClientConfig = {
-      baseUrl: config.baseUrl,
-      apiKey: apiKeyVault.getKey() ?? "",
-      model: config.model,
-      temperature: config.temperature,
-      maxTokens: config.maxTokens,
-      thinkingEnabled: config.thinkingEnabled,
-      reasoningEffort: config.reasoningEffort,
-    };
-    set({ isCompacting: true, agentStatus: "正在压缩对话历史…" });
-    try {
-      const result = await compactConversation(messages, aiConfig);
-      // 真写回 store——后续每一轮请求都发送压缩后的历史
-      const released = result.tokensBefore - result.tokensAfter;
-      set((s) => ({
-        messages: result.messages,
-        truncated: false,
-        // 累计本次释放的 token 数与压缩次数（压缩感知面板用）
-        compactedReleases: (s.compactedReleases ?? 0) + (released > 0 ? released : 0),
-        compactCount: (s.compactCount ?? 0) + 1,
-      }));
-      // 立即持久化压缩后的历史——否则刷新页面后 IndexedDB 里还是
-      // 未压缩的完整对话，压缩效果丢失（send 里下一次 schedulePersist
-      // 才会覆盖，但刷新前这个窗口期内持久化层是旧数据）。
-      void flushPersist(get);
-      const modeLabel = result.mode === "llm" ? "LLM 摘要" : "启发式压缩（摘要调用失败，已降级）";
-      useSession.setState((s) => ({
-        events: [
-          ...s.events,
-          {
-            id: nextId(),
-            kind: "system",
-            text: `已压缩对话历史（${modeLabel}）：${messages.length} 条消息 → ${result.messages.length} 条，释放约 ${((result.tokensBefore - result.tokensAfter) / 1000).toFixed(1)}K token（${result.tokensBefore.toLocaleString()} → ${result.tokensAfter.toLocaleString()}）。旧对话已浓缩为摘要。`,
-            ts: Date.now(),
-          },
-        ],
-      }));
-    } catch (e) {
-      useSession.setState((s) => ({
-        events: [
-          ...s.events,
-          {
-            id: nextId(),
-            kind: "error",
-            text: `压缩失败：${e instanceof Error ? e.message : String(e)}。对话历史保持不变。`,
-            ts: Date.now(),
-          },
-        ],
-      }));
-    } finally {
-      // 无论成功失败都清除压缩状态——UI 的"压缩中"动画随之消失
-      set({ isCompacting: false, agentStatus: "" });
-    }
+    await doCompact("manual", set, get);
   },
 
   toggleMode: () => {
@@ -915,7 +954,7 @@ async function runAgentLoop(
     // 替换当前历史（system/workspace-context 由 send 自行重建）。首轮消费后清空。
     const overrideMsgs = get().pendingOverrideMessages;
     const historyMsgs = overrideMsgs ?? get().messages;
-    const fullMessages: ChatMessage[] = [
+    let fullMessages: ChatMessage[] = [
       { role: "system", content: STATIC_SYSTEM_PROMPT },
       // The context block is injected as a user message so that the system
       // prompt stays fully static and cacheable.
@@ -926,6 +965,26 @@ async function runAgentLoop(
     // 预热真分词器（fire-and-forget，不阻塞发送；本轮估算仍走字符启发式，
     // 下一轮起自动升级为 DeepSeek BPE 精确计数）。
     warmup();
+    // auto-compact：真分词器就绪 + 估算超预算 85% + 距上次压缩 ≥10 条新消息
+    // → 自动 LLM 摘要（信息保留）；否则由 truncateConversation 丢旧消息兜底。
+    if (tokenizerStatus() === "ready") {
+      const estimatedTokens = await countConversationTokensAccurate(fullMessages);
+      if (shouldAutoCompact({
+        autoCompact: config.autoCompact,
+        isCompacting: get().isCompacting,
+        estimatedTokens,
+        tokenBudget: config.tokenBudget,
+        messagesSinceLastCompact: get().messages.length - (get().lastCompactMsgCount ?? 0),
+      })) {
+        await doCompact("auto", set, get);
+        // compact 已替换 get().messages——重建 fullMessages（含新注入的 context block）
+        fullMessages = [
+          { role: "system", content: STATIC_SYSTEM_PROMPT },
+          { role: "user", content: contextBlock },
+          ...get().messages,
+        ];
+      }
+    }
     const { messages: truncatedMsgs, dropped, tokensBefore, tokensAfter } =
       await truncateConversation(fullMessages, config.tokenBudget, 10);
     if (dropped > 0) {

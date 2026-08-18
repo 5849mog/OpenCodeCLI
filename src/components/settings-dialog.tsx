@@ -424,6 +424,24 @@ export function SettingsDialog({
             </Field>
           </div>
 
+          {/* 自动压缩 */}
+          <div className="mt-3">
+            <label className="flex cursor-pointer select-none items-start gap-2">
+              <input
+                type="checkbox"
+                checked={config.autoCompact}
+                onChange={(e) => setConfig({ autoCompact: e.target.checked })}
+                className="mt-0.5 h-4 w-4 accent-[#E58F67]"
+              />
+              <span>
+                <span className="block text-sm text-[#2D2B27] dark:text-zinc-100">自动压缩对话历史</span>
+                <span className="block text-[10px] text-[#8B8884] dark:text-zinc-500">
+                  真分词器估算超预算 85% 时自动用 LLM 摘要压缩（保留信息，需消耗一次摘要调用）；关闭则只丢弃旧消息。距上次压缩 ≥10 条新消息才再次触发。
+                </span>
+              </span>
+            </label>
+          </div>
+
           {/* DeepSeek V4: thinking + reasoning */}
           <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
