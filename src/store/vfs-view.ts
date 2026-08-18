@@ -21,8 +21,8 @@ interface VfsViewState {
   dirtyTabs: Record<string, boolean>;
   expandedDirs: Set<string>;
 
-  /** Right panel tab: "files" (default), "plan", or "subagents". */
-  rightPanelTab: "files" | "plan" | "subagents";
+  /** Right panel tab: "files" (default), "plan", "subagents", or "audit". */
+  rightPanelTab: "files" | "plan" | "subagents" | "audit";
   /** The subagent run to highlight in the 子智能体 panel (tool-call event id). */
   subagentFocus: string | null;
 
@@ -30,7 +30,7 @@ interface VfsViewState {
   select: (path: string | null) => void;
   toggleDir: (path: string) => void;
   init: () => void;
-  setRightPanelTab: (tab: "files" | "plan" | "subagents") => void;
+  setRightPanelTab: (tab: "files" | "plan" | "subagents" | "audit") => void;
   setSubagentFocus: (id: string | null) => void;
 
   // Tab management

@@ -30,6 +30,7 @@ import {
   Menu,
   PanelLeft,
   Bot,
+  ScrollText,
 } from "lucide-react";
 import JSZip from "jszip";
 import { FileTypeIcon } from "@/lib/file-icon";
@@ -39,6 +40,7 @@ import { useVfsView } from "@/store/vfs-view";
 import { useSession } from "@/store/session";
 import { PlanPanel } from "@/components/plan-panel";
 import { SubagentPanel, buildRuns } from "@/components/subagent-panel";
+import { AuditPanel } from "@/components/audit-panel";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -184,6 +186,7 @@ function FileBagInner() {
               { key: "files", label: "文件袋", Icon: FolderOpen },
               { key: "plan", label: "Plan", Icon: ClipboardList },
               { key: "subagents", label: "子智能体", Icon: Bot },
+              { key: "audit", label: "审计", Icon: ScrollText },
             ] as const
           ).map(({ key, label, Icon }) => {
             const active = rightPanelTab === key;
@@ -332,6 +335,10 @@ function FileBagInner() {
       ) : rightPanelTab === "plan" ? (
         <div className="flex min-h-0 flex-1">
           <PlanPanel />
+        </div>
+      ) : rightPanelTab === "audit" ? (
+        <div className="flex min-h-0 flex-1">
+          <AuditPanel />
         </div>
       ) : (
         <div className="flex min-h-0 flex-1">

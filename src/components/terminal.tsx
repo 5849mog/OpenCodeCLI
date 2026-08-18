@@ -83,6 +83,9 @@ import { Switch } from "@/components/ui/switch";
 import { FileTypeIcon } from "@/lib/file-icon";
 import { cn } from "@/lib/utils";
 import { planStats } from "@/lib/plan-utils";
+import { matchModelRate, estimateCost, split80_20 } from "@/lib/cost";
+import { buildAuditReport, renderAuditMarkdown } from "@/lib/audit";
+import { downloadBlob } from "@/lib/download";
 import { CollapsibleText } from "./collapsible-text";
 
 export function Terminal() {
@@ -429,45 +432,58 @@ export function Terminal() {
       }
 
       case "cost": {
-        // Rough cost estimates per 1M tokens (USD). User can adjust mentally.
-        const RATES: Record<string, { in: number; out: number }> = {
-          "gpt-4o": { in: 2.5, out: 10 },
-          "gpt-4o-mini": { in: 0.15, out: 0.6 },
-          "gpt-4.1": { in: 2, out: 8 },
-          "gpt-4.1-mini": { in: 0.4, out: 1.6 },
-          "deepseek-v4-flash": { in: 0.27, out: 1.1 },
-          "deepseek-v4-pro": { in: 0.55, out: 2.19 },
-          "claude-3-5-sonnet": { in: 3, out: 15 },
-          "claude-3-5-haiku": { in: 0.8, out: 4 },
-        };
-        // Sort by length descending so "gpt-4o-mini" matches before "gpt-4o".
-        const modelKey = Object.keys(RATES)
-          .sort((a, b) => b.length - a.length)
-          .find((k) => config.model.toLowerCase().includes(k.toLowerCase()));
-        if (!modelKey) {
+        // 价格表与估算逻辑在共享模块（审计面板同用）：src/lib/cost.ts
+        const rate = matchModelRate(config.model);
+        if (!rate) {
           pushSystem(
             `Session tokens: ${totalTokens.toLocaleString()} total.\n` +
               `No cost estimate available for model "${config.model}".\n` +
-              `Add its pricing to the /cost rate table in terminal.tsx if needed.`,
+              `Add its pricing to the /cost rate table in src/lib/cost.ts if needed.`,
           );
           break;
         }
-        const rate = RATES[modelKey];
-        // Approximate split: assume 80% prompt, 20% completion (rough).
-        const promptTok = Math.round(totalTokens * 0.8);
-        const completionTok = totalTokens - promptTok;
-        const costIn = (promptTok / 1_000_000) * rate.in;
-        const costOut = (completionTok / 1_000_000) * rate.out;
-        const costTotal = costIn + costOut;
+        // 有逐次 usage 记录用真实拆分，否则退化为 80/20 假设。
+        const usageHistory = useSession.getState().usageHistory ?? [];
+        const promptSum = usageHistory.reduce((s, u) => s + u.promptTokens, 0);
+        const completionSum = usageHistory.reduce((s, u) => s + u.completionTokens, 0);
+        let promptTok = promptSum;
+        let completionTok = completionSum;
+        let splitNote = "split from real per-request usage";
+        if (promptTok + completionTok === 0) {
+          const s = split80_20(totalTokens);
+          promptTok = s.prompt;
+          completionTok = s.completion;
+          splitNote = "split is estimated 80/20 (no per-request usage recorded yet)";
+        }
+        const costTotal = estimateCost(rate, promptTok, completionTok);
         pushSystem(
           `Estimated cost for "${config.model}":\n` +
-            `  • Tokens: ${totalTokens.toLocaleString()} total (~${promptTok.toLocaleString()} prompt + ~${completionTok.toLocaleString()} completion)\n` +
+            `  • Tokens: ${totalTokens.toLocaleString()} total (${promptTok.toLocaleString()} prompt + ${completionTok.toLocaleString()} completion)\n` +
             `  • Rate: $${rate.in}/M input, $${rate.out}/M output\n` +
             `  • Cost: $${costTotal.toFixed(4)} (≈ $${(costTotal * 100).toFixed(2)} cents)\n` +
-            `Note: split is estimated 80/20. Real split from lastUsage: ` +
-            (lastUsage
-              ? `${lastUsage.prompt_tokens.toLocaleString()} prompt + ${lastUsage.completion_tokens.toLocaleString()} completion`
-              : "n/a"),
+            `Note: ${splitNote}.`,
+        );
+        break;
+      }
+
+      case "audit": {
+        // 会话审计报告：与右侧栏「审计」面板共用 buildAuditReport 聚合，
+        // 这里导出 Markdown 供存档/分享。
+        const st = useSession.getState();
+        const report = buildAuditReport(
+          st.events,
+          st.usageHistory ?? [],
+          st.vfsChangeLog ?? [],
+          st.totalTokens,
+          st.config.model,
+        );
+        const md = renderAuditMarkdown(report);
+        const blob = new Blob([md], { type: "text/markdown" });
+        downloadBlob(blob, `opencode-audit-${Date.now()}.md`);
+        pushSystem(
+          `Audit report exported: ${report.toolCallCount} tool calls, ${report.fileChanges.length} file changes, ` +
+            `${report.totalTokens.toLocaleString()} tokens` +
+            (report.cost ? `, ≈ $${report.cost.usd.toFixed(4)}` : ", cost n/a"),
         );
         break;
       }

@@ -61,7 +61,7 @@ export async function orchestrateTask(
   onStatus?.("Decomposing task…");
 
   // 1. Decompose
-  const subTasks = await decomposeTask(config, task, maxSubAgents, signal);
+  const subTasks = await decomposeTask(config, task, maxSubAgents, signal, onUsage);
   if (subTasks.length === 0) {
     // Fall back to a single sub-agent if decomposition fails
     onStatus?.("Running single sub-agent (decomposition skipped)…");
@@ -104,6 +104,7 @@ export async function orchestrateTask(
     task,
     subTaskResults,
     signal,
+    onUsage,
   );
 
   const totalToolCalls = subTaskResults.reduce((s, r) => s + r.toolCallCount, 0);
@@ -126,6 +127,7 @@ async function decomposeTask(
   task: string,
   maxSubTasks: number,
   signal?: AbortSignal,
+  onUsage?: (usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number }) => void,
 ): Promise<string[]> {
   const prompt = `Decompose the following task into at most ${maxSubTasks} independent subtasks that can be worked on in parallel. Each subtask should produce work product (code, files, analysis).
 
@@ -148,9 +150,11 @@ Output format: ["subtask 1 description", "subtask 2 description", ...]`;
         { role: "system" as const, content: "You are a task decomposition expert. Output only valid JSON arrays." },
         { role: "user" as const, content: prompt },
       ],
-      [], // no tools needed
+      [],
+      // no tools needed
       {
         onText: (delta) => { collected += delta; },
+        onUsage,
       },
       signal,
       2,
@@ -241,6 +245,7 @@ async function synthesizeResults(
   originalTask: string,
   results: SubTaskResult[],
   signal?: AbortSignal,
+  onUsage?: (usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number }) => void,
 ): Promise<string> {
   const resultsBlock = results
     .map((r, i) => `## Subtask ${i + 1}: ${r.description}\n${r.summary}`)
@@ -267,6 +272,7 @@ Provide a concise, organized summary of the overall outcome.`;
       [],
       {
         onText: (delta) => { collected += delta; },
+        onUsage,
       },
       signal,
       2,

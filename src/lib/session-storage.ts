@@ -45,6 +45,21 @@ export interface PersistedSession {
   compactedReleases?: number;
   /** Number of successful /compact runs. */
   compactCount?: number;
+  /** Per-request API usage (audit panel). */
+  usageHistory?: {
+    ts: number;
+    source: "main" | "subagent" | "orchestrator";
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  }[];
+  /** VFS change log (audit panel; covers delete/move/bash writes that lack diffs). */
+  vfsChangeLog?: {
+    ts: number;
+    type: "write" | "delete" | "rename" | "clear";
+    path?: string;
+    toPath?: string;
+  }[];
   createdAt: number;
   updatedAt: number;
 }
@@ -152,6 +167,8 @@ export async function createSession(title = "新会话"): Promise<PersistedSessi
     events: [],
     totalTokens: 0,
     lastUsage: null,
+    usageHistory: [],
+    vfsChangeLog: [],
     createdAt: now,
     updatedAt: now,
   };

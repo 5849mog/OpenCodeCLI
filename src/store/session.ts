@@ -27,7 +27,7 @@ import {
   type ToolResult,
 } from "@/lib/tools/index";
 import { buildWorkspaceContext } from "@/lib/tools/system-prompt";
-import { vfs } from "@/lib/vfs";
+import { vfs, onVfsEvent } from "@/lib/vfs";
 import { useVfsView } from "@/store/vfs-view";
 import { compactConversation } from "@/lib/compact";
 import {
@@ -124,6 +124,27 @@ export interface SessionEvent {
   plan?: string;
   ok?: boolean;
   ts: number;
+}
+
+// ---------------------------------------------------------------------------
+// Audit data (per-session, persisted with the session)
+// ---------------------------------------------------------------------------
+
+/** 逐次 API 用量记录（审计面板/报告用，来源分主循环/子代理/编排）。 */
+export interface UsageRecord {
+  ts: number;
+  source: "main" | "subagent" | "orchestrator";
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+/** VFS 变更日志条目（审计面板用；覆盖 delete/move/bash 写入——这些工具没有 diff）。 */
+export interface VfsChangeRecord {
+  ts: number;
+  type: "write" | "delete" | "rename" | "clear";
+  path?: string;
+  toPath?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -281,6 +302,10 @@ interface SessionState {
   compactedReleases: number;
   /** 上次压缩时的消息条数（auto-compact 节流：距上次 ≥10 条新消息才再触发）。 */
   lastCompactMsgCount: number;
+  /** 逐次 API 用量（审计面板用；上限 200 条）。 */
+  usageHistory: UsageRecord[];
+  /** VFS 变更日志（审计面板用；覆盖无 diff 的写操作，上限 500 条）。 */
+  vfsChangeLog: VfsChangeRecord[];
   /** How many times /compact successfully ran in this session. */
   compactCount: number;
   /** True if the last send truncated history to fit the token budget. */
@@ -356,6 +381,8 @@ async function flushPersist(get: () => SessionState): Promise<void> {
     lastUsage: s.lastUsage,
     compactedReleases: s.compactedReleases ?? 0,
     compactCount: s.compactCount ?? 0,
+    usageHistory: s.usageHistory ?? [],
+    vfsChangeLog: s.vfsChangeLog ?? [],
     createdAt: s.events[0]?.ts ?? Date.now(),
     updatedAt: Date.now(),
   };
@@ -445,6 +472,28 @@ function isToolTargetingSkills(tool: string, args: Record<string, unknown>): boo
 
 type SessionSet = (partial: Partial<SessionState> | ((s: SessionState) => Partial<SessionState>)) => void;
 type SessionGet = () => SessionState;
+
+/** 累计真实 API 用量 + 追加逐次记录（审计面板用，上限 200 条）。 */
+function recordUsage(
+  set: SessionSet,
+  usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number },
+  source: UsageRecord["source"],
+): void {
+  set((s) => ({
+    totalTokens: s.totalTokens + usage.total_tokens,
+    lastUsage: usage,
+    usageHistory: [
+      ...(s.usageHistory ?? []),
+      {
+        ts: Date.now(),
+        source,
+        promptTokens: usage.prompt_tokens,
+        completionTokens: usage.completion_tokens,
+        totalTokens: usage.total_tokens,
+      },
+    ].slice(-200),
+  }));
+}
 
 /**
  * auto-compact 触发判定（纯函数，可测）：
@@ -570,6 +619,8 @@ export const useSession = create<SessionState>((set, get) => ({
   compactedReleases: 0,
   compactCount: 0,
   lastCompactMsgCount: 0,
+  usageHistory: [],
+  vfsChangeLog: [],
   truncated: false,
   mode: "bypass",
   pendingQuestions: null,
@@ -613,6 +664,8 @@ export const useSession = create<SessionState>((set, get) => ({
           // 恢复的会话视作"刚压缩过"：auto-compact 需再累积 10 条新消息才触发，
           // 避免恢复长会话时意外多花一次摘要调用。
           lastCompactMsgCount: persisted.messages.length,
+          usageHistory: persisted.usageHistory ?? [],
+          vfsChangeLog: persisted.vfsChangeLog ?? [],
         });
       }
       void get().refreshSessionList();
@@ -640,6 +693,8 @@ export const useSession = create<SessionState>((set, get) => ({
       lastUsage: null,
       compactedReleases: 0,
       compactCount: 0,
+      usageHistory: [],
+      vfsChangeLog: [],
       createdAt: get().events[0]?.ts ?? now,
       updatedAt: now,
     };
@@ -664,6 +719,8 @@ export const useSession = create<SessionState>((set, get) => ({
       compactedReleases: 0,
       compactCount: 0,
       lastCompactMsgCount: 0,
+      usageHistory: [],
+      vfsChangeLog: [],
       truncated: false,
       pendingQuestions: null,
       pendingDownload: null,
@@ -705,6 +762,8 @@ export const useSession = create<SessionState>((set, get) => ({
       compactedReleases: 0,
       compactCount: 0,
       lastCompactMsgCount: 0,
+      usageHistory: [],
+      vfsChangeLog: [],
       truncated: false,
       pendingQuestions: null,
       pendingDownload: null,
@@ -740,6 +799,9 @@ export const useSession = create<SessionState>((set, get) => ({
       lastUsage: rec?.lastUsage ?? null,
       compactedReleases: rec?.compactedReleases ?? 0,
       compactCount: rec?.compactCount ?? 0,
+      lastCompactMsgCount: rec?.messages?.length ?? 0,
+      usageHistory: rec?.usageHistory ?? [],
+      vfsChangeLog: rec?.vfsChangeLog ?? [],
       isStreaming: false,
       agentStatus: "",
       streamingText: null,
@@ -1050,10 +1112,7 @@ async function runAgentLoop(
             set({ streamingReasoning: { id: streamEventId, text: reasoning } });
           },
           onUsage: (usage) => {
-            set((s) => ({
-              totalTokens: s.totalTokens + usage.total_tokens,
-              lastUsage: usage,
-            }));
+            recordUsage(set, usage, "main");
           },
         },
         timeoutController.signal,
@@ -1340,10 +1399,7 @@ async function executeToolCall(
           maxIterations: maxIter,
           tokenBudget: config.tokenBudget,
           onUsage: (usage) => {
-            set((s) => ({
-              totalTokens: s.totalTokens + usage.total_tokens,
-              lastUsage: usage,
-            }));
+            recordUsage(set, usage, "subagent");
           },
           onStatus: (status) => {
             set({ agentStatus: `Subagent · ${status}` });
@@ -1406,10 +1462,7 @@ async function executeToolCall(
               set({ agentStatus: `🧠 ${s}` });
             },
             onUsage: (usage) => {
-              set((s) => ({
-                totalTokens: s.totalTokens + usage.total_tokens,
-                lastUsage: usage,
-              }));
+              recordUsage(set, usage, "orchestrator");
             },
             signal,
           });
@@ -1515,3 +1568,16 @@ async function executeToolCall(
   // Persist after each tool execution so a crash mid-loop still saves progress.
   schedulePersist(get);
 }
+
+/* ────────────────────────── VFS 变更日志订阅 ──────────────────────────
+ * emit 是同步的（vfs.ts），这里把每次写/删/改名/清空记入当前会话的
+ * vfsChangeLog（审计面板的"文件改动"数据源，覆盖 delete/move/bash 写入
+ * ——这些工具没有 diff）。上限 500 条防爆。 */
+onVfsEvent((e) => {
+  useSession.setState((s) => ({
+    vfsChangeLog: [
+      ...(s.vfsChangeLog ?? []),
+      { ts: Date.now(), ...e },
+    ].slice(-500),
+  }));
+});
