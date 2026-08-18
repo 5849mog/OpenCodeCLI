@@ -85,10 +85,10 @@ export async function checkSyntax(source: string, loader?: string): Promise<stri
     await esb.transform(source, { loader: resolvedLoader as never, target: "es2018" });
     return null; // 语法合法
   } catch (e) {
-    // esbuild 报错格式：`stdin:1:9: ERROR: ...`
+    // esbuild 报错格式：`<stdin>:1:9: ERROR: ...`（0.28 带 <>，旧版不带）。
     const raw = e instanceof Error ? e.message : String(e);
     // 提取友好信息（避免 /s flag——tsconfig target ES2017）
-    const m = raw.match(/stdin:(\d+):(\d+):\s*(ERROR|WARNING):\s*([\s\S]*)/);
+    const m = raw.match(/<?stdin>?:(\d+):(\d+):\s*(ERROR|WARNING):\s*([\s\S]*)/);
     if (m) return `第 ${m[1]} 行第 ${m[2]} 列: ${m[4].trim()}`;
     return raw;
   }

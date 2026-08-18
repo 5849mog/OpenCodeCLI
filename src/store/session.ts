@@ -1128,6 +1128,7 @@ const MUTATING_TOOLS = new Set([
   "apply_patch", "insert_at", "run_lua", "run_js", // run_lua/run_js 带 outputs 时写回 VFS → 需快照可 undo
   "bash", // bash 的 > / >> / tee / mkdir / rm / rmdir / touch / cp / mv / sed -i 会写 VFS
   "create_skill", "delete_skill", // 创建/删除 skill（写 skills/ 目录）→ 需快照可 undo
+  "transpile", // 编译器语义：file/files/path 模式把产物写入 VFS → 需快照可 undo
   "git_commit", // git 提交（写 git 工作区）→ 需快照可 undo
 ]);
 
@@ -1377,6 +1378,7 @@ async function executeToolCall(
         "move_file", "append_file", "create_dir",
         "apply_patch", "insert_at", "undo_edit", "unzip_archive",
         "create_skill", "delete_skill",
+        "transpile", // 编译器语义：file/files/path 模式把产物写入 VFS → Plan 模式拦截
       ]);
       // Skills 目录保护：普通写工具（write_file 等）不可指向 skills/（防
       // AI 乱写坏目录结构）；create_skill/delete_skill 是管理 skills/ 的

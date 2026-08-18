@@ -911,20 +911,37 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "transpile",
       description:
-        "用 esbuild 把 TypeScript/TSX/JSX/JavaScript 转译为 JavaScript（含语法校验）。AI 写完 TS 代码后，可用它验证语法是否合法、并得到可运行的 JS。loader 自动推断（ts/tsx/js/jsx），可用 sourcefile 文件名覆盖。输出转译后的 JS。首次调用会惰性加载 ~9MB WASM（稍慢）。只读工具。",
+        "用 esbuild 把 TypeScript/TSX/JSX/JavaScript 转译为 JavaScript（含语法校验），并把产物**写入 VFS**（编译器语义：文件进、文件出，像 tsc/esbuild 一样输出文件）。来源四选一：file（单文件路径）/ files（多文件路径数组，最多 20 个）/ path（目录，递归遍历该目录下所有受支持源文件，Web Worker 里跑不卡页面）/ code（内联源码，唯一不写文件、直接回 JS 文本的模式）。**path 传项目根 + outDir 一次产出整个项目的 JS，不要拆成多次 files 调用**。产物位置：不传 outDir 时写在源码旁（foo.ts → foo.js，tsc 语义）；传 outDir 时按源码目录结构镜像写入（outDir=/dist 时 src/foo.ts → /dist/src/foo.js）。扩展名映射：.ts/.tsx/.jsx → .js；.js/.mjs/.cjs 保持；.d.ts / json / lua / 其他扩展名跳过（计数）。已存在的同名 JS 会被覆盖（编译语义）。产物在 VFS 里，可直接用 run_js(script_file:) 运行、cat/read_file 查看，或随文件袋下载。**会写文件 → Plan 模式不可用**。首次调用惰性加载 ~9MB WASM（path 模式在 Worker 中）。",
       parameters: {
         type: "object",
         properties: {
+          file: {
+            type: "string",
+            description: "可选。VFS 中的单文件路径（如 /src/index.ts），转译后把 .js 产物写入 VFS（默认写在源码旁，传 outDir 则写入 outDir 镜像目录）。与 code / files / path 四选一。",
+          },
+          files: {
+            type: "array",
+            items: { type: "string" },
+            description: "可选。VFS 中的多文件路径数组（最多 20 个），逐个转译并把 .js 产物写入 VFS。与 code / file / path 四选一。注意：整个项目用 path 传根目录一次覆盖，不必拆 files。",
+          },
+          path: {
+            type: "string",
+            description: "可选。VFS 中的目录（或单文件）路径。传项目根目录会递归转译该目录下所有受支持源文件（ts/tsx/js/jsx/mjs/cjs，含子目录与根目录散落文件），一次完成，无需多次补查；建议配合 outDir 把产物集中写入。.d.ts / json / lua 不在转译范围内（跳过计数）。与 code / file / files 四选一。",
+          },
           code: {
             type: "string",
-            description: "要转译的源代码。",
+            description: "可选。要转译的内联源代码。此模式不写文件，直接返回转译后的 JS 文本（可配合 sourcefile 指定 loader）。与 file / files / path 四选一。",
           },
           sourcefile: {
             type: "string",
-            description: "可选。源码文件名（含扩展名），用于推断 loader 并改善错误信息。如 'src/foo.ts'、'App.tsx'。",
+            description: "可选。仅配合 code 使用：源码文件名（含扩展名），用于推断 loader 并改善错误信息。如 'src/foo.ts'、'App.tsx'。",
+          },
+          outDir: {
+            type: "string",
+            description: "可选。产物镜像目录（如 '/dist'）。传了之后产物按源码目录结构写入该目录下（src/foo.ts → /dist/src/foo.js）；不传则写在源码旁（foo.ts → foo.js，tsc 语义）。",
           },
         },
-        required: ["code"],
+        required: [],
       },
     },
   },

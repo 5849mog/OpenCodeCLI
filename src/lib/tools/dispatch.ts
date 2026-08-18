@@ -284,6 +284,17 @@ function extToLang(path: string): string | undefined {
   return map[ext];
 }
 
+/** 源文件路径 → esbuild loader（ts/tsx/js/jsx/mjs/cjs）。无扩展名/不支持 → undefined。 */
+function extToLoader(path: string): string | undefined {
+  const base = path.split("/").pop() ?? "";
+  const idx = base.lastIndexOf(".");
+  const ext = (idx < 0 ? "" : base.slice(idx + 1)).toLowerCase();
+  const map: Record<string, string> = {
+    ts: "ts", tsx: "tsx", js: "js", jsx: "jsx", mjs: "js", cjs: "js",
+  };
+  return map[ext];
+}
+
 /** 暂不支持语法校验的语言（诚实反馈，避免假阳性）。 */
 function isUnsupportedLang(lang: string): boolean {
   return [
@@ -347,6 +358,7 @@ const PLAN_MODE_BLOCKED = new Set([
   "write_file", "edit_file", "multi_edit", "delete_file",
   "move_file", "append_file", "create_dir",
   "apply_patch", "insert_at", "undo_edit", "unzip_archive",
+  "transpile", // 编译器语义：file/files/path 模式会把产物写入 VFS → 属写工具
 ]);
 
 /** check_types：基于 tsc 的跨文件类型检查（Worker 隔离，只读）。
@@ -525,19 +537,81 @@ export async function dispatchTool(
         };
       }
       case "transpile": {
-        const code = String(args.code ?? "");
-        if (!code.trim()) return { ok: false, output: "transpile: missing 'code'", tool: "transpile", args };
-        const sourcefile = args.sourcefile !== undefined ? String(args.sourcefile) : undefined;
-        const loader = sourcefile
-          ? sourcefile.split(".").pop()?.toLowerCase().replace(/^t/, "t")
-          : undefined;
-        const res = await esbuildWasm.transpile(code, loader);
-        return {
-          ok: res.ok,
-          output: res.ok ? res.code ?? "(empty)" : `transpile 失败: ${res.error}`,
-          tool: "transpile",
-          args,
-        };
+        // 来源四选一：code（内联）| file（单文件）| files（多文件数组）| path（目录遍历）。
+        const p = args.file !== undefined ? String(args.file) : "";
+        const batch = args.files;
+        const hasBatch = Array.isArray(batch) && batch.length > 0;
+        const hasCode = args.code !== undefined;
+        const pathArg = args.path !== undefined ? String(args.path).trim() : "";
+        const srcCount = (p ? 1 : 0) + (hasCode ? 1 : 0) + (hasBatch ? 1 : 0) + (pathArg ? 1 : 0);
+        if (srcCount > 1) {
+          return { ok: false, output: "transpile: code / file / files / path 只能四选一", tool: "transpile", args };
+        }
+        const outDir = args.outDir !== undefined && String(args.outDir).trim() ? String(args.outDir).trim() : undefined;
+
+        // ── path：目录遍历（Web Worker 隔离，host 写回 VFS，一次覆盖整个项目）──
+        if (pathArg) {
+          const r = await esbuildSyntax.transpileDir({ path: pathArg, outDir });
+          return { ok: r.ok, output: r.output, tool: "transpile", args, mutated: r.writtenFiles > 0 };
+        }
+
+        // ── code：内联源码，唯一不写文件、直接回 JS 文本的模式 ──
+        if (hasCode) {
+          const code = String(args.code ?? "");
+          if (!code.trim()) return { ok: false, output: "transpile: missing 'code'", tool: "transpile", args };
+          const sourcefile = args.sourcefile !== undefined ? String(args.sourcefile) : undefined;
+          const res = await esbuildWasm.transpile(code, sourcefile ? extToLoader(sourcefile) : undefined);
+          return {
+            ok: res.ok,
+            output: res.ok ? res.code ?? "(empty)" : `transpile 失败: ${res.error}`,
+            tool: "transpile",
+            args,
+          };
+        }
+
+        // ── file / files：读 VFS → 转译 → 把 .js 产物写入 VFS（编译器语义）──
+        const paths = p ? [p] : hasBatch ? batch.map((b) => String(b)) : [];
+        if (paths.length === 0) {
+          return { ok: false, output: "transpile: 需要 code / file / files / path 之一", tool: "transpile", args };
+        }
+        const maxFiles = 20;
+        if (paths.length > maxFiles) {
+          return { ok: false, output: `transpile: files 单次最多 ${maxFiles} 个文件，收到 ${paths.length}`, tool: "transpile", args };
+        }
+        const lines: string[] = [];
+        const errors: string[] = [];
+        let written = 0;
+        let failed = 0;
+        for (const fp of paths) {
+          const content = vfs.readFileSync(fp);
+          if (content === null) { errors.push(`  ✗ ${fp} — 文件不存在`); failed++; continue; }
+          if (!content.trim()) { lines.push(`  ⏭ ${fp} — 空文件`); continue; }
+          const destRel = esbuildSyntax.transpileDestRel(fp.replace(/^\/+/, ""));
+          if (!destRel) { lines.push(`  ⏭ ${fp} — 跳过（.d.ts / 不支持扩展名）`); continue; }
+          const dest = outDir ? esbuildSyntax.joinOutDir(outDir, destRel) : `/${destRel}`;
+          const res = await esbuildWasm.transpile(content, extToLoader(fp));
+          if (res.ok && res.code !== undefined) {
+            vfs.writeFileSync(dest, res.code);
+            written++;
+            lines.push(`  ✓ ${fp} → ${dest}（${res.code.length}B）`);
+          } else {
+            failed++;
+            errors.push(`  ✗ ${fp} — ${res.error ?? "转译失败"}`);
+          }
+        }
+        const CAP = 30;
+        const linesShown = lines.slice(0, CAP);
+        const moreLines = lines.length - linesShown.length;
+        const errorsShown = errors.slice(0, CAP);
+        const moreErrors = errors.length - errorsShown.length;
+        let output = failed === 0
+          ? `✓ 转译完成：${written} 个产物已写入 VFS`
+          : `发现 ${failed} 个文件转译失败（${written} 个成功写入）`;
+        output += `\n${linesShown.join("\n")}`;
+        if (moreLines > 0) output += `\n… 还有 ${moreLines} 个已写入（用 ls/cat 查看）`;
+        if (errorsShown.length) output += `\n${errorsShown.join("\n")}`;
+        if (moreErrors > 0) output += `\n… 还有 ${moreErrors} 个失败文件`;
+        return { ok: failed === 0, output, tool: "transpile", args, mutated: written > 0 };
       }
       case "check_types": {
         return await toolCheckTypes(args);
