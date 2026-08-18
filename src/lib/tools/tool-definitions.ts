@@ -933,7 +933,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "check_syntax",
       description:
-        "检查源码语法是否合法（非类型检查）。来源四选一：file（单文件路径）/ files（多文件路径数组，一次批量校验）/ path（目录，遍历目录下所有测试源文件）/ code（内联源码）。支持 ts/tsx/js/jsx（esbuild）、json（JSON.parse）、lua（Lua 引擎）语法校验；css/html/sql/python/markdown/yaml 等暂不支持会诚实提示。文件语言按扩展名自动推断，也可显式传 lang。path 目录遍历在 Web Worker 里跑（不卡页面）、只回错误文件 + 汇总（正常文件不逐行回，不占上下文）。只读工具。",
+        "检查源码语法是否合法（非类型检查）。来源四选一：file（单文件路径）/ files（多文件路径数组，一次批量校验）/ path（目录，遍历目录下所有测试源文件）/ code（内联源码）。支持 ts/tsx/js/jsx/mjs/cjs（esbuild）、json（JSON.parse）语法校验；lua 与 css/html/sql/python/markdown/yaml 等暂不支持会诚实提示。文件语言按扩展名自动推断，也可显式传 lang。**path 传项目根目录一次即可覆盖全部受支持文件**（含子目录、根目录散落的 .ts/.d.ts、以及 .json 如 tsconfig/package.json），不要拆成多次 files 补查；path 目录遍历不覆盖 lua（用 file/files）。path 在 Web Worker 里跑（不卡页面）、只回错误文件 + 汇总（正常文件不逐行回，不占上下文）。只读工具。",
       parameters: {
         type: "object",
         properties: {
@@ -944,11 +944,11 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           files: {
             type: "array",
             items: { type: "string" },
-            description: "可选。VFS 中的多文件路径数组，一次性批量校验（最多 20 个）。每个文件按各自扩展名推断语言。与 code / file / path 四选一。",
+            description: "可选。VFS 中的多文件路径数组，一次性批量校验（最多 20 个）。每个文件按各自扩展名推断语言。与 code / file / path 四选一。注意：检查整个项目用 path 传根目录即可一次覆盖，不必拆 files。",
           },
           path: {
             type: "string",
-            description: "可选。VFS 中的目录（或单文件）路径，遍历该目录下所有测试源文件逐个体检语法（Web Worker 隔离，不卡页面）。只回错误文件 + 汇总，正常文件不逐行回。与 code / file / files 四选一。",
+            description: "可选。VFS 中的目录（或单文件）路径。传项目根目录会递归覆盖该目录下所有受支持源文件（ts/tsx/js/jsx/mjs/cjs/json，含子目录与根目录散落文件，如 vite.config.ts、env.d.ts、tsconfig.json、package.json），一次完成，无需多次补查。只回错误文件 + 汇总，正常文件不逐行回。lua 不在目录遍历内（用 file/files）。与 code / file / files 四选一。",
           },
           code: {
             type: "string",
@@ -957,7 +957,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           lang: {
             type: "string",
             enum: ["ts", "tsx", "js", "jsx", "json", "lua"],
-            description: "可选。源码语言（有 file/files 时默认按扩展名推断；内联 code 时省略则由 esbuild 自动识别 JS/TS 变种）。",
+            description: "可选。源码语言（有 file/files/path 时默认按扩展名推断；内联 code 时省略则由 esbuild 自动识别 JS/TS 变种）。",
           },
         },
         required: [],
