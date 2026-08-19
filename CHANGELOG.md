@@ -1,10 +1,11 @@
 # 🚀 OpenCodeCLI 成长日志
 
-> 由 Git 历史自动整理，共 **137** 次提交。最新在最上方。
+> 由 Git 历史自动整理，共 **155** 次提交。最新在最上方。
 
 | 日期 | 提交数 | 高亮 |
 |------|--------|------|
-| 2026-08-17 | 2 | 1 个新功能、1 个修复 |
+| 2026-08-18 | 12 | 9 个新功能 |
+| 2026-08-17 | 8 | 3 个新功能、4 个修复 |
 | 2026-08-16 | 7 | 6 个新功能、1 个修复 |
 | 2026-08-15 | 16 | 4 个新功能、8 个修复 |
 | 2026-08-13 | 1 | 1 个新功能 |
@@ -24,7 +25,352 @@
 
 ---
 
+## 📅 2026-08-18
+
+<details open>
+<summary>⚡ <a href="https://github.com/5849mog/OpenCodeCLI/commit/fdf8c273e0481dbbf4dfc218826f8e0f76f3c5bb">fdf8c27</a> — perf(vfs): listAllFilesSync 有序路径索引（D 阶段，5000 文件提速 14.4x）</summary>
+
+> - vfs.ts 新增文件路径索引 filePaths[]：与 cache 严格同步，写入/删除/改名时
+> 二分插入/移除（O(log N)），hydrate/快照恢复时全量重建一次
+> - listAllFilesSync 改为二分区间取（O(log N + M)），替代全量扫描 + 全排序
+> （O(N log N)）；root 本身是文件的旧语义保留；排序口径 localeCompare 不变
+> - 8 处 cache 变更点全部接入索引（writeFile/writeFileSync/delete/rename/
+> renameSync/clear/restoreLastSnapshot/hydrateFromIDB）
+> - 14 个调用点自动受益（bash glob、@ 提及、treeSummary 每目录计数、
+> collectFiles、zip 打包等）
+> - 验证：node e2e 5 项全过（真实 vfs.ts 打包驱动：5000 文件乱序写入后全量
+> 有序完整/目录前缀过滤含 root 文件/覆盖写不重复/删除消失/改名迁移/clear
+> 清空；性能 200 次查询 66ms vs 旧实现 953ms = 14.4x）；
+> npx tsc --noEmit 零错误；REPO_NAME= next build 通过
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/5797dd5a9ceefb5626d01e04be9dd041143867b9">5797dd5</a> — feat(audit): 会话审计面板 + /audit 导出（C 阶段）</summary>
+
+> - 数据层：usageHistory（逐次 API 用量：ts/来源/真实 prompt+completion 拆分，
+> 上限 200，主循环/subagent/orchestrator 三处 recordUsage 记录；orchestrator
+> 的 decompose/synthesize 两笔 LLM 调用补上 onUsage 转发，堵住审计盲区）；
+> vfsChangeLog（订阅 onVfsEvent，覆盖 delete/move/bash 写入——这些工具没有
+> diff，与 events[].diff 互补，上限 500）；两者随 PersistedSession 持久化
+> - 新增 src/lib/audit.ts 共享聚合：buildAuditReport（工具配对耗时/文件改动
+> 合并排序/真实拆分成本估算，空记录退化 80/20）+ renderAuditMarkdown
+> - 新增 src/lib/cost.ts：价格表 + matchModelRate + estimateCost + split80_20
+> 从 /cost 提取（/cost 改用共享模块，并升级为真实拆分优先）
+> - 新增 audit-panel.tsx：右侧栏「审计」tab（与 Plan/子智能体同级）三视图
+> 工具调用统计表 / 文件改动时间线（含 diff 摘要）/ Token 累计+成本+逐请求明细
+> - /audit 命令：buildAuditReport → renderAuditMarkdown → downloadBlob 下载
+> - 验证：node e2e 4 项全过（工具统计/文件改动/成本/渲染，真实代码打包驱动）；
+> npx tsc --noEmit 零错误；REPO_NAME= next build 通过
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/951cfa0ff2b8053ffbcf5187f538b964c819e55b">951cfa0</a> — feat(session): auto-compact 自动触发（B 阶段）</summary>
+
+> - 新增 shouldAutoCompact 纯函数（可测）：开关开启 + 未在压缩中 + 真分词器
+> 估算超预算 85% + 距上次压缩 ≥10 条新消息（严格大于 85%，恰好 51k/60k 不触发）
+> - 提取 doCompact(trigger: manual|auto)：手动 /compact 与自动触发共用一套
+> 压缩流程；auto 模式失败/无 key/对话过短静默（truncate 丢消息兜底），
+> 成功事件文案标注已自动压缩
+> - send 循环：真分词器就绪时 countConversationTokensAccurate 估算，
+> 满足条件自动 doCompact 后重建 fullMessages；未就绪不阻塞（warmup 预热）
+> - 状态新增 lastCompactMsgCount（压缩节流基准；恢复会话视作刚压缩过，
+> 避免意外多花一次摘要调用）；不持久化（派生字段）
+> - 配置新增 autoCompact（默认 true）+ 设置面板开关
+> - 验证：node e2e 9 项全过（纯函数 6 边界 + 接线静态断言 3）；
+> npx tsc --noEmit 零错误；REPO_NAME= next build 通过
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/f62ffdd63445e50bff3ecf9b138c15b1be2cbaaa">f62ffdd</a> — feat(tokenizer): 嵌入 DeepSeek 真分词器（第四号 Worker，地基）</summary>
+
+> - 新增 public/tokenizer/tokenizer.json（7.8MB，DeepSeek-V3 官方 128k BPE 词表，
+> 已提交，部署零网络依赖）与 public/wasm/tokenizers-lib.js（@huggingface/tokenizers
+> 纯 JS 移植经 esbuild 打包的 IIFE，31KB，无 wasm 零加载风险；与 Python
+> transformers 同引擎，计数逐字节一致）
+> - 新增 public/wasm/tokenizer-worker.js：第四号静态 Worker，复用 worker-client
+> 池化单例（tokenizer.json fetch 一次常驻）；收 {id, texts} 批量回 counts
+> - 新增 src/lib/wasm/tokenizer.ts 宿主桥：countTokens/countTexts（LRU 2000 缓存）、
+> countConversationTokensAccurate（开销常数与 estimateMessageTokens 对齐）、
+> warmup（fire-and-forget 预热）、tokenizerStatus/onTokenizerStatus（UI 状态）、
+> contextCounter（就绪走真计数，否则零延迟回退字符估算）
+> - context.ts：truncateConversation 转 async + 可注入计数器（默认 contextCounter），
+> 调用方 session.ts / subagent.ts await；token-sheet 上下文占用率就绪后自动升级
+> 为精确计数（标注 DeepSeek 精确）
+> - session.ts 发送循环每次 fire-and-forget warmup：首次发送零延迟，后续自动精确
+> - tools/tokenizer/prepare.sh：esbuild-wasm 重建 tokenizers-lib.js（升级后重新生成）
+> - 验证：node e2e 7 项全过（真实 lib+词表驱动真实 worker：id 回包/中文代码特殊
+> token 计数/批量/引擎缺失致命回包/宿主-直连计数一致 69=69/LRU 命中/回退）；
+> npx tsc --noEmit 零错误；REPO_NAME= next build 通过
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/834be551259f5f939d812ec534bb7e15e69f2eaf">834be55</a> — feat(worker): 池化复用 — 常驻 Worker + 请求 id 路由（P0-1）</summary>
+
+> - 新增 src/lib/wasm/worker-client.ts：每个 worker 文件一个常驻单例
+> - 惰性创建：首个 request 才 new Worker，此后跨调用复用
+> - id 路由：每请求自增 id，回包按 id 分发（乱序到达各归各；并发请求正确但串行）
+> - 超时/取消 = 强杀重建：与既有'超时即 terminate'语义一致，下个请求自动重开
+> - 加载期错误（无 id 回包）→ 全部 pending 失败 + 重置；超时计时覆盖创建+执行全过程
+> - 两个 worker 回包带 id（esbuild-syntax-worker.js / tsc-worker.js）；postErr 支持
+> 可选 reqId，加载期致命错误保持无 id
+> - esbuild-syntax.ts / tsc.ts 换用共享 client：esbuild.initialize（~9MB wasm）与
+> typescript.js+tslib.js 解析从每调用一次 → 会话首次一次；输出组装/软封锁逻辑原样
+> - 修 worker-client 自赋值 bug：creating = new Promise(...) 的 executor 里写
+> creating = null 会被赋值覆盖 → 构造失败后 creating 永久保留 rejected promise、
+> worker 永远无法恢复；改为结算（settle）后清空
+> - 验证：node e2e（esbuild 转译真实 client + FakeWorker 驱动真实 worker 源码，
+> 6 场景全过：复用单例/并发乱序路由/超时重建/加载期失败恢复/错误路由/构造失败恢复）
+> + npx tsc --noEmit 零错误 + REPO_NAME= next build 通过
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/a1ac35021445462e1a5e166c18815e46966af369">a1ac350</a> — feat(transpile): 编译器语义改造 — 文件进、文件出</summary>
+
+> - schema: transpile(code?|file?|files?|path?, outDir?, sourcefile?)，四选一来源
+> - file/files/path 模式把 .js 产物写入 VFS（tsc 语义：默认源码旁，outDir 镜像树），
+> 只回汇总+写入清单+错误（各上限 30 条），不再回 JS 文本占上下文
+> - path 走 esbuild-syntax-worker.js（mode:transpile），Worker 隔离不卡页面；
+> .d.ts/json/lua 等跳过计数；同名产物直接覆盖（编译语义）
+> - code 模式保留：唯一不写文件、直接回 JS 文本
+> - 产物可 run_js(script_file:) 直跑 / cat 查看 / 随文件袋下载
+> - 变更为写工具：dispatch mutated:true（可 undo）、PLAN_MODE_BLOCKED、
+> session.ts mutatingTools + MUTATING_TOOLS 三处拦截同步
+> - 修 pre-existing bug：worker okFiles 双重计数（循环 + 末尾重复累加）
+> - 修 esbuild 0.28 报错格式：<stdin>:1:9: 前缀兼容（worker + 主线程 checkSyntax 两处）
+> - 验证：node e2e（真引擎驱动 worker 编排 + 从源码抽取 dest 映射纯函数断言）、
+> npx tsc --noEmit 零错误、REPO_NAME= next build 通过
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/f5e3c7ffdfa13ba8a3f5965e245295943caca2b2">f5e3c7f</a> — feat(check_syntax): 提示词明确"path 传项目根一次覆盖全部，勿拆多次"</summary>
+
+> 用户实测发现 AI 检查项目时用了三次 check_syntax（一次 path 目录 + 两次 files 补查
+> 根目录散落 ts/json），白白消耗 token——根源是描述没说清 path 的覆盖范围。
+> 提示词更新（system-prompt.ts + tool-definitions.ts）：
+> - 明确 path 传项目根目录一次即可递归覆盖全部受支持文件：子目录、根目录散落的
+> .ts/.d.ts（vite.config.ts、env.d.ts 等）、以及 .json（tsconfig.json、
+> package.json 等）都在内，无需拆多次 files 补查（"extra passes only burn tokens"）。
+> - 明确目录遍历支持 ts/tsx/js/jsx/mjs/cjs（esbuild）+ json（JSON.parse）；lua 与
+> css/html/md 等会跳过计数，查 lua 用 file/files。
+> - files 参数描述也提示"查整个项目用 path，不必拆 files"。
+> 验证：npx tsc --noEmit 与 REPO_NAME= next build 通过。
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/03bbcd6c0419226f99e4e731c702dff207a84030">03bbcd6</a> — feat(check_types): 从 AI 工具面完全移除（工具保留，不暴露给模型）</summary>
+
+> check_types 在无 node_modules 的浏览器环境对依赖项目信任度极低（连锁假错误会
+> 误导 AI 白烧 token），软封锁（不列诊断）仍不够——用户决定彻底不让 AI 使用。
+> 改动（工具代码全部保留，仅从 AI 可见面移除）：
+> - tool-definitions.ts：从 TOOL_DEFINITIONS 移除 check_types 条目 → AI 的
+> function-calling 列表不再有这个工具，无法调用。
+> - system-prompt.ts：移除 check_types 工具描述行 → AI 提示词不再提及。
+> 保留：dispatch.ts 的 toolCheckTypes 函数与 case、src/lib/wasm/tsc.ts、
+> tsc-worker.js/tslib.js、tools/tsc/prepare.sh 全部原样（Worker 体系支柱保留，
+> 未来如需恢复只需加回 schema 与描述）。check_syntax（用户满意）不受影响。
+> 验证：TOOL_DEFINITIONS 与 system-prompt 均无 check_types（grep 计数 0），
+> dispatch case 保留（代码存在）；npx tsc --noEmit 与 REPO_NAME= next build 通过。
+
+</details>
+
+<details open>
+<summary>• <a href="https://github.com/5849mog/OpenCodeCLI/commit/2185c4a02424704ecfd755dc24f991dbf854a620">2185c4a</a> — Add files via upload</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>• <a href="https://github.com/5849mog/OpenCodeCLI/commit/0f593cc3fea44528b3bd141a628a0850dbe96983">0f593cc</a> — Add files via upload</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/acbf31cc69536291ab5ef91a9eb79725efa01791">acbf31c</a> — feat(check_types): 软封锁——依赖项目不列诊断，按可信度分流</summary>
+
+> 用户实测发现：depMissing 降级后列出的"真错误"（TS2339/2322 等）仍是缺依赖
+> 连锁传播的假错误，看着像真 bug 会误导 AI 去复核、白烧 token。连锁传播的错误码
+> 无法靠固定码降噪拦截（同样错误码在正常项目是真错），这是无 node_modules 环境下
+> 对依赖项目类型检查的信息论本质困境。
+> 软封锁方案：
+> - host（src/lib/wasm/tsc.ts）：depMissing=true 时完全不列诊断，只返回一句说明
+> （"依赖 node_modules、浏览器无法权威检查，请本地 tsc；自包含项目结果才可信"），
+> ok=true、diagnostics 空。AI 拿不到错误清单 → 从源头杜绝误导与无效复核。
+> - 描述同步（tool-definitions/system-prompt）：check_types 明确"依赖第三方模块的
+> 项目会返回无法检查的说明且不列诊断，不要据此改代码；仅自包含项目可信"。
+> 价值保留：自包含（无三方依赖）项目照常列出可信错误；Worker 体系与 check_syntax
+> 不受影响（用户满意的工具保持原样）。未物理移除工具。
+> 验证：模拟 worker 确认依赖项目 depMissing=true（moduleMissing=3）；npx tsc
+> --noEmit 与 REPO_NAME= next build 通过。浏览器需复测：check_types 对 react 项目
+> 输出仅为一句说明、无任何诊断行。
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/85f174ed83ea755311c3ead6add312ab5166e07f">85f174e</a> — feat: check_types 缺依赖降级 + check_syntax 目录遍历（Worker 隔离）</summary>
+
+> 按方案 2 完成两项升级。
+> ## 一、check_types：补降噪码 + 缺依赖检测（解决几千行假阳性惊悚输出）
+> worker（public/wasm/tsc-worker.js）：
+> - ENV_NOISE 补 TS2580（Cannot find name 'process' 等 Node 全局）、7015/7023/7007
+> （implicit any 家族）、2769（泛型 unknown 重载退化）。
+> - TS2304（Cannot find name）按文本判：命中已知 Node/浏览器全局名清单降噪，其余
+> 保留为错误（真拼写错）。修复了此前 "Cannot find name 'process'" 被误标错误。
+> - 新增 moduleMissing / depMissing 统计：模块/全局缺失类噪声占错误级诊断比 >30% 时
+> 判定 depMissing=true。
+> host（src/lib/wasm/tsc.ts）：收到 depMissing=true 时不再逐条列诊断，降级为一句
+> 边界说明 + 只列可能真实的少数错误（errorCount 行），强烈建议本地 tsc --noEmit。
+> 彻底解决 react/zustand 项目输出几百~几千行假错误的问题。
+> 描述同步（tool-definitions/system-prompt）：write 明"缺依赖时会降级为一句说明"。
+> ## 二、check_syntax：新增 path（目录遍历，Web Worker）
+> - 新增 public/wasm/esbuild-syntax-worker.js（静态 worker）：importScripts 加载同目录
+> esbuild-browser.js（esbuild-wasm 自包含 UMD→self.esbuild），fetch esbuild.wasm 实例化
+> 到 worker 线程（worker:false），按扩展名分派 ts/tsx/js/jsx/mjs/cjs→esbuild.transform、
+> json→JSON.parse、其他→跳过计数。无文件数上限（worker 隔离不卡主线程）。
+> - tools/esbuild-wasm/prepare.sh 增复制 lib/browser.js → public/wasm/esbuild-browser.js
+> （CI 生成，gitignore）。
+> - 新增 src/lib/wasm/esbuild-syntax.ts（host 桥接层 checkSyntaxDir）：vfs.listAllFilesSync
+> 收集 + Worker 超时/abort 强杀；输出只回错误文件+汇总，正常文件不逐行，错误文件超 30
+> 只列前 30+"还有 X 个"，不爆上下文。
+> - dispatch.ts check_syntax case 扩为四选一（code/file/files/path），path 分支走 worker。
+> ## 验证
+> - check_types 缺依赖 e2e：react/axios/process 项目 → Cannot find module + process 降提示、
+> TS2339 Property 保留错误、depMissing=true，ALL PASS。
+> - check_syntax 目录 e2e：真实 esbuild transform 捕获 bad.ts 语法错 + bad.json 解析错、
+> 正常计数对、md/scss 跳过，ALL PASS。
+> - npx tsc --noEmit + REPO_NAME= next build 通过；out/wasm/{esbuild-syntax-worker.js,
+> esbuild-browser.js, esbuild.wasm, tsc-worker.js, typescript.js, tslib.js} 齐全。
+> - 浏览器需复测：check_types 对真实项目降级为"一句说明+少数真错"；check_syntax 传目录
+> 能扫全量不卡 UI。
+
+</details>
+
 ## 📅 2026-08-17
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/10db80cdf9f7171da7012b867a10e8361d69ed4b">10db80c</a> — feat(check_types): 环境边界降噪——第三方模块不可解析时列为提示而非报错</summary>
+
+> 浏览器没有 node_modules，check_types 对依赖三方依赖的现代前端项目（如 react/
+> zustand）会产生大量连锁假错误（Cannot find module→implicit any→JSX 全局类型丢失），
+> 淹没真实代码问题。按方案 A+B：
+> A（降噪，worker）：新增环境噪声 TS 码集合（2307/2792/7016/2686/7006/7005/7008/
+> 18046/2571——Cannot find module、declaration file 缺失、implicit any、unknown），
+> 这些降级为「提示」并入 noteCount，不计入 errorCount；其余错误（如 TS2339 Property
+> 不存在）保留。host 在输出附加环境边界说明：标「错误」才是可能真实的问题，有
+> node_modules 的项目请用本地 tsc。
+> B（边界，描述）：tool-definitions.ts 与 system-prompt.ts 的 check_types 描述明确写出
+> 该边界与适用场景（适合相对依赖的自包含项目；依赖 node_modules 的项目用本地 tsc 兜底）。
+> 验证：模拟 worker 跑含 react import + Property 错误的项目——Cannot find module
+> 降为[提示]、TS2339 保留为[错误]，errorCount=1/noteCount=1/envNoise=true，输出含
+> 环境边界说明。npx tsc --noEmit 与 REPO_NAME= next build 通过。需浏览器复测。
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/bab83c72f1e61277a63a08e983c0b95191422942">bab83c7</a> — fix(check_types): 修复浏览器 worker 里 tsc 引擎初始化崩溃 + 补齐内置 lib.d.ts</summary>
+
+> AI 在浏览器跑 check_types 报 "system.useCaseSensitiveFileNames is not an object"
+> （属环境能力缺失，非路径/tsconfig 问题）。已用模拟 worker 环境逐层定位根因：
+> 根因 1（崩溃）——ts.sys 在无 CommonJS 的 worker 环境是 undefified 且只读 getter：
+> ts.createCompilerHost(options, setParentNodes) 只有 2 参，内部默认 system=sys 落到
+> undefined，第一行访问 system.useCaseSensitiveFileNames 即崩。
+> → 改用 ts.createCompilerHostWorker(options, false, mySystem)（接受第三参 system），
+> 用自定义 CompilerSystem（useCaseSensitiveFileNames/getCurrentDirectory/
+> getExecutingFilePath/fileExists/readFile/... 全指向内存文件映射）替代 ts.sys。
+> 根因 2（lib 缺失）——typescript.js 浏览器版不含 lib.*.d.ts 内容，即便 sys 修好，
+> Array/Promise/dom 等全局类型仍找不到（TS2318）→ 无法做真类型检查。
+> → 新增 tools/tsc/prepare.sh 生成 tslib.js（把 node_modules/typescript/lib 下全部
+> lib.*.d.ts 内容打成 self.__TSLIB__，~3MB），worker importScripts 加载后注入内存
+> CompilerHost（key 形如 /lib/lib.es5.d.ts）；mySystem.getExecutingFilePath 指向
+> /lib/typescript.js 使默认 lib 位置解析到该映射。public/wasm/tslib.js 进 gitignore。
+> 验证：模拟 worker 端到端跑通——typescript.js 加载(ts.sys undefined 修复)、注入
+> __TSLIB__ 99 个 lib、内存 CompilerHost + Program 报出真实跨文件类型错误
+> (TS2724 no exported member 'Foo2')，无 TS2318 全局类型噪音，338ms。npx tsc --noEmit
+> 与 REPO_NAME= next build 通过；out/wasm/{typescript.js,tslib.js,tsc-worker.js} 均在。
+> 浏览器真实运行需复测 check_types。
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/06314f62a45d8891e1c0b7a7ef9a316d1cf2fe46">06314f6</a> — fix(check_types): 提交工作区已修复的 tsc.ts（移除 Blob worker 残留 import）</summary>
+
+> af028be 提交时 tsc.ts 是中间态（仍 import 已删除的 tsc-worker-source + Blob 代码），
+> 导致 CI 的 bun run build 报 Module not found './tsc-worker-source'。
+> 工作区实为已修复版本（独立静态 worker + 相对 importScripts），本次补齐提交，使
+> HEAD 与磁盘一致。验证：npx tsc --noEmit 与 REPO_NAME= next build 通过。
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/af028be16e8bd469e50ea3d4f99c26c4619b42e6">af028be</a> — fix(check_types): tsc worker 改用独立静态文件 + 相对 importScripts，修复浏览器加载失败</summary>
+
+> 初版用 Blob URL 内联 Worker + importScripts 加载**绝对** typescript.js URL。
+> 浏览器实际运行时报 "The string did not match the expected pattern"——根因是
+> Blob Worker 的源是 opaque（blob:），CSP 无权限从绝对路径拉取脚本，importScripts
+> 失败。路径本身正确（out/wasm/typescript.js 存在），非路径问题。
+> 修复：改为独立静态 Worker 文件架构
+> - 新增 public/wasm/tsc-worker.js（静态 worker，next 原样复制到 out/，不经打包）：
+> 内部用**相对** importScripts("./typescript.js")——worker 与 typescript.js 同目录，
+> 天然同源，无 Blob CSP 限制。
+> - host 用 new Worker(wasmUrl("wasm/tsc-worker.js"))（字符串路径，绕开 next 对
+> new Worker(new URL(...)) 的打包限制）。
+> - 删除 src/lib/wasm/tsc-worker-source.ts（Blob 版废弃）。
+> 验证：npx tsc --noEmit、REPO_NAME= next build 通过；out/wasm/tsc-worker.js 与
+> typescript.js 均在产物；worker 文件 node --check 语法正确；跨文件类型检查逻辑
+> 与此前 Node 冒测一致（报 TS2724 no exported member）。浏览器端 Blob→静态文件的
+> 真实加载需在浏览器复测 check_types。
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/e658f0233abd487056308865a1ce797922ff2be5">e658f02</a> — feat(check_types): 新增基于 tsc 的跨文件类型检查工具（Worker 隔离）</summary>
+
+> 为 check_syntax（esbuild 语法检查）补上真正缺失的"跨文件类型检查"。check_syntax
+> 只查语法不对类型（esbuild 转译时把类型当注释丢弃）；check_types 用官方 TypeScript
+> 编译器在浏览器对整个目录做 Program 级 PreEmit 诊断，能发现真实的跨文件类型错误
+> （import 了不存在的名字、缺 export、类型不可赋值等），解决"大项目 20 文件上限不够用"
+> 的问题。
+> 架构：
+> - src/lib/wasm/tsc.ts（宿主桥接层）：读 VFS 收集 root 范围所有 .ts/.tsx/.json →
+> 建 Blob URL 内联 Worker → 超时（默认 120s）+ 可取消（AbortSignal）强杀，主线程不冻结。
+> - src/lib/wasm/tsc-worker-source.ts（Worker 源码）：importScripts 加载
+> public/wasm/typescript.js；内存 CompilerHost 对接文件映射（全文只读、writeFile no-op）；
+> 无 tsconfig 用合理默认，有则解析；按 root 自动收集依赖闭包；诊断归一化 path:line:col。
+> - Blob Worker 绕开 Next static export 对 new Worker(new URL(import.meta.url)) 的打包限制；
+> typescript.js（UMD）经 importScripts 加载，挂 self.ts。
+> 依赖/部署：
+> - typescript ^5.9.3 从 devDependencies 移到 dependencies（运行时要 import）。
+> - 新增 tools/tsc/prepare.sh（仿 esbuild-wasm）：CI 时从 node_modules 复制 typescript.js
+> 到 public/wasm（8.7MB，惰性加载、不进首页 bundle）；.gitignore 排除；deploy.yml 加步骤。
+> 工具注册：dispatch.ts toolCheckTypes + check_types case；tool-definitions.ts 定义
+> （path 目录或文件，tsconfig 可选）；system-prompt 补充与 check_syntax 的分工说明；
+> tools/index.ts 导出 checkTypes。
+> 验证：
+> - Node 冒测：真实 ts.CompilerHost 对接内存映射能报跨文件类型错误（TS2724 no exported member），
+> 不加显式 lib + skipLibCheck 消除 TS2318 全局类型噪音。
+> - Node vm 探针：typescript.js 在无 CommonJS 的 worker 环境正确挂 self.ts（v5.9.3, createProgram ok）。
+> - npx tsc --noEmit 与 REPO_NAME= next build 均通过；out/wasm/typescript.js 正确生成。
+> - 浏览器端 Blob worker + importScripts 网络加载 + 真实大项目需在浏览器手测（验收清单）。
+> check_types：path 目录或单 .ts/.tsx，自动收集依赖闭包；不可用时诚实报错不卡死。
+> Type 问题用 check_types（全），Syntax 问题用 check_syntax（快），二者互补。
+
+</details>
+
+<details open>
+<summary>📝 <a href="https://github.com/5849mog/OpenCodeCLI/commit/9a8192361e8e7d27b985fc52a65b1eb66680be4d">9a81923</a> — docs: 重新生成 CHANGELOG（137 次提交）</summary>
+
+> _（无详细说明）_
+
+</details>
 
 <details open>
 <summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/9a0dbe50d38f9f27bfc10c001a85cfe993e8fd95">9a0dbe5</a> — feat: system-prompt 审查整改（P0/P1 关键 code 档）+ PLAN 移出 VFS</summary>
