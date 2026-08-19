@@ -1,4 +1,5 @@
-import { vfs, basename } from "../vfs";
+import { vfs, basename, normalizePath } from "../vfs";
+import { globToRegex } from "./glob";
 import type { ToolResult } from "./types";
 
 function countOccurrences(haystack: string, needle: string): number {
@@ -387,6 +388,120 @@ async function toolMoveFile(args: Record<string, unknown>): Promise<ToolResult> 
   };
 }
 
+async function toolBatchRename(args: Record<string, unknown>): Promise<ToolResult> {
+  const pattern = String(args.pattern ?? "");
+  const basePath = String(args.path ?? "");
+  const find = String(args.find ?? "");
+  const replace = String(args.replace ?? "");
+  const dryRun = args.dry_run === undefined ? true : Boolean(args.dry_run);
+  const caseSensitive = Boolean(args.case_sensitive);
+
+  if (!pattern || !find) {
+    return {
+      ok: false,
+      output: "batch_rename requires 'pattern', 'find', and 'replace' arguments.",
+      tool: "batch_rename",
+      args,
+    };
+  }
+  if (basePath && normalizePath(basePath) && !vfs.statSync(basePath)) {
+    return {
+      ok: false,
+      output: `Path not found: ${basePath}. Check the path or pass '' to scope the whole workspace.`,
+      tool: "batch_rename",
+      args,
+    };
+  }
+
+  let regex: RegExp;
+  try {
+    regex = globToRegex(pattern);
+    if (!caseSensitive) regex = new RegExp(regex.source, "i");
+  } catch {
+    return { ok: false, output: `Invalid glob pattern: ${pattern}`, tool: "batch_rename", args };
+  }
+
+  // 复用 glob 工具的同款匹配语义：相对 basePath 匹配以便裸 pattern（如 "*.ts"）在目录内生效。
+  const files = vfs.listAllFilesSync(basePath);
+  const matches = files.filter((f) => {
+    if (f.type !== "file") return false; // 只重命名文件，目录走 move_file
+    if (!basePath) return regex.test(f.path);
+    const rel = f.path.startsWith(basePath + "/") ? f.path.slice(basePath.length + 1) : f.path;
+    return regex.test(rel);
+  });
+
+  if (matches.length === 0) {
+    return {
+      ok: true,
+      output: `No files matched pattern: ${pattern}`,
+      tool: "batch_rename",
+      args,
+    };
+  }
+
+  // find → replace 全路径替换，计算每个源的目标路径。
+  const plan: { from: string; to: string }[] = [];
+  for (const f of matches) {
+    const to = f.path.split(find).join(replace);
+    if (to === f.path) continue; // 没有变化的跳过
+    plan.push({ from: f.path, to });
+  }
+  if (plan.length === 0) {
+    return {
+      ok: true,
+      output: `${matches.length} file(s) matched, but none would change with find=${JSON.stringify(find)} → replace=${JSON.stringify(replace)}.`,
+      tool: "batch_rename",
+      args,
+    };
+  }
+
+  // 冲突检测：多个源映射到同一目标 → 报错拒绝（避免静默覆盖）。
+  const byTarget = new Map<string, string>();
+  for (const p of plan) {
+    if (byTarget.has(p.to)) {
+      return {
+        ok: false,
+        output: `batch_rename would map both ${byTarget.get(p.to)} and ${p.from} to the same target ${p.to}. Narrow the pattern or 'find' so each source maps to a unique target.`,
+        tool: "batch_rename",
+        args,
+      };
+    }
+    byTarget.set(p.to, p.from);
+  }
+
+  const preview = plan.map((p) => `${p.from} -> ${p.to}`).join("\n");
+  if (dryRun) {
+    return {
+      ok: true,
+      output: `[dry-run] Would rename ${plan.length} file(s):\n${preview}\n\nSet dry_run=false to apply.`,
+      tool: "batch_rename",
+      args,
+    };
+  }
+
+  // 执行：跳过 target 已存在（statSync 非空）的项，其余逐个 rename。
+  const done: string[] = [];
+  const skipped: string[] = [];
+  for (const p of plan) {
+    if (vfs.statSync(p.to)) {
+      skipped.push(`${p.from} -> ${p.to} (target exists)`);
+      continue;
+    }
+    await vfs.rename(p.from, p.to);
+    done.push(`${p.from} -> ${p.to}`);
+  }
+  const lines: string[] = [];
+  if (done.length) lines.push(`Renamed ${done.length} file(s):\n${done.join("\n")}`);
+  if (skipped.length) lines.push(`Skipped ${skipped.length} file(s):\n${skipped.join("\n")}`);
+  return {
+    ok: true,
+    output: lines.join("\n\n") || "(command completed with no output)",
+    tool: "batch_rename",
+    args,
+    mutated: done.length > 0,
+  };
+}
+
 async function toolAppendFile(args: Record<string, unknown>): Promise<ToolResult> {
   const path = String(args.path ?? "");
   if (!path) {
@@ -615,6 +730,7 @@ export {
   toolListDirs,
   toolCreateDir,
   toolMoveFile,
+  toolBatchRename,
   toolAppendFile,
   toolInsertAt,
   toolUndoEdit,

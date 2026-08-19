@@ -1,5 +1,5 @@
 import type { ToolResult } from "./types";
-import { toolReadFile, toolWriteFile, toolEditFile, toolDeleteFile, toolListFiles, toolListDirs, toolCreateDir, toolMoveFile, toolAppendFile, toolInsertAt, toolUndoEdit, toolReadMultipleFiles, toolProjectStats } from "./file-ops";
+import { toolReadFile, toolWriteFile, toolEditFile, toolDeleteFile, toolListFiles, toolListDirs, toolCreateDir, toolMoveFile, toolBatchRename, toolAppendFile, toolInsertAt, toolUndoEdit, toolReadMultipleFiles, toolProjectStats } from "./file-ops";
 import { toolSearchFiles, toolGlob, toolSearchSymbols, toolViewOutline } from "./search";
 import { toolBash } from "./bash";
 import { toolMultiEdit, toolApplyPatch } from "./patch";
@@ -357,6 +357,7 @@ async function checkSourceForLang(
 const PLAN_MODE_BLOCKED = new Set([
   "write_file", "edit_file", "multi_edit", "delete_file",
   "move_file", "append_file", "create_dir",
+  "batch_rename",
   "apply_patch", "insert_at", "undo_edit", "unzip_archive",
   "transpile", // 编译器语义：file/files/path 模式会把产物写入 VFS → 属写工具
 ]);
@@ -409,6 +410,8 @@ export async function dispatchTool(
         return await toolCreateDir(args);
       case "move_file":
         return await toolMoveFile(args);
+      case "batch_rename":
+        return await toolBatchRename(args);
       case "search_files":
         return await toolSearchFiles(args);
       case "bash":

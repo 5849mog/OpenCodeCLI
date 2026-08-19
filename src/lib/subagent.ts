@@ -189,7 +189,7 @@ ${opts.task}
       // Push a snapshot before mutating tools (so /undo works across subagent edits)
       const mutatingTools = new Set([
         "write_file", "edit_file", "multi_edit", "delete_file",
-        "move_file", "append_file", "create_dir", "update_plan",
+        "move_file", "batch_rename", "append_file", "create_dir", "update_plan",
         "apply_patch", "insert_at", "run_lua", "run_js",
       ]);
       if (mutatingTools.has(tc.function.name)) {

@@ -194,6 +194,26 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "batch_rename",
+      description:
+        "Batch-rename a set of files selected by a glob pattern, replacing occurrences of a 'find' substring in each matched path with 'replace'. Use this for mass extension or name changes (e.g. rename all 'src/**/*.ts' with find '.ts' → replace '.txt' in one call). Only FILE nodes are renamed — directories are skipped (use move_file for those). Default dry_run=true: the tool only PREVIEWS the from→to list and changes nothing; set dry_run=false to actually apply. The replace is applied to every occurrence of 'find' in the full path. Make 'find' specific (include the dot, e.g. '.ts' not 'ts') to avoid hitting unintended substrings. If two sources would map to the same target, or a target already exists, those items are skipped and reported.",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: { type: "string", description: "Glob pattern selecting the files to rename (e.g. 'src/**/*.ts', '*.md', '**/*.{js,jsx}')." },
+          path: { type: "string", description: "Optional directory to scope the selection; the pattern matches paths relative to this directory (like glob.path). Default '' (whole workspace)." },
+          find: { type: "string", description: "Substring of the path to replace. Make it specific (e.g. '.ts' not 'ts')." },
+          replace: { type: "string", description: "Replacement substring inserted where 'find' is removed." },
+          dry_run: { type: "boolean", description: "Default true: only preview the changes without applying them. Set false to actually rename.", default: true },
+          case_sensitive: { type: "boolean", description: "Match the glob pattern case-sensitively. Default false." },
+        },
+        required: ["pattern", "find", "replace"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "search_files",
       description:
         "Search for a text pattern across files in the workspace (grep). Returns matching lines with file path and line number. IMPORTANT: by default the pattern is treated as a LITERAL string (regex=false). Only set regex=true if you intentionally want regex metacharacters (.*, \\d, ^, $, etc.) interpreted. If you pass a pattern containing regex metacharacters but leave regex=false, they are matched literally. Supports context lines (-A/-B/-C like grep) and include/exclude glob filters for file types (like grep --include/--exclude). Results are capped at 100 — if the output says 'TRUNCATED', narrow the search.",

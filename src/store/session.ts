@@ -440,6 +440,13 @@ function isToolTargetingSkills(tool: string, args: Record<string, unknown>): boo
       return inSkills(args.path);
     case "move_file":
       return inSkills(args.from) || inSkills(args.to);
+    case "batch_rename": {
+      // 保护 skills：pattern 选中的路径可能落在 skills/ 下，或 replace 会把文件改名为 skills/ 开头。
+      const pat = typeof args.pattern === "string" ? args.pattern : "";
+      const rep = typeof args.replace === "string" ? args.replace : "";
+      const basePath = typeof args.path === "string" ? args.path : "";
+      return /(^|\/)skills(\/|$)/.test(pat) || /(^|\/)skills(\/|$)/.test(basePath) || inSkills(rep);
+    }
     case "create_dir":
       return inSkills(args.path);
     case "multi_edit": {
@@ -1246,7 +1253,7 @@ async function runAgentLoop(
 /** Tools that mutate the VFS. Undo snapshots are taken before these. */
 const MUTATING_TOOLS = new Set([
   "write_file", "edit_file", "multi_edit", "delete_file",
-  "move_file", "append_file", "create_dir", // update_plan 不在其中：计划存独立 plan store（不在 VFS），无需快照
+  "move_file", "batch_rename", "append_file", "create_dir", // update_plan 不在其中：计划存独立 plan store（不在 VFS），无需快照
   "apply_patch", "insert_at", "run_lua", "run_js", // run_lua/run_js 带 outputs 时写回 VFS → 需快照可 undo
   "bash", // bash 的 > / >> / tee / mkdir / rm / rmdir / touch / cp / mv / sed -i 会写 VFS
   "create_skill", "delete_skill", // 创建/删除 skill（写 skills/ 目录）→ 需快照可 undo
@@ -1491,7 +1498,7 @@ async function executeToolCall(
       // produces work product → blocked in Plan mode (in its special-case).
       const mutatingTools = new Set([
         "write_file", "edit_file", "multi_edit", "delete_file",
-        "move_file", "append_file", "create_dir",
+        "move_file", "batch_rename", "append_file", "create_dir",
         "apply_patch", "insert_at", "undo_edit", "unzip_archive",
         "create_skill", "delete_skill",
         "transpile", // 编译器语义：file/files/path 模式把产物写入 VFS → Plan 模式拦截
