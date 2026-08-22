@@ -59,6 +59,20 @@ function compressToolResultForSummary(msg: ChatMessage): ChatMessage {
   };
 }
 
+/** Render a message `content` (string or vision ContentPart[]) to plain text
+ *  for the summarizer prompt. Images become a placeholder note — the LLM
+ *  summarizer doesn't need base64, just the fact that an image was attached. */
+function contentToText(content: ChatMessage["content"]): string {
+  if (typeof content === "string" || content == null) return content ?? "";
+  return content
+    .map((p) => {
+      if (p.type === "text") return p.text;
+      if (p.type === "image_url") return "[图片附件]";
+      return "[附件: file_id]";
+    })
+    .join("\n");
+}
+
 /**
  * Summarize the given messages with the LLM. `messages` must already have
  * tool results compressed. Returns the summary text. Throws on failure so
@@ -74,11 +88,11 @@ async function summarizeWithLLM(
     .map((m) => {
       switch (m.role) {
         case "user":
-          return `[User]\n${m.content ?? ""}`;
+          return `[User]\n${contentToText(m.content)}`;
         case "assistant":
-          return `[Assistant]\n${m.content ?? ""}`;
+          return `[Assistant]\n${contentToText(m.content)}`;
         case "tool":
-          return `[Tool ${m.name ?? ""}]\n${m.content ?? ""}`;
+          return `[Tool ${m.name ?? ""}]\n${contentToText(m.content)}`;
         default:
           return "";
       }
@@ -135,7 +149,8 @@ async function summarizeWithLLM(
       {},
       reqSignal,
     );
-    const text = result.message.content?.trim() ?? "";
+    const c = result.message.content;
+    const text = (typeof c === "string" ? c : "").trim();
     if (!text) throw new Error("Empty summary returned");
     return text;
   } finally {

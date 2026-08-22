@@ -161,7 +161,8 @@ Output format: ["subtask 1 description", "subtask 2 description", ...]`;
     );
 
     // Try to extract JSON array from the response
-    const text = result.message?.content || collected;
+    const c = result.message?.content;
+    const text = (typeof c === "string" ? c : "") || collected;
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) return [];
     const parsed = JSON.parse(jsonMatch[0]);
@@ -278,7 +279,8 @@ Provide a concise, organized summary of the overall outcome.`;
       2,
     );
 
-    return result.message?.content || collected;
+    const c = result.message?.content;
+    return (typeof c === "string" ? c : "") || collected;
   } catch (e) {
     return results
       .map((r) => `**${r.description}**: ${r.summary}`)

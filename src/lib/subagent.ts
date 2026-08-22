@@ -168,8 +168,9 @@ ${opts.task}
 
     if (!result.message.tool_calls || result.message.tool_calls.length === 0) {
       // Subagent is done — returned text summary
+      const c = result.message.content;
       return {
-        summary: lastText || result.message.content || "(subagent returned no summary)",
+        summary: lastText || (typeof c === "string" ? c : "") || "(subagent returned no summary)",
         toolCallCount,
         iterations,
         completed: true,

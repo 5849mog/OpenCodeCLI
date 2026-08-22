@@ -14,7 +14,7 @@
  *      success/fail + first line, instead of full output)
  */
 
-import type { ChatMessage } from "./ai-client";
+import type { ChatMessage, ContentPart } from "./ai-client";
 import { contextCounter } from "./wasm/tokenizer";
 
 /** Rough token estimate for a string. */
@@ -27,10 +27,31 @@ export function estimateTokens(text: string): number {
   return Math.ceil(cjk / 1.5 + other / 4);
 }
 
+/**
+ * Token estimate for a message `content` array (vision messages). Images are
+ * charged a fixed amount (DeepSeek vision doc: ~384 tokens/image after
+ * auto-resize); `file` references (Files API ids) are near-free; text parts
+ * count normally. Export for tokenizer.ts to reuse.
+ */
+export function estimateContentPartsTokens(parts: ContentPart[]): number {
+  let total = 0;
+  for (const p of parts) {
+    if (p.type === "text") {
+      total += estimateTokens(p.text);
+    } else if (p.type === "image_url") {
+      total += 384; // DeepSeek vision: per-image cap after auto-resize (~800x800)
+    } else if (p.type === "file") {
+      total += 15; // file_id reference — a few dozen bytes
+    }
+  }
+  return total;
+}
+
 /** Estimate tokens for a single chat message (content + tool_calls + name). */
 export function estimateMessageTokens(msg: ChatMessage): number {
   let total = 4; // per-message overhead (role, etc.)
   if (typeof msg.content === "string") total += estimateTokens(msg.content);
+  else if (Array.isArray(msg.content)) total += estimateContentPartsTokens(msg.content);
   if (msg.tool_calls) {
     for (const tc of msg.tool_calls) {
       total += estimateTokens(tc.function.name);

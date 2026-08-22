@@ -10,9 +10,19 @@
  * path is OpenAI-compatible.
  */
 
+/**
+ * OpenAI-compatible content part. `content` can be a plain string (legacy /
+ * non-vision models) or an array of these parts (required for vision models).
+ * `file` blocks reference files uploaded via the DeepSeek Files API.
+ */
+export type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } }
+  | { type: "file"; file_id: string };
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
+  content: string | ContentPart[] | null;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
   name?: string;

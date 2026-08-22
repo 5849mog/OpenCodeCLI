@@ -75,6 +75,17 @@ export function FileBag() {
   return <FileBagInner />;
 }
 
+/** Read a File/Blob as a data: URL (base64). Used to store images in the VFS
+ *  (which is string-backed) so they can be rendered inline and read back. */
+function fileToDataUrl(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
 function FileBagInner() {
   const activeTab = useVfsView((s) => s.activeTab);
   const openTab = useVfsView((s) => s.openTab);
@@ -125,6 +136,17 @@ function FileBagInner() {
           content: `[Binary file: ${file.name}, ${file.size} bytes — too large to display inline]`,
         });
         continue;
+      }
+      // Images: store as a data: URL string so the workspace editor can render
+      // them inline (<img src>) and tools can read them back as base64.
+      if (/\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name)) {
+        try {
+          const dataUrl = await fileToDataUrl(file);
+          toImport.push({ path, content: dataUrl });
+          continue;
+        } catch {
+          // fall through to text read below
+        }
       }
       try {
         const text = await file.text();
@@ -908,15 +930,26 @@ function TabbedEditor() {
 
       {/* Editor */}
       <div className="min-h-0 flex-1 overflow-hidden bg-[#FAF9F7] dark:bg-[#161512]">
-        <CodeMirrorEditor
-          key={activeTab}
-          value={content}
-          onChange={(v) => {
-            setContents((prev) => ({ ...prev, [activeTab]: v }));
-            setTabDirty(activeTab, v !== savedContents[activeTab]);
-          }}
-          language={language}
-        />
+        {isImageTab(activeTab, content) ? (
+          <div className="flex h-full items-center justify-center overflow-auto p-4">
+            <img
+              src={content}
+              alt={basename(activeTab)}
+              className="max-h-full max-w-full rounded object-contain shadow"
+              draggable={false}
+            />
+          </div>
+        ) : (
+          <CodeMirrorEditor
+            key={activeTab}
+            value={content}
+            onChange={(v) => {
+              setContents((prev) => ({ ...prev, [activeTab]: v }));
+              setTabDirty(activeTab, v !== savedContents[activeTab]);
+            }}
+            language={language}
+          />
+        )}
       </div>
 
       {/* Status bar */}
@@ -937,6 +970,12 @@ function TabbedEditor() {
 // ---------------------------------------------------------------------------
 
 import { CodeMirrorEditor } from "./code-editor";
+
+/** True if a tab's file is an image (by extension or by stored data: URL). */
+function isImageTab(path: string, content: string): boolean {
+  if (/^data:image\//.test(content)) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(path);
+}
 
 function detectLanguage(path: string): string {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";

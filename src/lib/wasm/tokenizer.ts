@@ -17,7 +17,7 @@
  */
 
 import type { ChatMessage } from "../ai-client";
-import { estimateTokens } from "../context";
+import { estimateTokens, estimateContentPartsTokens } from "../context";
 import { createWorkerClient, type WorkerClient } from "./worker-client";
 
 /** GitHub Pages basePath 兼容（复用 esbuild.ts 的 wasmUrl 逻辑）。 */
@@ -136,10 +136,12 @@ export async function countTokens(text: string): Promise<number> {
  */
 export async function countConversationTokensAccurate(msgs: ChatMessage[]): Promise<number> {
   const flat: string[] = [];
-  const perMsg: { overhead: number; partIdx: number[] }[] = msgs.map((m) => {
+  const perMsg: { overhead: number; partIdx: number[]; local: number }[] = msgs.map((m) => {
     let overhead = 4; // per-message overhead（与 estimateMessageTokens 一致）
     const partIdx: number[] = [];
+    let local = 0; // 数组 content（图片/file 引用等固定计数，不走 worker）
     if (typeof m.content === "string") { partIdx.push(flat.length); flat.push(m.content); }
+    else if (Array.isArray(m.content)) { local += estimateContentPartsTokens(m.content); }
     if (m.tool_calls) {
       overhead += m.tool_calls.length * 8;
       for (const tc of m.tool_calls) {
@@ -148,13 +150,13 @@ export async function countConversationTokensAccurate(msgs: ChatMessage[]): Prom
       }
     }
     if (m.name) { partIdx.push(flat.length); flat.push(m.name); }
-    return { overhead, partIdx };
+    return { overhead, partIdx, local };
   });
 
   const counts = flat.length > 0 ? await countTexts(flat) : [];
   let total = 0;
   perMsg.forEach((p, i) => {
-    let sum = 0;
+    let sum = p.local;
     for (const idx of p.partIdx) sum += counts[idx] ?? 0;
     total += p.overhead + sum;
   });
@@ -174,6 +176,7 @@ export async function contextCounter(msgs: ChatMessage[]): Promise<number> {
 function estimateMessageTokensLocal(msg: ChatMessage): number {
   let total = 4;
   if (typeof msg.content === "string") total += estimateTokens(msg.content);
+  else if (Array.isArray(msg.content)) total += estimateContentPartsTokens(msg.content);
   if (msg.tool_calls) {
     for (const tc of msg.tool_calls) {
       total += estimateTokens(tc.function.name);

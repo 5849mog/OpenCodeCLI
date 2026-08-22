@@ -26,6 +26,7 @@ import {
   Terminal as TerminalIcon,
   Check,
   CheckCircle2,
+  X,
   XCircle,
   Wrench,
   Sparkles,
@@ -70,7 +71,19 @@ import "prismjs/components/prism-yaml";
 import "prismjs/components/prism-go";
 import "prismjs/components/prism-rust";
 import "prismjs/components/prism-sql";
-import { useSession, type SessionEvent, type QuestionPanelData } from "@/store/session";
+import { useSession, type SessionEvent, type QuestionPanelData, type UploadedAttachment } from "@/store/session";
+import { uploadFileToDeepSeek } from "@/lib/files-api";
+import { apiKeyVault } from "@/lib/api-key-vault";
+
+/** Read a File/Blob as a data: URL (base64) — used for image attachments. */
+function fileToDataUrl(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
+    reader.readAsDataURL(file);
+  });
+}
 import { buildHelpText } from "@/lib/help-content";
 import { useVfsView } from "@/store/vfs-view";
 import { vfs } from "@/lib/vfs";
@@ -126,6 +139,12 @@ export function Terminal() {
   const [payloadOpen, setPayloadOpen] = useState(false);
   // Token usage sheet (右侧滑出)
   const [tokenSheetOpen, setTokenSheetOpen] = useState(false);
+  // 附件（用户上传，随消息发送 + 写入 VFS uploads/）
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const attachInputRef = useRef<HTMLInputElement>(null);
+  // 在途的 Files API 上传（避免并发 setState 竞态）
+  const filesUploading = useRef(0);
 
   // Auto-scroll to bottom on new events when user is near the bottom.
   useLayoutEffect(() => {
@@ -144,7 +163,7 @@ export function Terminal() {
   };
 
   const submit = () => {
-    if (!input.trim() || isStreaming) return;
+    if ((!input.trim() && attachments.length === 0) || isStreaming) return;
     // Process @mentions: replace @filename with file content blocks
     const processedText = processMentions(input);
     const text = processedText;
@@ -158,7 +177,59 @@ export function Terminal() {
       return;
     }
 
-    void send(text);
+    const atts = attachments;
+    setAttachments([]);
+    void send(text, atts.length > 0 ? atts : undefined);
+  };
+
+  /** 附件上传：10MB 限制 → 写 VFS uploads/ → 图片异步尝试 Files API 拿 file_id。 */
+  const handleAttach = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const MAX = 10 * 1024 * 1024;
+    const next: UploadedAttachment[] = [];
+    for (const file of Array.from(files)) {
+      if (file.size > MAX) {
+        toast.error(`${file.name} 超过 10MB 上限，已跳过`);
+        continue;
+      }
+      const isImage = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name);
+      const path = `uploads/${file.name}`;
+      const att: UploadedAttachment = { name: file.name, path, isImage };
+      // 写 VFS（图片=dataUrl，其余=文本）
+      try {
+        if (isImage) {
+          att.dataUrl = await fileToDataUrl(file);
+          await vfs.writeFile(path, att.dataUrl);
+        } else {
+          const text = await file.text();
+          await vfs.writeFile(path, text);
+        }
+      } catch {
+        toast.error(`写入工作区失败: ${file.name}`);
+        continue;
+      }
+      next.push(att);
+      // 图片异步走 Files API（成功后清 dataUrl 省内存，失败保留 base64 兜底）
+      if (isImage) {
+        setUploading(true);
+        filesUploading.current++;
+        const res = await uploadFileToDeepSeek(config.baseUrl, file, apiKeyVault.getKey() ?? "");
+        filesUploading.current--;
+        if (res.ok && res.fileId) {
+          att.fileId = res.fileId;
+          att.dataUrl = undefined; // 已有 file_id，content 用 file 块，不必带 base64
+        } else if (!res.ok) {
+          // 保留 dataUrl → send 时自动走 image_url base64 兜底
+          console.warn("[attach] Files API 失败，回退 base64:", res.error);
+        }
+        if (filesUploading.current <= 0) setUploading(false);
+        setAttachments((prev) => [...prev]);
+      }
+    }
+    if (next.length > 0) {
+      setAttachments((prev) => [...prev, ...next]);
+      toast.success(`已添加 ${next.length} 个附件`);
+    }
   };
 
   /** @ 引用：只把 @路径 规范成明确的路径标记，供 AI 用 read_file 等工具
@@ -751,6 +822,59 @@ export function Terminal() {
       {/* Input area — modern: soft glass panel, focus glow, gradient send */}
       <div className="border-t border-[#E5E2D9] bg-gradient-to-b from-[#FFFFFF] to-[#FAF9F7] px-4 py-3 dark:border-[#3a3731] dark:from-[#161512] dark:to-[#121110]">
         <div className="group relative flex items-end gap-2.5 rounded-2xl border border-[#E5E2D9] bg-[#FAF9F7]/80 px-4 py-3 shadow-sm backdrop-blur transition-all duration-200 focus-within:border-[#E58F67]/60 focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.08),0_4px_20px_rgba(0,0,0,0.06)] dark:border-[#3a3731] dark:bg-[#1c1a17]/70 dark:shadow-none dark:focus-within:border-[#E58F67]/50 dark:focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.12),0_8px_30px_rgba(0,0,0,0.4)]">
+          {/* 附件 chips（输入框上方） */}
+          {attachments.length > 0 && (
+            <div className="absolute bottom-full left-0 mb-2 flex max-w-full flex-wrap gap-1.5">
+              {attachments.map((a) => (
+                <span
+                  key={a.path}
+                  className="flex max-w-[180px] items-center gap-1.5 rounded-lg border border-[#E5E2D9] bg-white px-2 py-1 text-[length:var(--font-size-ui-sm)] text-[#3D3B37] dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-200"
+                  title={a.fileId ? `已上传 Files API: ${a.fileId}` : a.isImage ? "将以内联 base64 发送" : "写入工作区，AI 可读取"}
+                >
+                  {a.isImage ? (
+                    a.dataUrl ? (
+                      <img src={a.dataUrl} alt="" className="h-4 w-4 shrink-0 rounded object-cover" />
+                    ) : (
+                      <FileText className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
+                    )
+                  ) : (
+                    <FileText className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
+                  )}
+                  <span className="truncate">{a.name}</span>
+                  {a.isImage && a.fileId ? (
+                    <Check className="h-3 w-3 shrink-0 text-emerald-500" />
+                  ) : null}
+                  <button
+                    onClick={() => setAttachments((prev) => prev.filter((x) => x.path !== a.path))}
+                    className="shrink-0 rounded p-0.5 text-[#A8A29E] hover:bg-[#F0EDE5] hover:text-[#E54D2E] dark:hover:bg-[#2a2723]"
+                    title="移除"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          {/* 附件选择按钮 */}
+          <button
+            onClick={() => attachInputRef.current?.click()}
+            disabled={isStreaming || isCompacting || uploading}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-[#8B8884] transition-colors hover:bg-[#F0EDE5] hover:text-[#E58F67] disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-[#E58F67]"
+            title={uploading ? "正在上传图片到 Files API…" : "上传文件（图片 / 文本，≤10MB）"}
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          </button>
+          <input
+            ref={attachInputRef}
+            type="file"
+            multiple
+            accept="*/*"
+            className="hidden"
+            onChange={(e) => {
+              void handleAttach(e.target.files);
+              e.target.value = "";
+            }}
+          />
           {/* @mention autocomplete dropdown */}
           {mentionQuery !== null && mentionFiles.length > 0 && (
             <div className="absolute bottom-full left-0 mb-2 w-72 overflow-hidden rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
@@ -786,7 +910,7 @@ export function Terminal() {
           />
           <button
             onClick={submit}
-            disabled={!input.trim() || isStreaming || isCompacting}
+            disabled={(!input.trim() && attachments.length === 0) || isStreaming || isCompacting}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#E88A5F] to-[#C96A45] text-white shadow-md shadow-[#E58F67]/30 transition-all hover:from-[#F09A70] hover:to-[#E58F67] hover:shadow-lg hover:shadow-[#E58F67]/40 active:scale-95 disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#D6D3CE] disabled:text-[#A8A29E] disabled:shadow-none dark:disabled:bg-[#3a3731]"
             title="Send (Enter)"
           >
@@ -1269,7 +1393,7 @@ function EventRow({
 }) {
   switch (ev.kind) {
     case "user":
-      return <UserRow text={ev.text ?? ""} />;
+      return <UserRow text={ev.text ?? ""} attachments={ev.attachments} />;
     case "assistant-message":
       return (
         <AssistantRow text={ev.text ?? ""} reasoning={ev.reasoning} streaming={false} />
@@ -1431,11 +1555,24 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function UserRow({ text }: { text: string }) {
+function UserRow({ text, attachments }: { text: string; attachments?: Array<{ name: string; path: string; dataUrl?: string; fileId?: string }> }) {
+  const imgs = (attachments ?? []).filter((a) => a.dataUrl);
   return (
     <div className="group flex gap-2">
       <span className="shrink-0 pt-0.5 text-[#E58F67]">&gt;</span>
       <div className="flex-1 min-w-0 text-[#1A1815] dark:text-zinc-100">
+        {imgs.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {imgs.map((a) => (
+              <img
+                key={a.path}
+                src={a.dataUrl}
+                alt={a.name}
+                className="max-h-40 max-w-[240px] rounded-lg border border-[#E5E2D9] object-contain shadow dark:border-[#3a3731]"
+              />
+            ))}
+          </div>
+        )}
         <CollapsibleText text={text} render={(t) => <MarkdownRenderer text={t} />} />
       </div>
       <CopyButton text={text} />

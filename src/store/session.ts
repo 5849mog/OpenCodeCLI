@@ -17,6 +17,7 @@ import {
   classifyApiError,
   type AiClientConfig,
   type ChatMessage,
+  type ContentPart,
   type ToolCall,
   type TokenUsage,
 } from "@/lib/ai-client";
@@ -123,12 +124,29 @@ export interface SessionEvent {
   /** Plan content for update_plan tool — rendered as checkbox list. */
   plan?: string;
   ok?: boolean;
+  /** 用户随消息上传的附件（图片等）。图片含 dataUrl（工作区/UI 显示），
+   *  已走 Files API 的有 fileId（content 用 file 块引用，无 dataUrl 占用体积）。 */
+  attachments?: Array<{ name: string; path: string; dataUrl?: string; fileId?: string }>;
   ts: number;
 }
 
 // ---------------------------------------------------------------------------
 // Audit data (per-session, persisted with the session)
 // ---------------------------------------------------------------------------
+
+/** 用户随消息上传的附件（图片等）。dataUrl 用于工作区/UI 显示与 base64 兜底；
+ *  fileId 是 DeepSeek Files API 上传成功后拿到的引用（content 用 file 块，不再带 dataUrl）。 */
+export interface UploadedAttachment {
+  name: string;
+  /** VFS 路径（uploads/<name>）。 */
+  path: string;
+  /** 图片 data: URL（base64）。仅图片有；Files API 成功后可省略以省内存。 */
+  dataUrl?: string;
+  /** DeepSeek Files API 的 file_id（仅图片，上传成功后设置）。 */
+  fileId?: string;
+  /** 是否图片（决定进 ContentPart[] 还是仅写工作区）。 */
+  isImage: boolean;
+}
 
 /** 逐次 API 用量记录（审计面板/报告用，来源分主循环/子代理/编排）。 */
 export interface UsageRecord {
@@ -182,6 +200,9 @@ export interface AiConfig {
   corsProxyUrl: string;
   /** Auto-lock API keys after N minutes of inactivity (0 = disabled). */
   idleLockMinutes: number;
+  /** 当前模型是否支持视觉输入（图片）。支持时用户上传的图片会作为
+   *  ContentPart 传入；不支持时带图发送会记 error 提示（后端会 400）。 */
+  supportVision: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -228,6 +249,7 @@ const DEFAULT_CONFIG: AiConfig = {
   useJinaReader: true,
   corsProxyUrl: "",
   idleLockMinutes: 0,
+  supportVision: true,
 };
 
 function loadConfig(): AiConfig {
@@ -346,7 +368,7 @@ interface SessionState {
   renameSession: (id: string, title: string) => Promise<void>;
   refreshSessionList: () => Promise<void>;
   abort: () => void;
-  send: (text: string) => Promise<void>;
+  send: (text: string, attachments?: UploadedAttachment[]) => Promise<void>;
   /** 真正的上下文压缩：LLM 摘要旧对话并写回 store（/compact 命令调用）。 */
   compact: () => Promise<void>;
   toggleMode: () => void;
@@ -889,7 +911,7 @@ export const useSession = create<SessionState>((set, get) => ({
     set({ pendingZipRequest: r });
   },
 
-  send: async (text: string) => {
+  send: async (text: string, attachments?: UploadedAttachment[]) => {
     const trimmed = text.trim();
     if (!trimmed) return;
     if (get().isStreaming) return;
@@ -910,11 +932,38 @@ export const useSession = create<SessionState>((set, get) => ({
       return;
     }
 
-    const userMsg: ChatMessage = { role: "user", content: trimmed };
+    const imgs = (attachments ?? []).filter((a) => a.isImage);
+    const hasImages = imgs.length > 0;
+
+    // 视觉模型：content 用数组（text + 每张图的 file_id 或 base64 兜底）。
+    // 非视觉模型：content 保持纯字符串（图片若存在则报错提示——后端会 400）。
+    let userMsg: ChatMessage;
+    let note: string | null = null;
+    if (hasImages && !config.supportVision) {
+      userMsg = {
+        role: "user",
+        content: `${trimmed}\n\n[用户上传了 ${imgs.length} 张图片，但当前模型不支持视觉输入，图片未附加上传。请切换到支持视觉的模型（如 deepseek-v4-flash-vision-exp）后重试。]`,
+      };
+      note = `当前模型不支持视觉输入，已跳过 ${imgs.length} 张图片。`;
+    } else if (hasImages) {
+      const parts: ContentPart[] = [
+        { type: "text", text: trimmed },
+        ...imgs.map((a): ContentPart =>
+          a.fileId
+            ? { type: "file", file_id: a.fileId }
+            : { type: "image_url", image_url: { url: a.dataUrl ?? "" } },
+        ),
+      ];
+      userMsg = { role: "user", content: parts };
+    } else {
+      userMsg = { role: "user", content: trimmed };
+    }
+
     const userEvent: SessionEvent = {
       id: nextId(),
       kind: "user",
       text: trimmed,
+      attachments: (attachments ?? []).length > 0 ? attachments : undefined,
       ts: Date.now(),
     };
     const ac = new AbortController();
@@ -922,8 +971,11 @@ export const useSession = create<SessionState>((set, get) => ({
       const newMessages = [...s.messages, userMsg];
       // Auto-title from the first user message (empty/new sessions only).
       const title = !s.title ? deriveTitle(trimmed) : s.title;
+      const extraEvents = note
+        ? [{ id: nextId(), kind: "error" as const, text: note, ts: Date.now() }]
+        : [];
       return {
-        events: [...s.events, userEvent],
+        events: [...s.events, userEvent, ...extraEvents],
         messages: newMessages,
         title,
         isStreaming: true,

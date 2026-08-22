@@ -23,6 +23,7 @@ const PRESETS: Array<{
   baseUrl: string;
   models: string[];
   hint: string;
+  vision?: boolean;
 }> = [
   {
     name: "OpenAI",
@@ -33,8 +34,9 @@ const PRESETS: Array<{
   {
     name: "DeepSeek",
     baseUrl: "https://api.deepseek.com/v1",
-    models: ["deepseek-v4-flash", "deepseek-v4-pro"],
-    hint: "deepseek-v4-flash / deepseek-v4-pro",
+    models: ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-flash-vision-exp"],
+    hint: "deepseek-v4-flash / deepseek-v4-pro / vision-exp（视觉）",
+    vision: true,
   },
   {
     name: "Zhipu (智谱)",
@@ -291,6 +293,7 @@ export function SettingsDialog({
                     setConfig({
                       baseUrl: p.baseUrl,
                       model: p.models[0],
+                      supportVision: p.vision ?? false,
                     })
                   }
                   className={`rounded border px-3 py-2 text-left text-xs transition ${
@@ -350,7 +353,17 @@ export function SettingsDialog({
             <div className="flex gap-2">
               <input
                 value={config.model}
-                onChange={(e) => setConfig({ model: e.target.value })}
+                onChange={(e) => {
+                  const m = e.target.value;
+                  // 视觉能力随模型推断：模型名含 vision / 已知视觉模型 → 开启；
+                  // 否则保留当前设置（用户可在下方手动开关）。
+                  const visionLike = /vision|gpt-4o|gemini|claude/i.test(m);
+                  setConfig(
+                    visionLike
+                      ? { model: m, supportVision: true }
+                      : { model: m },
+                  );
+                }}
                 placeholder="gpt-4o"
                 list="model-suggestions"
                 className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
@@ -476,6 +489,24 @@ export function SettingsDialog({
             <div className="mt-1.5 text-[11px] text-[#A8A29E] dark:text-zinc-500">
               For DeepSeek V4 models. On sends <code className="text-[#E58F67]">thinking=enabled</code> + <code className="text-[#E58F67]">reasoning_effort</code>; off sends <code className="text-[#E58F67]">thinking=disabled</code>. Valid efforts: low/high/xhigh/max. Note: thinking &amp; answer share the Max tokens budget.
             </div>
+          </div>
+
+          {/* Vision / Image input */}
+          <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={config.supportVision}
+                onChange={(e) => setConfig({ supportVision: e.target.checked })}
+                className="h-4 w-4 accent-[#E58F67]"
+              />
+              <span>
+                <span className="block text-sm text-[#2D2B27] dark:text-zinc-100">支持图片输入（Vision）</span>
+                <span className="block text-[10px] text-[#8B8884] dark:text-zinc-500">
+                  开启后随消息上传的图片会作为视觉输入传给模型（优先 DeepSeek Files API，失败自动转 base64 内联）。仅视觉模型支持（如 deepseek-v4-flash-vision-exp）；非视觉模型带图会报错。
+                </span>
+              </span>
+            </label>
           </div>
 
           {/* ── DeepSeek account balance (provider-specific /user/balance) ── */}

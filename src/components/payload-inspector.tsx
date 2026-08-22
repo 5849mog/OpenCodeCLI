@@ -17,7 +17,7 @@
 import { useEffect, useState } from "react";
 import { X, Eye, Plus, Trash2, RotateCcw, Check } from "lucide-react";
 import { useSession } from "@/store/session";
-import type { ChatMessage } from "@/lib/ai-client";
+import type { ChatMessage, ContentPart } from "@/lib/ai-client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +58,19 @@ export function PayloadInspector({
 
   const updateMsg = (idx: number, patch: Partial<ChatMessage>) => {
     setEditable((prev) => prev.map((m, i) => (i === idx ? { ...m, ...patch } : m)));
+  };
+  // 数组 content（视觉消息）：文本域里显示 JSON，改动时尝试解析回数组。
+  const contentDisplay = (m: ChatMessage): string =>
+    typeof m.content === "string" || m.content == null ? (m.content ?? "") : JSON.stringify(m.content);
+  const contentOnChange = (idx: number, val: string) => {
+    let next: string | ContentPart[] = val;
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) next = parsed;
+    } catch {
+      // keep as string
+    }
+    updateMsg(idx, { content: next });
   };
   const removeMsg = (idx: number) => {
     setEditable((prev) => prev.filter((_, i) => i !== idx));
@@ -137,9 +150,9 @@ export function PayloadInspector({
               </div>
               <div className="px-3 pb-3">
                 <textarea
-                  value={m.content ?? ""}
-                  onChange={(e) => updateMsg(i, { content: e.target.value })}
-                  rows={Math.max(2, Math.min(12, Math.ceil((m.content?.length ?? 0) / 80)))}
+                  value={contentDisplay(m)}
+                  onChange={(e) => contentOnChange(i, e.target.value)}
+                  rows={Math.max(2, Math.min(12, Math.ceil(contentDisplay(m).length / 80)))}
                   placeholder="消息内容…"
                   className="w-full resize-y rounded border border-[#E5E2D9] bg-[#FFFFFF] px-3 py-2 font-mono text-xs focus:border-[#E58F67] focus:outline-none dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-100"
                 />
@@ -198,7 +211,10 @@ function ReadOnlyRow({
   message: ChatMessage;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const content = message.content ?? "";
+  const content =
+    typeof message.content === "string" || message.content == null
+      ? (message.content ?? "")
+      : JSON.stringify(message.content);
   const preview = content.length > 200 ? content.slice(0, 200) + "…" : content;
   return (
     <div className="rounded-lg border border-dashed border-[#D6D3CE] bg-[#F5F3EE] dark:border-[#52504b] dark:bg-[#201e1a]">
