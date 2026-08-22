@@ -206,6 +206,8 @@ export interface AiConfig {
   supportVision: boolean;
   /** 新建会话默认的运行模式（full/light/minimal）。会话创建时锁定。 */
   defaultPreset: AgentPreset;
+  /** 顶部工作区/项目名称（输入框工作区选择器显示，可在设置里改）。 */
+  workspaceName: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +256,7 @@ const DEFAULT_CONFIG: AiConfig = {
   idleLockMinutes: 0,
   supportVision: true,
   defaultPreset: "full",
+  workspaceName: "工作区",
 };
 
 function loadConfig(): AiConfig {

@@ -872,7 +872,7 @@ export function Terminal() {
               title="文件袋（虚拟工作区）"
             >
               <Folder className="h-3.5 w-3.5 text-[#E8A87C]" />
-              <span className="font-medium">OpenCodeCLI</span>
+              <span className="font-medium">{config.workspaceName || "工作区"}</span>
               <ChevronDown className="h-3 w-3" />
             </button>
             <Sparkles className="h-3.5 w-3.5 text-[#8B8884] dark:text-zinc-500" />
@@ -888,7 +888,7 @@ export function Terminal() {
             placeholder={
               isStreaming
                 ? "agent is working…"
-                : "向 ZCode 提问，使用 @ 添加上下文，使用 / 选择命令或能力"
+                : "向 Open Code 提问，使用 @ 引用文件，使用 / 调用命令"
             }
             disabled={isStreaming || isCompacting}
             className="max-h-[200px] w-full resize-none bg-transparent text-[length:var(--font-size-base)] text-[#1A1815] placeholder:text-[#A8A29E] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
@@ -959,31 +959,53 @@ export function Terminal() {
                     <ChevronDown className="h-3 w-3 shrink-0" />
                   </button>
                   {modelMenuOpen && (
-                    <div className="absolute left-0 top-full z-50 mt-1.5 max-h-64 w-64 overflow-y-auto rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
+                    <div className="absolute bottom-full left-0 z-50 mb-1.5 max-h-72 w-72 overflow-y-auto rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
                       {headerModelChoices.length === 0 ? (
                         <div className="px-3 py-2 text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
                           暂无模型列表——在设置里点 Test 拉取
                         </div>
                       ) : (
-                        headerModelChoices.map((m) => (
+                        <>
+                          <div className="border-b border-[#E5E2D9] px-3 py-2 text-[length:var(--font-size-ui-sm)] font-medium text-[#6B6862] dark:border-[#3a3731] dark:text-zinc-400">
+                            模型
+                          </div>
+                          {groupModels(headerModelChoices).map((g) => (
+                            <div key={g.provider}>
+                              <div className="px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[#A8A29E] dark:text-zinc-500">
+                                {g.provider}
+                              </div>
+                              {g.models.map((m) => (
+                                <button
+                                  key={m}
+                                  onClick={() => {
+                                    const visionLike = /vision|gpt-4o|gemini|claude/i.test(m);
+                                    setConfig(visionLike ? { model: m, supportVision: true } : { model: m });
+                                    setModelMenuOpen(false);
+                                    toast.success(`模型已切换为 ${m}`);
+                                  }}
+                                  className={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-[length:var(--font-size-ui-sm)] transition-colors ${
+                                    m === config.model
+                                      ? "bg-[#E58F67]/10 text-[#E58F67]"
+                                      : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]"
+                                  }`}
+                                >
+                                  <span className="min-w-0 flex-1 truncate">{m}</span>
+                                  {m === config.model && <Check className="h-3 w-3 shrink-0" />}
+                                </button>
+                              ))}
+                            </div>
+                          ))}
                           <button
-                            key={m}
                             onClick={() => {
-                              const visionLike = /vision|gpt-4o|gemini|claude/i.test(m);
-                              setConfig(visionLike ? { model: m, supportVision: true } : { model: m });
                               setModelMenuOpen(false);
-                              toast.success(`模型已切换为 ${m}`);
+                              toast.info("请到设置面板管理模型与 API Key");
                             }}
-                            className={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-[length:var(--font-size-ui-sm)] transition-colors ${
-                              m === config.model
-                                ? "bg-[#E58F67]/10 text-[#E58F67]"
-                                : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]"
-                            }`}
+                            className="flex w-full items-center gap-2 border-t border-[#E5E2D9] px-3 py-2 text-left text-[length:var(--font-size-ui-sm)] text-[#8B7355] transition-colors hover:bg-[#F5F3EE] dark:border-[#3a3731] dark:text-[#E8A87C] dark:hover:bg-[#262320]"
                           >
-                            <span className="min-w-0 flex-1 truncate">{m}</span>
-                            {m === config.model && <Check className="h-3 w-3 shrink-0" />}
+                            <Wrench className="h-3.5 w-3.5" />
+                            <span>管理模型</span>
                           </button>
-                        ))
+                        </>
                       )}
                     </div>
                   )}
@@ -1637,6 +1659,21 @@ function TurnBlock({ turn }: { turn: TurnGroup }) {
       )}
     </motion.div>
   );
+}
+
+/** 把模型列表按 provider（"/" 前的部分）分组，用于模型选择菜单。 */
+function groupModels(models: string[]): { provider: string; models: string[] }[] {
+  const order: string[] = [];
+  const map = new Map<string, string[]>();
+  for (const m of models) {
+    const provider = m.includes("/") ? m.split("/")[0].trim() : "其他";
+    if (!map.has(provider)) {
+      map.set(provider, []);
+      order.push(provider);
+    }
+    map.get(provider)!.push(m);
+  }
+  return order.map((p) => ({ provider: p, models: map.get(p)! }));
 }
 
 function CopyButton({ text }: { text: string }) {
