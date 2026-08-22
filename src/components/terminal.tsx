@@ -836,11 +836,6 @@ export function Terminal() {
                 pairedResult={ev.pairedResult}
                 canRegenerate={ev.kind === "assistant-message" && ev.id === lastAssistantEventId}
                 fullText={ev.kind === "assistant-message" ? assistantTurnTexts.get(ev.id) : undefined}
-                onModifyUser={(t) => {
-                  setInput(t);
-                  setMentionQuery(null);
-                  textareaRef.current?.focus();
-                }}
               />
             ),
           )}
@@ -1666,18 +1661,16 @@ function EventRow({
   ev,
   pairedResult,
   canRegenerate,
-  onModifyUser,
   fullText,
 }: {
   ev: SessionEvent;
   pairedResult?: SessionEvent;
   canRegenerate?: boolean;
-  onModifyUser?: (text: string) => void;
   fullText?: string;
 }) {
   switch (ev.kind) {
     case "user":
-      return <UserRow text={ev.text ?? ""} attachments={ev.attachments} onModify={onModifyUser} />;
+      return <UserRow text={ev.text ?? ""} attachments={ev.attachments} eventId={ev.id} />;
     case "assistant-message":
       return (
         <AssistantRow
@@ -2042,13 +2035,21 @@ function StepCard({
 function UserRow({
   text,
   attachments,
-  onModify,
+  eventId,
 }: {
   text: string;
   attachments?: Array<{ name: string; path: string; dataUrl?: string; fileId?: string }>;
-  onModify?: (text: string) => void;
+  eventId: string;
 }) {
   const imgs = (attachments ?? []).filter((a) => a.dataUrl);
+  const rewriteFromMessage = useSession((s) => s.rewriteFromMessage);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(text);
+  const submitEdit = () => {
+    if (!draft.trim()) return;
+    setEditing(false);
+    void rewriteFromMessage(eventId, draft);
+  };
   return (
     <div className="flex flex-col items-end gap-1">
       {imgs.length > 0 && (
@@ -2063,19 +2064,58 @@ function UserRow({
           ))}
         </div>
       )}
-      <div className="max-w-[75%] rounded-2xl rounded-br-md bg-[#F5F3EE] px-4 py-2.5 text-[#2D2B27] dark:bg-[#262320] dark:text-zinc-100">
-        <CollapsibleText text={text} render={(t) => <MarkdownRenderer text={t} />} />
-      </div>
-      <div className="flex items-center gap-0.5 pr-1 text-[#A8A29E] dark:text-zinc-500">
-        <CopyButton text={text} />
-        <button
-          onClick={() => onModify?.(text)}
-          className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:hover:bg-[#2a2723] dark:hover:text-zinc-300"
-          title="修改"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-      </div>
+      {editing ? (
+        <div className="w-full max-w-[80%] rounded-2xl rounded-br-md border border-[#E58F67]/40 bg-[#262320] px-4 py-2.5">
+          <textarea
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setEditing(false);
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitEdit();
+            }}
+            rows={Math.min(8, Math.max(1, draft.split("\n").length))}
+            className="w-full resize-none bg-transparent text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+            placeholder="输入修改后的消息…"
+          />
+          <div className="mt-1.5 flex items-center justify-end gap-1.5">
+            <button
+              onClick={() => setEditing(false)}
+              className="flex h-7 w-7 items-center justify-center rounded text-[#A8A29E] transition-colors hover:bg-white/10"
+              title="取消"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={submitEdit}
+              disabled={!draft.trim()}
+              className="flex h-7 w-7 items-center justify-center rounded bg-[#3a3731] text-zinc-200 transition-colors hover:bg-[#4a4740] disabled:opacity-40"
+              title="发送并重新开始"
+            >
+              <ArrowUp className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="max-w-[75%] rounded-2xl rounded-br-md bg-[#F5F3EE] px-4 py-2.5 text-[#2D2B27] dark:bg-[#262320] dark:text-zinc-100">
+            <CollapsibleText text={text} render={(t) => <MarkdownRenderer text={t} />} />
+          </div>
+          <div className="flex items-center gap-0.5 pr-1 text-[#A8A29E] dark:text-zinc-500">
+            <CopyButton text={text} />
+            <button
+              onClick={() => {
+                setDraft(text);
+                setEditing(true);
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:hover:bg-[#2a2723] dark:hover:text-zinc-300"
+              title="修改"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

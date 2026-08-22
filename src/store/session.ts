@@ -385,6 +385,8 @@ interface SessionState {
   send: (text: string, attachments?: UploadedAttachment[]) => Promise<void>;
   /** 重改：丢弃最后一轮 Q→A，用同一个用户消息重新跑一遍。 */
   regenerate: () => Promise<void>;
+  /** 修改某条用户消息：原地替换，清空其后全部内容，并从该消息重新开始重构。 */
+  rewriteFromMessage: (eventId: string, newText: string) => Promise<void>;
   /** 真正的上下文压缩：LLM 摘要旧对话并写回 store（/compact 命令调用）。 */
   compact: () => Promise<void>;
   toggleMode: () => void;
@@ -1063,6 +1065,96 @@ export const useSession = create<SessionState>((set, get) => ({
     set({
       messages: newMessages,
       events: newEvents,
+      isStreaming: true,
+      abortController: ac,
+      agentStatus: "Thinking…",
+      agentIteration: 0,
+      streamingText: null,
+      streamingReasoning: null,
+    });
+    try {
+      await runAgentLoop(set, get, ac.signal);
+    } catch (e) {
+      const isAbort = e instanceof Error && e.name === "AbortError";
+      const errEvent: SessionEvent = {
+        id: nextId(),
+        kind: "error",
+        text: isAbort ? "Stopped by user." : e instanceof Error ? classifyApiError(e) : String(e),
+        ts: Date.now(),
+      };
+      set((st) => ({
+        events: [...st.events, errEvent],
+        isStreaming: false,
+        abortController: null,
+        agentStatus: "",
+        streamingText: null,
+        streamingReasoning: null,
+        agentIteration: 0,
+      }));
+    } finally {
+      set({
+        isStreaming: false,
+        abortController: null,
+        agentStatus: "",
+        streamingText: null,
+        streamingReasoning: null,
+        agentIteration: 0,
+      });
+      schedulePersist(get);
+    }
+  },
+
+  /** 修改某条用户消息：替换它，清空其后所有事件/消息，并从它重新跑 agent。 */
+  rewriteFromMessage: async (eventId: string, newText: string) => {
+    if (get().isStreaming) return;
+    const trimmed = newText.trim();
+    if (!trimmed) return;
+    const s = get();
+    let userEventIdx = -1;
+    for (let i = s.events.length - 1; i >= 0; i--) {
+      if (s.events[i].id === eventId && s.events[i].kind === "user") {
+        userEventIdx = i;
+        break;
+      }
+    }
+    if (userEventIdx < 0) return;
+    const oldEvent = s.events[userEventIdx];
+    // 该事件之前有多少个 user 事件 → 对应 messages 中第 N 条 user 消息
+    let userCount = 0;
+    for (let i = 0; i <= userEventIdx; i++) if (s.events[i].kind === "user") userCount++;
+    let userMsgIdx = -1;
+    let seen = 0;
+    for (let i = 0; i < s.messages.length && userMsgIdx < 0; i++) {
+      if (s.messages[i].role === "user") {
+        seen++;
+        if (seen === userCount) userMsgIdx = i;
+      }
+    }
+    // 构造替换后的 user 消息（保留图片附件的 file_id / base64）
+    let userMsg: ChatMessage;
+    const attachments = oldEvent.attachments;
+    if (attachments && attachments.length > 0) {
+      const parts: ContentPart[] = [{ type: "text", text: trimmed }];
+      for (const a of attachments) {
+        if (a.fileId) parts.push({ type: "file", file_id: a.fileId });
+        else if (a.dataUrl) parts.push({ type: "image_url", image_url: { url: a.dataUrl } });
+      }
+      userMsg = { role: "user", content: parts };
+    } else {
+      userMsg = { role: "user", content: trimmed };
+    }
+    const newMessages = userMsgIdx >= 0
+      ? [...s.messages.slice(0, userMsgIdx), userMsg]
+      : [...s.messages, userMsg];
+    const newEvents = [
+      ...s.events.slice(0, userEventIdx),
+      { id: nextId(), kind: "user" as const, text: trimmed, attachments, ts: Date.now() },
+    ];
+    const ac = new AbortController();
+    set({
+      messages: newMessages,
+      events: newEvents,
+      title: !s.title ? deriveTitle(trimmed) : s.title,
       isStreaming: true,
       abortController: ac,
       agentStatus: "Thinking…",
