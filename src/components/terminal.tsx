@@ -101,7 +101,7 @@ import { toast } from "sonner";
 import { ZipDownloadBridge, ZipPickerModal } from "./zip-picker";
 import { PayloadInspector } from "./payload-inspector";
 import { TokenSheet } from "./token-sheet";
-import { FileTypeIcon } from "@/lib/file-icon";
+import { FileTypeIcon, getFileIcon } from "@/lib/file-icon";
 import { cn } from "@/lib/utils";
 import { planStats } from "@/lib/plan-utils";
 import { matchModelRate, estimateCost, split80_20 } from "@/lib/cost";
@@ -813,7 +813,7 @@ export function Terminal() {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-3 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] [&::-webkit-scrollbar-track]:bg-transparent"
+        className="flex-1 overflow-y-auto px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] [&::-webkit-scrollbar-track]:bg-transparent"
       >
         {events.every((ev) => ev.kind !== "user" && ev.kind !== "assistant-message") &&
           !streamingText &&
@@ -848,6 +848,10 @@ export function Terminal() {
               preview line. The full text stops scrolling in front of the user;
               once done, events take over and it becomes either a TurnBlock
               (process) or a full assistant message (the answer). */}
+          {/* 流式思考：思考中实时显示，结束后由事件里的"思考过程"接管（自动闭合） */}
+          {streamingReasoning?.text && (
+            <ThinkingStep text={streamingReasoning.text} streaming={true} />
+          )}
           {/* 流式输出直接以最终正文形态逐字渲染（不再用"正在分析"占位） */}
           {streamingText?.text && (
             <AssistantRow text={streamingText.text} streaming={true} />
@@ -1597,6 +1601,7 @@ interface TurnGroup {
   id: string;
   analysis: string;
   reasoning?: string;
+  durationMs?: number;
   tools: (SessionEvent & { pairedResult?: SessionEvent })[];
 }
 
@@ -1627,7 +1632,14 @@ function groupAssistantTurns(
   for (const ev of events) {
     if (ev.kind === "assistant-message") {
       close();
-      open = { kind: "turn", id: ev.id, analysis: ev.text ?? "", reasoning: ev.reasoning, tools: [] };
+      open = {
+        kind: "turn",
+        id: ev.id,
+        analysis: ev.text ?? "",
+        reasoning: ev.reasoning,
+        durationMs: ev.durationMs,
+        tools: [],
+      };
       continue;
     }
     if (ev.kind === "tool-call" || ev.kind === "tool-result") {
@@ -1675,6 +1687,7 @@ function EventRow({
           ts={ev.ts}
           canRegenerate={canRegenerate}
           fullText={fullText}
+          durationMs={ev.durationMs}
         />
       );
     case "tool-call":
@@ -1760,7 +1773,7 @@ function TurnBlock({ turn }: { turn: TurnGroup }) {
       )}
       {/* 思考过程：独立步骤，默认收起 */}
       {turn.reasoning && turn.reasoning.trim().length > 0 && (
-        <ThinkingStep text={turn.reasoning} streaming={false} />
+        <ThinkingStep text={turn.reasoning} streaming={false} durationMs={turn.durationMs} />
       )}
       {/* 工具：每个动作一行可折叠步骤卡（运行中显示 xx中） */}
       {turn.tools.map((ev) =>
@@ -1869,10 +1882,16 @@ function stepMeta(name: string): {
   }
 }
 
-function ThinkingStep({ text, streaming }: { text: string; streaming: boolean }) {
+function formatDuration(ms: number): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s} 秒`;
+  return `${Math.floor(s / 60)} 分 ${s % 60} 秒`;
+}
+
+function ThinkingStep({ text, streaming, durationMs }: { text: string; streaming: boolean; durationMs?: number }) {
   const deferredText = useDeferredValue(text);
   const isStale = deferredText !== text;
-  const [collapsed, setCollapsed] = useState(!streaming && text.length > 400);
+  const [collapsed, setCollapsed] = useState(true);
   const preview = text.split("\n").find((l) => l.trim()) ?? text;
   const shown = streaming ? deferredText : text;
   return (
@@ -1889,7 +1908,7 @@ function ThinkingStep({ text, streaming }: { text: string; streaming: boolean })
         <ChevronRight className={cn("h-3 w-3 shrink-0 text-[#8B8884] transition-transform", !collapsed && "rotate-90")} />
         <Brain className={cn("h-3.5 w-3.5 shrink-0", streaming ? "text-[#E58F67]" : "text-[#A8A29E]")} />
         <span className={cn("shrink-0 font-medium", streaming ? "text-shimmer" : "text-[#8B8884]")}>
-          {streaming ? "思考中" : "思考过程"}
+          {streaming ? "思考中" : `思考过程${durationMs != null ? ` 持续了 ${formatDuration(durationMs)}` : ""}`}
         </span>
         {streaming && (
           <span className="flex gap-0.5 pl-1">
@@ -1931,14 +1950,34 @@ function StepCard({
   const diff = result?.diff ?? null;
   const path = diff?.path ?? (typeof args.path === "string" ? args.path : null);
   const command = typeof args.command === "string" ? args.command : null;
-  const Icon = meta.icon;
+  // 有文件路径时用按扩展名区分的专业文件图标（如 .tsx→FileCode2）
+  const Icon = path ? getFileIcon(path) : meta.icon;
 
   let metaText = "";
-  if (meta.kind === "terminal" && command) metaText = `$ ${command}`;
-  else if (path) metaText = path;
-  else if (meta.kind === "explore" && output) {
-    const count = output.split("\n").filter((l) => l.trim()).length;
-    metaText = count > 0 ? `${count} 个文件` : "";
+  if (meta.kind === "terminal") {
+    // 摘要不显示命令——命令只在点开后出现
+    metaText = "";
+  } else if ((meta.kind === "edit" || meta.kind === "write") && path) {
+    // 已编辑：先文件，再目录，再真实 +/-行数
+    const base = path.split("/").pop() ?? path;
+    const dir = path.includes("/") ? path.slice(0, path.lastIndexOf("/") + 1) : "";
+    let stat = "";
+    if (diff) {
+      const rows = lineDiff(diff.before.split("\n"), diff.after.split("\n"));
+      const added = rows.filter((r) => r.type === "add").length;
+      const removed = rows.filter((r) => r.type === "del").length;
+      if (added > 0 || removed > 0) stat = `+${added} -${removed}`;
+    }
+    metaText = [base, dir, stat].filter(Boolean).join(" ");
+  } else if (meta.kind === "explore") {
+    // 探索收敛：N 文件（读文件）/ N 搜索（搜索类命令）
+    const isSearch = name === "search_files" || name === "search_symbols";
+    const matches = output.split("\n").filter((l) => l.trim()).length;
+    const count =
+      name === "read_file" || name === "view_outline" ? 1 : matches;
+    metaText = count > 0 ? `${count} ${isSearch ? "搜索" : "文件"}` : "";
+  } else if (path) {
+    metaText = path;
   }
 
   return (
@@ -1983,9 +2022,14 @@ function StepCard({
           ) : diff ? (
             <DiffView before={diff.before} after={diff.after} />
           ) : output ? (
-            <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-xs leading-relaxed text-[#A8A29E] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
-              {output}
-            </pre>
+            <div className="px-3 py-2">
+              {meta.kind === "terminal" && command && (
+                <div className="mb-1.5 font-mono text-xs text-[#8B8884]">$ {command}</div>
+              )}
+              <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-[#A8A29E] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+                {output}
+              </pre>
+            </div>
           ) : (
             <div className="px-3 py-2 text-xs text-[#A8A29E]">{ok ? "完成" : "失败"}</div>
           )}
@@ -2094,6 +2138,7 @@ function AssistantRow({
   ts,
   canRegenerate,
   fullText,
+  durationMs,
 }: {
   text: string;
   reasoning?: string;
@@ -2101,6 +2146,7 @@ function AssistantRow({
   ts?: number;
   canRegenerate?: boolean;
   fullText?: string;
+  durationMs?: number;
 }) {
   const deferredText = useDeferredValue(text);
   const isStale = deferredText !== text;
@@ -2113,7 +2159,7 @@ function AssistantRow({
         className="min-w-0 break-words text-[#2D2B27] dark:text-zinc-100"
         style={{ opacity: isStale ? 0.95 : 1 }}
       >
-        {showReasoning && <ThinkingStep text={reasoning!} streaming={streaming} />}
+        {showReasoning && <ThinkingStep text={reasoning!} streaming={streaming} durationMs={durationMs} />}
         {text && <MarkdownRenderer text={streaming ? deferredText : text} />}
         {streaming && (
           <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-emerald-400 align-middle dark:bg-[#34d399]" />

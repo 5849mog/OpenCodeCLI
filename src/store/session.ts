@@ -129,6 +129,8 @@ export interface SessionEvent {
    *  已走 Files API 的有 fileId（content 用 file 块引用，无 dataUrl 占用体积）。 */
   attachments?: Array<{ name: string; path: string; dataUrl?: string; fileId?: string }>;
   ts: number;
+  /** 思考/回合持续时长（毫秒）——用于「思考过程 持续了几秒」（真实计时，非硬编码）。 */
+  durationMs?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -1216,6 +1218,8 @@ async function runAgentLoop(
     let streamedText = "";
     let reasoning = "";
     let firstTokenReceived = false;
+    let firstReasoningMs: number | null = null;
+    const streamStartMs = Date.now();
     const streamEventId = nextId();
     // Don't push to events yet — use streamingText for live updates.
     // The final event is pushed once when streaming completes.
@@ -1251,6 +1255,7 @@ async function runAgentLoop(
             set({ streamingText: { id: streamEventId, text: streamedText } });
           },
           onReasoning: (delta) => {
+            if (firstReasoningMs === null) firstReasoningMs = Date.now();
             reasoning += delta;
             set({ streamingReasoning: { id: streamEventId, text: reasoning } });
           },
@@ -1324,6 +1329,7 @@ async function runAgentLoop(
             text: hasText ? streamedText : undefined,
             reasoning: hasReasoning ? reasoning : undefined,
             ts: Date.now(),
+            durationMs: firstReasoningMs !== null ? Date.now() - firstReasoningMs : Date.now() - streamStartMs,
           },
         ],
       }));
