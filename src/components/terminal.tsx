@@ -40,6 +40,7 @@ import {
   FilePen,
   FilePlus,
   FolderSearch,
+  Pencil,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -812,6 +813,11 @@ export function Terminal() {
                 ev={ev}
                 pairedResult={ev.pairedResult}
                 canRegenerate={ev.kind === "assistant-message" && ev.id === lastAssistantEventId}
+                onModifyUser={(t) => {
+                  setInput(t);
+                  setMentionQuery(null);
+                  textareaRef.current?.focus();
+                }}
               />
             ),
           )}
@@ -1630,14 +1636,16 @@ function EventRow({
   ev,
   pairedResult,
   canRegenerate,
+  onModifyUser,
 }: {
   ev: SessionEvent;
   pairedResult?: SessionEvent;
   canRegenerate?: boolean;
+  onModifyUser?: (text: string) => void;
 }) {
   switch (ev.kind) {
     case "user":
-      return <UserRow text={ev.text ?? ""} attachments={ev.attachments} />;
+      return <UserRow text={ev.text ?? ""} attachments={ev.attachments} onModify={onModifyUser} />;
     case "assistant-message":
       return (
         <AssistantRow
@@ -1796,7 +1804,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={copy}
-      className="shrink-0 self-start pt-0.5 text-[#A8A29E] transition-opacity hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:text-zinc-300"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded transition-colors text-[#A8A29E] hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-300"
       title={copied ? "Copied" : "Copy message"}
     >
       {copied ? <Check size={14} className="text-emerald-500 dark:text-[#34d399]" /> : <Copy size={14} />}
@@ -1966,7 +1974,15 @@ function StepCard({
   );
 }
 
-function UserRow({ text, attachments }: { text: string; attachments?: Array<{ name: string; path: string; dataUrl?: string; fileId?: string }> }) {
+function UserRow({
+  text,
+  attachments,
+  onModify,
+}: {
+  text: string;
+  attachments?: Array<{ name: string; path: string; dataUrl?: string; fileId?: string }>;
+  onModify?: (text: string) => void;
+}) {
   const imgs = (attachments ?? []).filter((a) => a.dataUrl);
   return (
     <div className="flex flex-col items-end gap-1">
@@ -1984,6 +2000,16 @@ function UserRow({ text, attachments }: { text: string; attachments?: Array<{ na
       )}
       <div className="max-w-[75%] rounded-2xl rounded-br-md bg-[#F5F3EE] px-4 py-2.5 text-[#2D2B27] dark:bg-[#262320] dark:text-zinc-100">
         <CollapsibleText text={text} render={(t) => <MarkdownRenderer text={t} />} />
+      </div>
+      <div className="flex items-center gap-0.5 pr-1 text-[#A8A29E] dark:text-zinc-500">
+        <CopyButton text={text} />
+        <button
+          onClick={() => onModify?.(text)}
+          className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:hover:bg-[#2a2723] dark:hover:text-zinc-300"
+          title="修改"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
       </div>
     </div>
   );
@@ -2059,9 +2085,9 @@ function AssistantRow({
   const regenerate = useSession((s) => s.regenerate);
   if (!text && !showReasoning) return null;
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
       <div
-        className="min-w-0 break-words rounded-2xl rounded-tl-md border border-[#E5E2D9] bg-[#FAF9F7]/60 px-4 py-2.5 text-[#2D2B27] dark:border-[#3a3731] dark:bg-[#1c1a17]/60 dark:text-zinc-100"
+        className="min-w-0 break-words text-[#2D2B27] dark:text-zinc-100"
         style={{ opacity: isStale ? 0.95 : 1 }}
       >
         {showReasoning && <ThinkingStep text={reasoning!} streaming={streaming} />}
@@ -2071,20 +2097,19 @@ function AssistantRow({
         )}
       </div>
       {!streaming && (
-        <div className="flex items-center gap-1.5 pl-1 text-[#A8A29E] dark:text-zinc-500">
+        <div className="flex items-center gap-0.5 pl-1 text-[#A8A29E] dark:text-zinc-500">
           <CopyButton text={text || reasoning || ""} />
           {canRegenerate && (
             <button
               onClick={() => void regenerate()}
-              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[length:var(--font-size-ui-sm)] transition-colors hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:hover:bg-[#2a2723] dark:hover:text-zinc-300"
+              className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:hover:bg-[#2a2723] dark:hover:text-zinc-300"
               title="重新生成"
             >
-              <RefreshCw className="h-3 w-3" />
-              <span>重改</span>
+              <RefreshCw className="h-3.5 w-3.5" />
             </button>
           )}
           {ts && (
-            <span className="text-[10px]">
+            <span className="pl-1 text-[10px]">
               {new Date(ts).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
             </span>
           )}
