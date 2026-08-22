@@ -31,7 +31,6 @@ import {
   XCircle,
   Wrench,
   Sparkles,
-  Folder,
   RefreshCw,
   PanelRight,
   ClipboardList,
@@ -96,7 +95,6 @@ import { toast } from "sonner";
 import { ZipDownloadBridge, ZipPickerModal } from "./zip-picker";
 import { PayloadInspector } from "./payload-inspector";
 import { TokenSheet } from "./token-sheet";
-import { Switch } from "@/components/ui/switch";
 import { FileTypeIcon } from "@/lib/file-icon";
 import { cn } from "@/lib/utils";
 import { planStats } from "@/lib/plan-utils";
@@ -104,6 +102,9 @@ import { matchModelRate, estimateCost, split80_20 } from "@/lib/cost";
 import { buildAuditReport, renderAuditMarkdown } from "@/lib/audit";
 import { downloadBlob } from "@/lib/download";
 import { CollapsibleText } from "./collapsible-text";
+
+/** DeepSeek 官方模型兜底：即使 /models 尚未拉取，也保证模型菜单能看到这几个。 */
+const DEEPSEEK_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-flash-vision-exp"];
 
 export function Terminal() {
   const events = useSession((s) => s.events);
@@ -122,6 +123,7 @@ export function Terminal() {
   const availableModels = useSession((s) => s.availableModels);
   const mode = useSession((s) => s.mode);
   const toggleMode = useSession((s) => s.toggleMode);
+  const setAgentPreset = useSession((s) => s.setAgentPreset);
   const streamingText = useSession((s) => s.streamingText);
   const streamingReasoning = useSession((s) => s.streamingReasoning);
   const send = useSession((s) => s.send);
@@ -141,9 +143,15 @@ export function Terminal() {
   // 模型切换下拉（header）
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
-  // header 可选的模型：provider 拉取的 + 当前模型（可能手动输入不在列表）
+  // 运行模式 / 执行模式 下拉
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  const modeMenuRef = useRef<HTMLDivElement>(null);
+  // header 可选的模型：provider 拉取的 + DeepSeek 兜底 + 当前模型（可能手动输入不在列表）
   const headerModelChoices = useMemo(
-    () => Array.from(new Set([...(availableModels ?? []), config.model].filter(Boolean))),
+    () =>
+      Array.from(
+        new Set([...DEEPSEEK_MODELS, ...(availableModels ?? []), config.model].filter(Boolean)),
+      ),
     [availableModels, config.model],
   );
   // @mention state
@@ -186,6 +194,18 @@ export function Terminal() {
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [modelMenuOpen]);
+
+  // 点击运行模式/执行模式下拉外部 → 关闭
+  useEffect(() => {
+    if (!modeMenuOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (modeMenuRef.current && !modeMenuRef.current.contains(e.target as Node)) {
+        setModeMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [modeMenuOpen]);
 
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -864,20 +884,6 @@ export function Terminal() {
               ))}
             </div>
           )}
-          {/* 顶行：工作区 + 命令/能力指示 */}
-          <div className="flex items-center justify-between text-[length:var(--font-size-ui-sm)] text-[#6B6862] dark:text-zinc-400">
-            <button
-              onClick={() => useVfsView.getState().setRightPanelTab("files")}
-              className="flex items-center gap-1.5 rounded px-1.5 py-1 transition-colors hover:bg-[#F0EDE5] dark:hover:bg-[#2a2723]"
-              title="文件袋（虚拟工作区）"
-            >
-              <Folder className="h-3.5 w-3.5 text-[#E8A87C]" />
-              <span className="font-medium">{config.workspaceName || "工作区"}</span>
-              <ChevronDown className="h-3 w-3" />
-            </button>
-            <Sparkles className="h-3.5 w-3.5 text-[#8B8884] dark:text-zinc-500" />
-          </div>
-          <div className="h-px w-full bg-[#E5E2D9] dark:bg-[#3a3731]" />
           {/* 中区：输入 */}
           <textarea
             ref={textareaRef}
@@ -905,46 +911,72 @@ export function Terminal() {
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               </button>
-              {/* 预设徽标 */}
-              {agentPreset && (
-                <span
-                  className="shrink-0 rounded-md px-2 py-1 text-[length:var(--font-size-ui-sm)] font-medium text-[#8B7355] dark:text-[#E8A87C]"
-                  title="运行模式（创建时锁定，切换需新建会话）"
+              {/* 运行模式 + 执行模式 下拉（向上弹出） */}
+              <div className="relative" ref={modeMenuRef}>
+                <button
+                  onClick={() => setModeMenuOpen((v) => !v)}
+                  className="flex items-center gap-1.5 rounded-md bg-[#F5F3EE] px-2.5 py-1 text-[length:var(--font-size-ui-sm)] font-medium text-[#8B7355] transition-colors hover:bg-[#F0EDE5] dark:bg-[#262320] dark:text-[#E8A87C] dark:hover:bg-[#2a2723]"
+                  title="运行模式（完整/精简/极简）+ 执行模式"
                 >
-                  {agentPreset === "minimal" ? "⚡ 极简" : agentPreset === "light" ? "✨ 精简" : "🟢 完整"}
-                </span>
-              )}
-              {/* 模式开关 */}
-              <div
-                className="flex items-center gap-1.5 rounded-full border border-[#E5E2D9] bg-[#F5F3EE] px-2.5 py-1 text-[length:var(--font-size-ui-sm)] font-medium dark:border-[#3a3731] dark:bg-[#262320]"
-                title="Shift+Tab to toggle"
-              >
-                <span
-                  className={cn(
-                    "transition-colors",
-                    mode === "bypass" ? "text-[#2D2B27] dark:text-zinc-100" : "text-[#8B8884] dark:text-zinc-500",
-                  )}
-                >
-                  ⚡ Bypass
-                </span>
-                <Switch
-                  checked={mode === "plan"}
-                  onCheckedChange={() => {
-                    const next = mode === "plan" ? "bypass" : "plan";
-                    toggleMode();
-                    toast(next === "plan" ? "已切换到 Plan 模式 — 只读" : "已切换到 Bypass 模式");
-                  }}
-                  className="scale-[0.85]"
-                  aria-label="Toggle Plan mode"
-                />
-                <span
-                  className={cn(
-                    "transition-colors",
-                    mode === "plan" ? "text-[#E58F67]" : "text-[#8B8884] dark:text-zinc-500",
-                  )}
-                >
-                  📋 Plan
-                </span>
+                  <Wrench className="h-3 w-3" />
+                  <span>{agentPreset === "minimal" ? "⚡ 极简" : agentPreset === "light" ? "✨ 精简" : "🟢 完整"}</span>
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+                {modeMenuOpen && (
+                  <div className="absolute bottom-full left-0 z-50 mb-1.5 w-56 overflow-hidden rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
+                    <div className="px-3 py-2 text-[length:var(--font-size-ui-sm)] font-medium text-[#6B6862] dark:text-zinc-400">
+                      运行模式
+                    </div>
+                    {([
+                      { id: "full" as const, label: "🟢 完整", desc: "全部工具 + 完整提示词" },
+                      { id: "light" as const, label: "✨ 精简", desc: "核心工具 + 精简提示词" },
+                      { id: "minimal" as const, label: "⚡ 极简", desc: "仅 4 工具 + 一句话" },
+                    ]).map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setAgentPreset(p.id);
+                          setModeMenuOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors",
+                          agentPreset === p.id
+                            ? "bg-[#E58F67]/10 text-[#E58F67]"
+                            : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
+                        )}
+                      >
+                        <span className="text-[length:var(--font-size-ui-sm)]">{p.label}</span>
+                        <span className="text-[10px] text-[#A8A29E] dark:text-zinc-500">{p.desc}</span>
+                        {agentPreset === p.id && <Check className="ml-auto h-3 w-3 shrink-0" />}
+                      </button>
+                    ))}
+                    <div className="border-t border-[#E5E2D9] px-3 py-2 text-[length:var(--font-size-ui-sm)] font-medium text-[#6B6862] dark:border-[#3a3731] dark:text-zinc-400">
+                      执行模式
+                    </div>
+                    {([
+                      { id: "bypass" as const, label: "完全访问", desc: "直接改文件" },
+                      { id: "plan" as const, label: "计划模式", desc: "改前先出计划" },
+                    ]).map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          if (mode !== m.id) toggleMode();
+                          setModeMenuOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors",
+                          mode === m.id
+                            ? "bg-[#E58F67]/10 text-[#E58F67]"
+                            : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
+                        )}
+                      >
+                        <span className="text-[length:var(--font-size-ui-sm)]">{m.label}</span>
+                        <span className="text-[10px] text-[#A8A29E] dark:text-zinc-500">{m.desc}</span>
+                        {mode === m.id && <Check className="ml-auto h-3 w-3 shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               {/* 模型选择器 */}
               {config.hasApiKey && (

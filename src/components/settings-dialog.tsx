@@ -686,22 +686,6 @@ export function SettingsDialog({
             </div>
           </div>
 
-          {/* ── 工作区名称（输入框上方工作区选择器显示） ── */}
-          <div className="mb-4 rounded border border-[#E5E2D9] px-4 py-3 dark:border-[#3a3731]">
-            <div className="text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
-              工作区名称
-            </div>
-            <input
-              value={config.workspaceName ?? ""}
-              onChange={(e) => setConfig({ workspaceName: e.target.value })}
-              placeholder="工作区"
-              className="mt-1.5 w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
-            />
-            <div className="mt-1.5 text-[11px] text-[#A8A29E] dark:text-zinc-600">
-              显示在输入框上方的项目/工作区名（例如你的仓库名）。留空则显示"工作区"。
-            </div>
-          </div>
-
           {/* ── DeepSeek account balance (provider-specific /user/balance) ── */}
           {isDeepSeek && (
             <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">

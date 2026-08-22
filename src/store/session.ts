@@ -206,8 +206,6 @@ export interface AiConfig {
   supportVision: boolean;
   /** 新建会话默认的运行模式（full/light/minimal）。会话创建时锁定。 */
   defaultPreset: AgentPreset;
-  /** 顶部工作区/项目名称（输入框工作区选择器显示，可在设置里改）。 */
-  workspaceName: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -256,7 +254,6 @@ const DEFAULT_CONFIG: AiConfig = {
   idleLockMinutes: 0,
   supportVision: true,
   defaultPreset: "full",
-  workspaceName: "工作区",
 };
 
 function loadConfig(): AiConfig {
@@ -369,8 +366,10 @@ interface SessionState {
   /** 从 provider /models 端点拉取到的可用模型列表（设置面板写入，主对话 header 切换器读取）。 */
   availableModels: string[];
   setAvailableModels: (models: string[]) => void;
-  /** 当前会话的运行模式（full/light/minimal）——创建时锁定，会话内不可改。 */
+  /** 当前会话的运行模式（full/light/minimal）。运行中可切换（下一次请求即用新提示词/工具集）。 */
   agentPreset: AgentPreset;
+  /** 运行中切换会话模式（更新 agentPreset 并持久化）。 */
+  setAgentPreset: (preset: AgentPreset) => void;
   /** Clear the current session's content but keep its entry. Alias of clearSession. */
   reset: () => void;
   clearSession: () => Promise<void>;
@@ -866,6 +865,11 @@ export const useSession = create<SessionState>((set, get) => ({
       pendingOverrideMessages: null,
     });
     await get().refreshSessionList();
+  },
+
+  setAgentPreset: (preset: AgentPreset) => {
+    set({ agentPreset: preset });
+    void flushPersist(get);
   },
 
   deleteSession: async (id: string) => {
