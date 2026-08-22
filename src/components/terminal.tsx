@@ -33,6 +33,7 @@ import {
   Sparkles,
   RefreshCw,
   PanelRight,
+  Shield,
   ClipboardList,
   ScrollText,
 } from "lucide-react";
@@ -146,6 +147,9 @@ export function Terminal() {
   // 运行模式 / 执行模式 下拉
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
   const modeMenuRef = useRef<HTMLDivElement>(null);
+  // 思考强度 下拉
+  const [effortMenuOpen, setEffortMenuOpen] = useState(false);
+  const effortMenuRef = useRef<HTMLDivElement>(null);
   // header 可选的模型：provider 拉取的 + DeepSeek 兜底 + 当前模型（可能手动输入不在列表）
   const headerModelChoices = useMemo(
     () =>
@@ -206,6 +210,18 @@ export function Terminal() {
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [modeMenuOpen]);
+
+  // 点击思考强度下拉外部 → 关闭
+  useEffect(() => {
+    if (!effortMenuOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (effortMenuRef.current && !effortMenuRef.current.contains(e.target as Node)) {
+        setEffortMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [effortMenuOpen]);
 
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -772,7 +788,9 @@ export function Terminal() {
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto px-4 py-3 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] [&::-webkit-scrollbar-track]:bg-transparent"
       >
-        {events.length === 0 && !streamingText && !streamingReasoning && (
+        {events.every((ev) => ev.kind !== "user" && ev.kind !== "assistant-message") &&
+          !streamingText &&
+          !streamingReasoning && (
           <EmptyState
             onUsePrompt={(t) => {
               setInput(t);
@@ -899,28 +917,28 @@ export function Terminal() {
             disabled={isStreaming || isCompacting}
             className="max-h-[200px] w-full resize-none bg-transparent text-[length:var(--font-size-base)] text-[#1A1815] placeholder:text-[#A8A29E] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
           />
-          {/* 底排：控制簇 + 发送 */}
+          {/* 底排：左 [+/模式]，右 [模型/思考/发送]（对齐参考图） */}
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex items-center gap-0.5">
               {/* 附件选择按钮 */}
               <button
                 onClick={() => attachInputRef.current?.click()}
                 disabled={isStreaming || isCompacting || uploading}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-[#8B8884] transition-colors hover:bg-[#F0EDE5] hover:text-[#E58F67] disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-[#E58F67]"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#A8A29E] transition-colors hover:bg-[#F0EDE5] hover:text-[#3D3B37] disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-300"
                 title={uploading ? "正在上传图片到 Files API…" : "上传文件（图片 / 文本，≤10MB）"}
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               </button>
-              {/* 运行模式 + 执行模式 下拉（向上弹出） */}
+              {/* 运行模式 + 执行模式 下拉：橙色盾牌（向上弹出） */}
               <div className="relative" ref={modeMenuRef}>
                 <button
                   onClick={() => setModeMenuOpen((v) => !v)}
-                  className="flex items-center gap-1.5 rounded-md bg-[#F5F3EE] px-2.5 py-1 text-[length:var(--font-size-ui-sm)] font-medium text-[#8B7355] transition-colors hover:bg-[#F0EDE5] dark:bg-[#262320] dark:text-[#E8A87C] dark:hover:bg-[#2a2723]"
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[length:var(--font-size-ui-sm)] font-medium text-zinc-300 transition-colors hover:bg-[#F0EDE5] dark:text-zinc-300 dark:hover:bg-[#2a2723]"
                   title="运行模式（完整/精简/极简）+ 执行模式"
                 >
-                  <Wrench className="h-3 w-3" />
-                  <span>{agentPreset === "minimal" ? "⚡ 极简" : agentPreset === "light" ? "✨ 精简" : "🟢 完整"}</span>
-                  <ChevronDown className="h-3 w-3" />
+                  <Shield className="h-3.5 w-3.5 text-[#E58F67]" />
+                  <span>{mode === "plan" ? "计划模式" : "完全访问"}</span>
+                  <ChevronDown className="h-3 w-3 text-[#8B8884]" />
                 </button>
                 {modeMenuOpen && (
                   <div className="absolute bottom-full left-0 z-50 mb-1.5 w-56 overflow-hidden rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
@@ -978,17 +996,18 @@ export function Terminal() {
                   </div>
                 )}
               </div>
+            </div>
+            <div className="flex items-center gap-0.5">
               {/* 模型选择器 */}
               {config.hasApiKey && (
                 <div className="relative" ref={modelMenuRef}>
                   <button
                     onClick={() => setModelMenuOpen((v) => !v)}
-                    className="flex max-w-[180px] items-center gap-1.5 rounded-md bg-[#F5F3EE] px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium text-[#8B7355] transition-colors hover:bg-[#F0EDE5] dark:bg-[#262320] dark:text-[#E8A87C] dark:hover:bg-[#2a2723]"
+                    className="flex max-w-[200px] items-center gap-1.5 rounded-lg px-2 py-1 text-[length:var(--font-size-ui-sm)] text-zinc-300 transition-colors hover:bg-[#F0EDE5] dark:text-zinc-300 dark:hover:bg-[#2a2723]"
                     title="切换模型"
                   >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#E58F67]" />
                     <span className="truncate">{config.model}</span>
-                    <ChevronDown className="h-3 w-3 shrink-0" />
+                    <ChevronDown className="h-3 w-3 shrink-0 text-[#8B8884]" />
                   </button>
                   {modelMenuOpen && (
                     <div className="absolute bottom-full left-0 z-50 mb-1.5 max-h-72 w-72 overflow-y-auto rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
@@ -1043,16 +1062,56 @@ export function Terminal() {
                   )}
                 </div>
               )}
+              {/* 思考强度 下拉 */}
+              <div className="relative" ref={effortMenuRef}>
+                <button
+                  onClick={() => setEffortMenuOpen((v) => !v)}
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[length:var(--font-size-ui-sm)] text-zinc-300 transition-colors hover:bg-[#F0EDE5] dark:text-zinc-300 dark:hover:bg-[#2a2723]"
+                  title="思考强度"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-[#8B8884]" />
+                  <span>{config.reasoningEffort === "max" || config.reasoningEffort === "xhigh" ? "最高" : config.reasoningEffort === "low" ? "低" : "高"}</span>
+                  <ChevronDown className="h-3 w-3 text-[#8B8884]" />
+                </button>
+                {effortMenuOpen && (
+                  <div className="absolute bottom-full left-0 z-50 mb-1.5 w-40 overflow-hidden rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
+                    {([
+                      { id: "low" as const, label: "低", desc: "更快，更省 token" },
+                      { id: "high" as const, label: "高", desc: "均衡" },
+                      { id: "xhigh" as const, label: "最高", desc: "更强推理" },
+                      { id: "max" as const, label: "最高+", desc: "最强推理" },
+                    ]).map((e) => (
+                      <button
+                        key={e.id}
+                        onClick={() => {
+                          setConfig({ reasoningEffort: e.id });
+                          setEffortMenuOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors",
+                          config.reasoningEffort === e.id
+                            ? "bg-[#E58F67]/10 text-[#E58F67]"
+                            : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
+                        )}
+                      >
+                        <span className="text-[length:var(--font-size-ui-sm)]">{e.label}</span>
+                        <span className="text-[10px] text-[#A8A29E] dark:text-zinc-500">{e.desc}</span>
+                        {config.reasoningEffort === e.id && <Check className="ml-auto h-3 w-3 shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* 发送 */}
+              <button
+                onClick={submit}
+                disabled={(!input.trim() && attachments.length === 0) || isStreaming || isCompacting}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-zinc-300 transition-all hover:bg-[#F0EDE5] hover:text-[#3D3B37] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-[#2a2723] dark:hover:text-zinc-100"
+                title="Send (Enter)"
+              >
+                <ArrowUp className="h-3.5 w-3.5" />
+              </button>
             </div>
-            {/* 发送 */}
-            <button
-              onClick={submit}
-              disabled={(!input.trim() && attachments.length === 0) || isStreaming || isCompacting}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#E88A5F] to-[#C96A45] text-white shadow-md shadow-[#E58F67]/30 transition-all hover:from-[#F09A70] hover:to-[#E58F67] hover:shadow-lg hover:shadow-[#E58F67]/40 active:scale-95 disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#D6D3CE] disabled:text-[#A8A29E] disabled:shadow-none dark:disabled:bg-[#3a3731]"
-              title="Send (Enter)"
-            >
-              <ArrowUp className="h-3.5 w-3.5" />
-            </button>
           </div>
           <input
             ref={attachInputRef}

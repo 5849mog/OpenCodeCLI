@@ -792,14 +792,7 @@ export const useSession = create<SessionState>((set, get) => ({
       sessionId: session.id,
       agentPreset: preset,
       title: "",
-      events: [
-        {
-          id: nextId(),
-          kind: "system",
-          text: "New session started. The workspace (文件袋) is unchanged.",
-          ts: Date.now(),
-        },
-      ],
+      events: [],
       messages: [],
       isStreaming: false,
       agentStatus: "",
@@ -834,16 +827,7 @@ export const useSession = create<SessionState>((set, get) => ({
       sessionId: id,
       title: rec?.title ?? "",
       messages: rec?.messages ?? [],
-      events: events.length
-        ? events
-        : [
-            {
-              id: nextId(),
-              kind: "system",
-              text: "Empty session — send a message to get started.",
-              ts: Date.now(),
-            },
-          ],
+      events,
       totalTokens: rec?.totalTokens ?? 0,
       lastUsage: rec?.lastUsage ?? null,
       compactedReleases: rec?.compactedReleases ?? 0,
