@@ -1947,21 +1947,24 @@ function StepCard({
   const Icon = path ? getFileIcon(path) : meta.icon;
 
   let metaText = "";
+  let statAdd = 0;
+  let statRem = 0;
   if (meta.kind === "terminal") {
     // 摘要不显示命令——命令只在点开后出现
     metaText = "";
   } else if ((meta.kind === "edit" || meta.kind === "write") && path) {
-    // 已编辑：先文件，再目录，再真实 +/-行数
+    // 已编辑：先文件，再目录，再真实 +/-行数（+N 绿 / -M 红）
     const base = path.split("/").pop() ?? path;
     const dir = path.includes("/") ? path.slice(0, path.lastIndexOf("/") + 1) : "";
-    let stat = "";
+    metaText = [base, dir].filter(Boolean).join(" ");
     if (diff) {
-      const rows = lineDiff(diff.before.split("\n"), diff.after.split("\n"));
-      const added = rows.filter((r) => r.type === "add").length;
-      const removed = rows.filter((r) => r.type === "del").length;
-      if (added > 0 || removed > 0) stat = `+${added} -${removed}`;
+      const rows = lineDiff(
+        diff.before.length === 0 ? [] : diff.before.split("\n"),
+        diff.after.split("\n"),
+      );
+      statAdd = rows.filter((r) => r.type === "add").length;
+      statRem = rows.filter((r) => r.type === "del").length;
     }
-    metaText = [base, dir, stat].filter(Boolean).join(" ");
   } else if (meta.kind === "explore") {
     // 探索收敛：N 文件（读文件）/ N 搜索（搜索类命令）
     const isSearch = name === "search_files" || name === "search_symbols";
@@ -1990,6 +1993,12 @@ function StepCard({
           {running ? meta.running : meta.done}
         </span>
         {metaText && <span className="min-w-0 truncate font-mono text-[#A8A29E]">{metaText}</span>}
+        {(statAdd > 0 || statRem > 0) && (
+          <span className="shrink-0 font-mono text-[10px]">
+            <span className="text-emerald-400">+{statAdd}</span>{" "}
+            <span className="text-red-400">-{statRem}</span>
+          </span>
+        )}
         {running && (
           <span className="ml-auto flex gap-0.5">
             <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "0ms" }} />
@@ -2628,7 +2637,8 @@ function SystemRow({ text }: { text: string }) {
 // ---------------------------------------------------------------------------
 
 function DiffView({ before, after }: { before: string; after: string }) {
-  const beforeLines = before.split("\n");
+  // 新文件（before 为空）：不要显示"幽灵空行删除"，只显示新增行。
+  const beforeLines = before.length === 0 ? [] : before.split("\n");
   const afterLines = after.split("\n");
   const diff = lineDiff(beforeLines, afterLines);
 
