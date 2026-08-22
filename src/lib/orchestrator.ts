@@ -25,6 +25,8 @@ export interface OrchestratorOptions {
   signal?: AbortSignal;
   onStatus?: (status: string) => void;
   onUsage?: (usage: TokenUsage) => void;
+  /** 继承主代理运行模式（full/light/minimal）——子代理工具集/提示词一致。 */
+  preset?: "full" | "light" | "minimal";
 }
 
 export interface SubTaskResult {
@@ -56,6 +58,7 @@ export async function orchestrateTask(
     signal,
     onStatus,
     onUsage,
+    preset,
   } = opts;
 
   onStatus?.("Decomposing task…");
@@ -70,6 +73,7 @@ export async function orchestrateTask(
       maxIterations: subAgentMaxIterations * 2,
       signal,
       onUsage,
+      preset,
     });
     const singleResult: SubTaskResult = {
       description: task,
@@ -95,6 +99,7 @@ export async function orchestrateTask(
     signal,
     onStatus,
     onUsage,
+    preset,
   );
 
   // 3. Synthesize
@@ -186,6 +191,7 @@ async function executeSubTasks(
   signal?: AbortSignal,
   onStatus?: (status: string) => void,
   onUsage?: (usage: TokenUsage) => void,
+  preset?: "full" | "light" | "minimal",
 ): Promise<SubTaskResult[]> {
   const total = subTasks.length;
   const completed = new Array(total).fill(false);
@@ -210,6 +216,7 @@ async function executeSubTasks(
           signal,
           onStatus: (s) => onStatus?.(`子任务 ${index + 1}/${total}: ${description.slice(0, 30)} → ${s}`),
           onUsage,
+          preset,
         });
         completed[index] = true;
         const doneCount = completed.filter(Boolean).length;

@@ -115,6 +115,7 @@ export function Terminal() {
   const lastUsage = useSession((s) => s.lastUsage);
   const config = useSession((s) => s.config);
   const setConfig = useSession((s) => s.setConfig);
+  const agentPreset = useSession((s) => s.agentPreset);
   const availableModels = useSession((s) => s.availableModels);
   const mode = useSession((s) => s.mode);
   const toggleMode = useSession((s) => s.toggleMode);
@@ -720,6 +721,14 @@ export function Terminal() {
                 </div>
               )}
             </div>
+          )}
+          {agentPreset && agentPreset !== "full" && (
+            <span
+              className="shrink-0 rounded-md px-2 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium"
+              title="运行模式（创建时锁定，切换需新建会话）"
+            >
+              {agentPreset === "minimal" ? "⚡ 极简" : "✨ 精简"}
+            </span>
           )}
         </div>
         <div className="flex items-center gap-2">

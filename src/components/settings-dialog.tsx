@@ -640,6 +640,51 @@ export function SettingsDialog({
             </label>
           </div>
 
+          {/* 运行模式（新会话默认，会话创建时锁定） */}
+          <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+              运行模式 · 新会话默认
+            </div>
+            <div className="flex flex-col gap-2">
+              {(
+                [
+                  {
+                    id: "full",
+                    name: "完整模式",
+                    desc: "全部工具 + 完整提示词（含探索/成本/说教指南）。功能最全，固定开销 ~26K tokens。",
+                  },
+                  {
+                    id: "light",
+                    name: "精简模式",
+                    desc: "核心开发工具集 + 精简提示词（保留安全边界与失败协议，去掉说教段）。固定开销 ~10K tokens。",
+                  },
+                  {
+                    id: "minimal",
+                    name: "极简模式",
+                    desc: "仅 bash + read_file + edit_file + glob + 一句话 persona（对标 DeepSeek Harness 极简模式）。固定开销 ~2K tokens。",
+                  },
+                ] as const
+              ).map((p) => (
+                <label key={p.id} className="flex cursor-pointer items-start gap-2.5 rounded border border-[#E5E2D9] px-3 py-2 dark:border-[#3a3731]">
+                  <input
+                    type="radio"
+                    name="agentPreset"
+                    checked={config.defaultPreset === p.id}
+                    onChange={() => setConfig({ defaultPreset: p.id })}
+                    className="mt-0.5 h-3.5 w-3.5 accent-[#E58F67]"
+                  />
+                  <span>
+                    <span className="block text-sm text-[#2D2B27] dark:text-zinc-100">{p.name}</span>
+                    <span className="block text-[10px] text-[#8B8884] dark:text-zinc-500">{p.desc}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="mt-1.5 text-[11px] text-[#A8A29E] dark:text-zinc-600">
+              该模式在新建会话时锁定，会话内不可切换（保证提示词前缀稳定，持续命中 API 前缀缓存）。切换需新建会话。
+            </div>
+          </div>
+
           {/* ── DeepSeek account balance (provider-specific /user/balance) ── */}
           {isDeepSeek && (
             <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">

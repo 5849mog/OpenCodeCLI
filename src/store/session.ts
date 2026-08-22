@@ -22,9 +22,10 @@ import {
   type TokenUsage,
 } from "@/lib/ai-client";
 import {
-  TOOL_DEFINITIONS,
   dispatchTool,
   buildSystemPrompt,
+  filterToolsByPreset,
+  type AgentPreset,
   type ToolResult,
 } from "@/lib/tools/index";
 import { buildWorkspaceContext } from "@/lib/tools/system-prompt";
@@ -203,6 +204,8 @@ export interface AiConfig {
   /** 当前模型是否支持视觉输入（图片）。支持时用户上传的图片会作为
    *  ContentPart 传入；不支持时带图发送会记 error 提示（后端会 400）。 */
   supportVision: boolean;
+  /** 新建会话默认的运行模式（full/light/minimal）。会话创建时锁定。 */
+  defaultPreset: AgentPreset;
 }
 
 // ---------------------------------------------------------------------------
@@ -250,6 +253,7 @@ const DEFAULT_CONFIG: AiConfig = {
   corsProxyUrl: "",
   idleLockMinutes: 0,
   supportVision: true,
+  defaultPreset: "full",
 };
 
 function loadConfig(): AiConfig {
@@ -362,9 +366,12 @@ interface SessionState {
   /** 从 provider /models 端点拉取到的可用模型列表（设置面板写入，主对话 header 切换器读取）。 */
   availableModels: string[];
   setAvailableModels: (models: string[]) => void;
+  /** 当前会话的运行模式（full/light/minimal）——创建时锁定，会话内不可改。 */
+  agentPreset: AgentPreset;
   /** Clear the current session's content but keep its entry. Alias of clearSession. */
   reset: () => void;
   clearSession: () => Promise<void>;
+  /** 新建会话时指定运行模式（从设置面板的"新会话默认"读取）。 */
   newSession: () => Promise<void>;
   switchSession: (id: string) => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
@@ -663,6 +670,7 @@ export const useSession = create<SessionState>((set, get) => ({
   setPendingOverrideMessages: (msgs) => set({ pendingOverrideMessages: msgs }),
   availableModels: [],
   setAvailableModels: (models) => set({ availableModels: models }),
+  agentPreset: "full",
 
   init: () => {
     const cfg = loadConfig();
@@ -772,10 +780,12 @@ export const useSession = create<SessionState>((set, get) => ({
   newSession: async () => {
     get().abort();
     await flushPersist(get);
-    const session = await createSession();
+    const preset = get().config.defaultPreset ?? "full";
+    const session = await createSession(undefined, preset);
     setActiveSessionId(session.id);
     set({
       sessionId: session.id,
+      agentPreset: preset,
       title: "",
       events: [
         {
@@ -836,6 +846,7 @@ export const useSession = create<SessionState>((set, get) => ({
       lastCompactMsgCount: rec?.messages?.length ?? 0,
       usageHistory: rec?.usageHistory ?? [],
       vfsChangeLog: rec?.vfsChangeLog ?? [],
+      agentPreset: rec?.agentPreset ?? "full",
       isStreaming: false,
       agentStatus: "",
       streamingText: null,
@@ -1056,11 +1067,17 @@ async function runAgentLoop(
   set({ agentMaxIterations: 0 });
 
   // Build static system prompt once. This NEVER changes between iterations
-  // (customInstructions is user-controlled and rarely changes), ensuring the
-  // prompt prefix is stable for API caching.
+  // (customInstructions is user-controlled and rarely changes; agentPreset is
+  // locked at session creation), ensuring the prompt prefix is stable for API
+  // caching.
+  const preset = get().agentPreset ?? "full";
   const STATIC_SYSTEM_PROMPT = buildSystemPrompt({
+    preset,
     customInstructions: config.customInstructions,
   });
+  // 按运行模式过滤模型可见的工具集（full=全部；light/minimal=白名单子集）。
+  // dispatch 层仍注册全部工具——被过滤的模型看不到就不会调用。
+  const ACTIVE_TOOLS = filterToolsByPreset(preset);
 
   let iter = 0;
   while (true) {
@@ -1161,7 +1178,7 @@ async function runAgentLoop(
       const result = await streamChatCompletionWithRetry(
         aiConfig,
         messagesForAI,
-        TOOL_DEFINITIONS,
+        ACTIVE_TOOLS,
         {
           onText: (delta) => {
             if (!firstTokenReceived) {
@@ -1470,6 +1487,7 @@ async function executeToolCall(
           },
           // 继承主循环模式：Plan 模式下子代理也只读（堵住绕过只读的漏洞）
           mode: get().mode,
+          preset: get().agentPreset,
           signal,
         });
         // 撞迭代上限也是正常结果（部分完成），不标记失败——主代理从
@@ -1529,6 +1547,7 @@ async function executeToolCall(
               recordUsage(set, usage, "orchestrator");
             },
             signal,
+            preset: get().agentPreset,
           });
           result = {
             ok: true,

@@ -41,6 +41,8 @@ export interface PersistedSession {
   events: SessionEvent[];
   totalTokens: number;
   lastUsage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null;
+  /** 运行模式（full/light/minimal）——会话创建时锁定，切换需新建会话。 */
+  agentPreset?: "full" | "light" | "minimal";
   /** Cumulative tokens released by compaction (for the compression-aware panel). */
   compactedReleases?: number;
   /** Number of successful /compact runs. */
@@ -157,8 +159,11 @@ async function pruneOldestSessions(): Promise<void> {
   }
 }
 
-/** Create a fresh (empty) persisted session. */
-export async function createSession(title = "新会话"): Promise<PersistedSession> {
+/** Create a fresh (empty) persisted session. preset 创建时锁定。 */
+export async function createSession(
+  title = "新会话",
+  agentPreset: "full" | "light" | "minimal" = "full",
+): Promise<PersistedSession> {
   const now = Date.now();
   return {
     id: uuid(),
@@ -167,6 +172,7 @@ export async function createSession(title = "新会话"): Promise<PersistedSessi
     events: [],
     totalTokens: 0,
     lastUsage: null,
+    agentPreset,
     usageHistory: [],
     vfsChangeLog: [],
     createdAt: now,

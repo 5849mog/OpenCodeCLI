@@ -23,6 +23,7 @@ import {
   TOOL_DEFINITIONS,
   dispatchTool,
   buildSystemPrompt,
+  PRESET_TOOLS,
   type ToolResult,
 } from "./tools/index";
 import { buildWorkspaceContext } from "./tools/system-prompt";
@@ -31,12 +32,19 @@ import { truncateConversation, DEFAULT_TOKEN_BUDGET } from "./context";
 /** 子代理不允许再委派子代理（dispatch.ts 无 dispatch_subagent/orchestrate_task
  *  分支，调用必失败）——工具集直接剔除，避免诱导模型调用后吃到 "Unknown tool"。
  *  ask_user_input 同样剔除：子代理侧没有用户，禁止弹提问面板（Rule 7）。 */
-const SUBAGENT_TOOLS = TOOL_DEFINITIONS.filter(
-  (t) =>
-    t.function.name !== "dispatch_subagent" &&
-    t.function.name !== "orchestrate_task" &&
-    t.function.name !== "ask_user_input",
-);
+const SUBAGENT_EXCLUDED = new Set([
+  "dispatch_subagent",
+  "orchestrate_task",
+  "ask_user_input",
+]);
+
+/** 子代理工具集 = 主代理 preset 白名单 ∩ 剔除委派/提问工具。 */
+function subagentTools(preset: "full" | "light" | "minimal") {
+  const allowed = new Set(PRESET_TOOLS[preset]);
+  return TOOL_DEFINITIONS.filter(
+    (t) => allowed.has(t.function.name) && !SUBAGENT_EXCLUDED.has(t.function.name),
+  );
+}
 
 /** 每请求超时（与主循环 PER_REQUEST_TIMEOUT_MS 一致）——子代理卡死不能无声无息。 */
 const PER_REQUEST_TIMEOUT_MS = 300_000;
@@ -57,6 +65,8 @@ export interface SubagentOptions {
   /** 继承主循环模式："plan" 时子代理只读（workspace context 与 dispatchTool readOnly
    *  都按此 mode）——堵住「Plan 模式派子代理绕过只读」的漏洞。 */
   mode?: "plan" | "bypass";
+  /** 继承主代理的运行模式（full/light/minimal）——决定子代理的工具集与提示词。 */
+  preset?: "full" | "light" | "minimal";
 }
 
 export interface SubagentResult {
@@ -91,8 +101,10 @@ export async function runSubagent(
 
   // Build the subagent's conversation: static system prompt + workspace
   // context (cache-friendly) + task description. mode 继承主循环：
-  // Plan 模式下子代理也只读。
-  const systemPrompt = buildSystemPrompt({});
+  // Plan 模式下子代理也只读。preset 继承主代理（工具集与提示词一致）。
+  const preset = opts.preset ?? "full";
+  const systemPrompt = buildSystemPrompt({ preset });
+  const activeTools = subagentTools(preset);
   const contextBlock = buildWorkspaceContext({ mode: opts.mode ?? "bypass" });
   // NOTE: index 0 = system prompt, index 1 = workspace context block.
   // truncateConversation below protects both by index — keep this order.
@@ -149,7 +161,7 @@ ${opts.task}
       result = await streamChatCompletionWithRetry(
         aiConfig,
         messages,
-        SUBAGENT_TOOLS,
+        activeTools,
         {
           onText: (delta) => {
             lastText += delta;
