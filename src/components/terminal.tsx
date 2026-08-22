@@ -870,8 +870,8 @@ export function Terminal() {
       </div>
 
       {/* Input */}
-      {/* Input area — modern: soft glass panel, focus glow, gradient send */}
-      <div className="border-t border-[#E5E2D9] bg-gradient-to-b from-[#FFFFFF] to-[#FAF9F7] px-4 py-3 dark:border-[#3a3731] dark:from-[#161512] dark:to-[#121110]">
+      {/* Input area — 输入框与暗色背景融为一体（不再是独立渐变条） */}
+      <div className="px-4 py-3">
         <div className="group relative flex flex-col gap-2 rounded-2xl border border-[#E5E2D9] bg-[#FAF9F7]/80 p-3 shadow-sm backdrop-blur transition-all duration-200 focus-within:border-[#E58F67]/60 focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.08),0_4px_20px_rgba(0,0,0,0.06)] dark:border-[#3a3731] dark:bg-[#1c1a17]/70 dark:shadow-none dark:focus-within:border-[#E58F67]/50 dark:focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.12),0_8px_30px_rgba(0,0,0,0.4)]">
           {/* 附件 chips（命令框上方） */}
           {attachments.length > 0 && (
@@ -1066,7 +1066,7 @@ export function Terminal() {
                   )}
                 </div>
               )}
-              {/* 思考强度 下拉 */}
+              {/* 思考强度 下拉：关闭 / 低 / 高 / 超高 */}
               <div className="relative" ref={effortMenuRef}>
                 <button
                   onClick={() => setEffortMenuOpen((v) => !v)}
@@ -1074,35 +1074,50 @@ export function Terminal() {
                   title="思考强度"
                 >
                   <Sparkles className="h-3.5 w-3.5 text-[#8B8884]" />
-                  <span>{config.reasoningEffort === "max" || config.reasoningEffort === "xhigh" ? "最高" : config.reasoningEffort === "low" ? "低" : "高"}</span>
+                  <span>
+                    {!config.thinkingEnabled
+                      ? "关闭"
+                      : config.reasoningEffort === "low"
+                        ? "低"
+                        : config.reasoningEffort === "max"
+                          ? "超高"
+                          : "高"}
+                  </span>
                   <ChevronDown className="h-3 w-3 text-[#8B8884]" />
                 </button>
                 {effortMenuOpen && (
-                  <div className="absolute bottom-full left-0 z-50 mb-1.5 w-40 overflow-hidden rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
+                  <div className="absolute bottom-full left-0 z-50 mb-1.5 w-44 overflow-hidden rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
                     {([
+                      { id: "off" as const, label: "关闭", desc: "不启用思考" },
                       { id: "low" as const, label: "低", desc: "更快，更省 token" },
                       { id: "high" as const, label: "高", desc: "均衡" },
-                      { id: "xhigh" as const, label: "最高", desc: "更强推理" },
-                      { id: "max" as const, label: "最高+", desc: "最强推理" },
-                    ]).map((e) => (
-                      <button
-                        key={e.id}
-                        onClick={() => {
-                          setConfig({ reasoningEffort: e.id });
-                          setEffortMenuOpen(false);
-                        }}
-                        className={cn(
-                          "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors",
-                          config.reasoningEffort === e.id
-                            ? "bg-[#E58F67]/10 text-[#E58F67]"
-                            : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
-                        )}
-                      >
-                        <span className="text-[length:var(--font-size-ui-sm)]">{e.label}</span>
-                        <span className="text-[10px] text-[#A8A29E] dark:text-zinc-500">{e.desc}</span>
-                        {config.reasoningEffort === e.id && <Check className="ml-auto h-3 w-3 shrink-0" />}
-                      </button>
-                    ))}
+                      { id: "max" as const, label: "超高", desc: "最强推理" },
+                    ]).map((e) => {
+                      const selected =
+                        e.id === "off"
+                          ? !config.thinkingEnabled
+                          : config.thinkingEnabled && config.reasoningEffort === e.id;
+                      return (
+                        <button
+                          key={e.id}
+                          onClick={() => {
+                            if (e.id === "off") setConfig({ thinkingEnabled: false });
+                            else setConfig({ thinkingEnabled: true, reasoningEffort: e.id });
+                            setEffortMenuOpen(false);
+                          }}
+                          className={cn(
+                            "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors",
+                            selected
+                              ? "bg-[#E58F67]/10 text-[#E58F67]"
+                              : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
+                          )}
+                        >
+                          <span className="text-[length:var(--font-size-ui-sm)]">{e.label}</span>
+                          <span className="text-[10px] text-[#A8A29E] dark:text-zinc-500">{e.desc}</span>
+                          {selected && <Check className="ml-auto h-3 w-3 shrink-0" />}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1836,16 +1851,17 @@ function ThinkingStep({ text, streaming }: { text: string; streaming: boolean })
       initial={{ opacity: 0, y: 2 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="overflow-hidden rounded-lg border border-[#E58F67]/25 bg-[#E58F67]/5 dark:border-[#E58F67]/25"
     >
       <button
         onClick={() => !streaming && setCollapsed((c) => !c)}
         disabled={streaming}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-[#8B7355] disabled:cursor-default dark:text-[#E8A87C]"
+        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-white/5 disabled:cursor-default dark:hover:bg-white/5"
       >
-        <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform", !collapsed && "rotate-90")} />
-        <Brain className="h-3.5 w-3.5 text-[#E58F67]/80" />
-        <span className="font-medium">{streaming ? "思考中" : "思考过程"}</span>
+        <ChevronRight className={cn("h-3 w-3 shrink-0 text-[#8B8884] transition-transform", !collapsed && "rotate-90")} />
+        <Brain className={cn("h-3.5 w-3.5 shrink-0", streaming ? "text-[#E58F67]" : "text-[#A8A29E]")} />
+        <span className={cn("shrink-0 font-medium", streaming ? "text-shimmer" : "text-[#8B8884]")}>
+          {streaming ? "思考中" : "思考过程"}
+        </span>
         {streaming && (
           <span className="flex gap-0.5 pl-1">
             <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "0ms" }} />
@@ -1854,11 +1870,11 @@ function ThinkingStep({ text, streaming }: { text: string; streaming: boolean })
           </span>
         )}
         {!streaming && collapsed && <span className="min-w-0 truncate pl-1 text-[#A8A29E]">{preview}</span>}
-        {!streaming && <span className="ml-auto text-[#A8A29E]">{collapsed ? "展开" : "收起"}</span>}
+        {!streaming && <span className="ml-auto text-[#8B8884]">{collapsed ? "展开" : "收起"}</span>}
       </button>
       {(!collapsed || streaming) && (
         <pre
-          className="max-h-64 overflow-auto whitespace-pre-wrap break-words px-3 pb-2.5 pt-0.5 font-mono text-xs leading-relaxed text-[#6B6862] dark:text-zinc-400 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#3a3731]"
+          className="ml-6 mb-1 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-[#3a3731] bg-[#161512] px-3 py-2.5 font-mono text-xs leading-relaxed text-[#A8A29E] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#3a3731]"
           style={{ opacity: isStale ? 0.9 : 1 }}
         >
           {shown}
@@ -1901,16 +1917,15 @@ function StepCard({
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="overflow-hidden rounded-lg border border-[#E5E2D9] bg-[#FFFFFF]/50 dark:border-[#3a3731] dark:bg-[#1c1a17]/60"
     >
       <button
         onClick={() => !running && setCollapsed((c) => !c)}
         disabled={running}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs disabled:cursor-default"
+        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-white/5 disabled:cursor-default dark:hover:bg-white/5"
       >
         <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 text-[#8B8884] transition-transform", expanded && "rotate-90")} />
-        <Icon className="h-3.5 w-3.5 shrink-0 text-[#E58F67]" />
-        <span className={cn("shrink-0 font-medium", running ? "text-[#E58F67]" : "text-zinc-200")}>
+        <Icon className={cn("h-3.5 w-3.5 shrink-0", running ? "text-[#E58F67]" : "text-[#A8A29E]")} />
+        <span className={cn("shrink-0 font-medium", running ? "text-shimmer" : "text-[#8B8884]")}>
           {running ? meta.running : meta.done}
         </span>
         {metaText && <span className="min-w-0 truncate font-mono text-[#A8A29E]">{metaText}</span>}
@@ -1921,29 +1936,29 @@ function StepCard({
             <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "240ms" }} />
           </span>
         )}
-        {!running && <span className="ml-auto text-[#A8A29E]">{expanded ? "收起" : "展开"}</span>}
+        {!running && <span className="ml-auto text-[#8B8884]">{expanded ? "收起" : "展开"}</span>}
       </button>
       {expanded && (
-        <div className="border-t border-[#E5E2D9] px-3 py-2 dark:border-[#3a3731]">
+        <div className="ml-6 mb-1 overflow-hidden rounded-lg border border-[#3a3731] bg-[#161512]">
           {running ? (
-            <div className="space-y-0.5 text-[#6B6862] dark:text-zinc-400">
+            <div className="space-y-0.5 px-3 py-2 text-xs">
               {Object.entries(args).slice(0, 6).map(([k, v]) => (
                 <div key={k} className="flex gap-2">
-                  <span className="shrink-0 text-[#8B8884] dark:text-zinc-500">{k}:</span>
-                  <span className="break-all text-[#3D3B37] dark:text-zinc-300">{formatArgValue(v)}</span>
+                  <span className="shrink-0 text-[#8B8884]">{k}:</span>
+                  <span className="break-all text-[#A8A29E]">{formatArgValue(v)}</span>
                 </div>
               ))}
             </div>
           ) : result?.plan ? (
-            <div className="text-xs text-[#A8A29E] dark:text-zinc-500">计划已更新 · 可在右侧 Plan 面板查看</div>
+            <div className="px-3 py-2 text-xs text-[#A8A29E]">计划已更新 · 可在右侧 Plan 面板查看</div>
           ) : diff ? (
             <DiffView before={diff.before} after={diff.after} />
           ) : output ? (
-            <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-[#6B6862] dark:text-zinc-400 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+            <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-xs leading-relaxed text-[#A8A29E] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
               {output}
             </pre>
           ) : (
-            <div className="text-xs text-[#A8A29E] dark:text-zinc-500">{ok ? "完成" : "失败"}</div>
+            <div className="px-3 py-2 text-xs text-[#A8A29E]">{ok ? "完成" : "失败"}</div>
           )}
         </div>
       )}
@@ -2049,7 +2064,7 @@ function AssistantRow({
         className="min-w-0 break-words rounded-2xl rounded-tl-md border border-[#E5E2D9] bg-[#FAF9F7]/60 px-4 py-2.5 text-[#2D2B27] dark:border-[#3a3731] dark:bg-[#1c1a17]/60 dark:text-zinc-100"
         style={{ opacity: isStale ? 0.95 : 1 }}
       >
-        {showReasoning && <ThinkingBlock text={reasoning!} streaming={streaming} />}
+        {showReasoning && <ThinkingStep text={reasoning!} streaming={streaming} />}
         {text && <MarkdownRenderer text={streaming ? deferredText : text} />}
         {streaming && (
           <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-emerald-400 align-middle dark:bg-[#34d399]" />
