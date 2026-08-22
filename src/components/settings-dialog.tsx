@@ -6,10 +6,11 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { X, Settings, Eye, EyeOff, Zap, Download, Upload, Lock, RefreshCw } from "lucide-react";
+import { X, Settings, Eye, EyeOff, Zap, Download, Upload, Lock, RefreshCw, Trash2, FileText, Loader2 } from "lucide-react";
 import { useSession } from "@/store/session";
 import { fetchModels, fetchBalance, type BalanceResult } from "@/lib/ai-client";
 import { apiKeyVault } from "@/lib/api-key-vault";
+import { listDeepSeekFiles, deleteDeepSeekFile, type DeepSeekFileInfo } from "@/lib/files-api";
 import {
   loadAllSessions,
   saveSession,
@@ -99,6 +100,12 @@ export function SettingsDialog({
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
 
+  // ── DeepSeek Files API 管理 ──
+  const [files, setFiles] = useState<DeepSeekFileInfo[] | null>(null);
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [filesError, setFilesError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   // The /user/balance endpoint is DeepSeek-specific — only surface the card
   // when the configured base URL points at deepseek.com.
   let isDeepSeek = false;
@@ -125,10 +132,64 @@ export function SettingsDialog({
     }
   };
 
+  const loadFiles = async () => {
+    const key = apiKeyVault.getKey();
+    if (!key) {
+      setFilesError("未配置 LLM API Key，无法读取 Files API 文件");
+      setFiles(null);
+      return;
+    }
+    setFilesLoading(true);
+    setFilesError(null);
+    try {
+      const res = await listDeepSeekFiles(config.baseUrl, key);
+      if (res.ok) {
+        setFiles(res.files ?? []);
+      } else {
+        setFilesError(res.error ?? "读取文件列表失败");
+        setFiles(null);
+      }
+    } finally {
+      setFilesLoading(false);
+    }
+  };
+
+  const deleteFile = async (fileId: string) => {
+    const key = apiKeyVault.getKey();
+    if (!key) return;
+    setDeletingId(fileId);
+    setFilesError(null);
+    try {
+      const res = await deleteDeepSeekFile(config.baseUrl, key, fileId);
+      if (res.ok) {
+        setFiles((prev) => (prev ? prev.filter((f) => f.id !== fileId) : prev));
+        toast.success(`已删除 ${fileId}`);
+      } else {
+        setFilesError(res.error ?? "删除失败");
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const clearAllFiles = async () => {
+    if (!files || files.length === 0) return;
+    if (!confirm(`确定要删除全部 ${files.length} 个已上传文件吗？此操作不可撤销。`)) return;
+    const key = apiKeyVault.getKey();
+    if (!key) return;
+    setFilesError(null);
+    for (const f of [...files]) {
+      await deleteDeepSeekFile(config.baseUrl, key, f.id);
+    }
+    setFiles([]);
+    toast.success("已清空 Files API 文件");
+  };
+
   // Auto-query balance when the dialog opens for a DeepSeek base URL.
   useEffect(() => {
     if (open && isDeepSeek && apiKeyVault.getKey()) {
       void queryBalance();
+      void loadFiles();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, config.baseUrl]);
@@ -552,6 +613,76 @@ export function SettingsDialog({
               ) : (
                 <div className="text-xs text-[#A8A29E] dark:text-zinc-500">正在查询…</div>
               )}
+            </div>
+          )}
+
+          {/* ── DeepSeek Files API 管理（图片上传占用的云端文件） ── */}
+          {isDeepSeek && (
+            <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+                  DeepSeek · Files API 文件
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {files && files.length > 0 && (
+                    <button
+                      onClick={() => void clearAllFiles()}
+                      disabled={filesLoading}
+                      className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-2 py-1 text-[11px] text-[#E54D2E] hover:bg-[#E54D2E]/10 disabled:opacity-40 dark:border-[#3a3731]"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      清空
+                    </button>
+                  )}
+                  <button
+                    onClick={() => void loadFiles()}
+                    disabled={filesLoading}
+                    className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-2 py-1 text-[11px] text-[#3D3B37] hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:text-zinc-300 dark:hover:bg-[#2a2723] disabled:opacity-40"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${filesLoading ? "animate-spin" : ""}`} />
+                    {filesLoading ? "读取中…" : "刷新"}
+                  </button>
+                </div>
+              </div>
+              {filesError ? (
+                <div className="text-xs text-[#E54D2E]">{filesError}</div>
+              ) : files === null ? (
+                <div className="text-xs text-[#A8A29E] dark:text-zinc-500">正在读取…</div>
+              ) : files.length === 0 ? (
+                <div className="text-xs text-[#A8A29E] dark:text-zinc-500">暂无已上传文件</div>
+              ) : (
+                <div className="max-h-48 space-y-1 overflow-y-auto">
+                  {files.map((f) => (
+                    <div key={f.id} className="flex items-center gap-2 text-xs">
+                      <FileText className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
+                      <span className="min-w-0 flex-1 truncate font-mono" title={`${f.id} · ${f.filename}`}>
+                        {f.filename}
+                      </span>
+                      <span className="shrink-0 text-[#A8A29E] dark:text-zinc-500">
+                        {(f.bytes / 1024).toFixed(1)} KB
+                      </span>
+                      <span className="shrink-0 text-[10px] text-[#A8A29E] dark:text-zinc-600">
+                        {new Date(f.created_at * 1000).toLocaleDateString()}
+                      </span>
+                      <button
+                        onClick={() => void deleteFile(f.id)}
+                        disabled={deletingId === f.id}
+                        className="shrink-0 rounded p-1 text-[#A8A29E] hover:bg-[#E54D2E]/10 hover:text-[#E54D2E] disabled:opacity-40"
+                        title={`删除 ${f.filename}（${f.id}）`}
+                      >
+                        {deletingId === f.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-2 text-[10px] text-[#A8A29E] dark:text-zinc-600">
+                上传的图片文件永久保存在你的 DeepSeek 账户（25 GiB 配额）。删除可释放空间。
+              </div>
             </div>
           )}
 
