@@ -825,14 +825,9 @@ export function Terminal() {
               preview line. The full text stops scrolling in front of the user;
               once done, events take over and it becomes either a TurnBlock
               (process) or a full assistant message (the answer). */}
-          {(streamingText?.text || streamingReasoning?.text) && (
-            <StreamingBubble
-              text={streamingText?.text ?? ""}
-              reasoning={streamingReasoning?.text ?? ""}
-            />
-          )}
-          {(isStreaming || isCompacting) && (
-            <AgentStatusRow status={agentStatus} />
+          {/* 流式输出直接以最终正文形态逐字渲染（不再用"正在分析"占位） */}
+          {streamingText?.text && (
+            <AssistantRow text={streamingText.text} streaming={true} />
           )}
         </div>
 
