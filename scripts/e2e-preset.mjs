@@ -70,9 +70,12 @@ console.log("\n== preset (full/light/minimal) e2e ==");
 {
   const minimal = filterToolsByPreset("minimal");
   const minimalNames = minimal.map((t) => t.function.name).sort();
-  assert(minimal.length === 4, `minimal 恰好 4 工具（实际 ${minimal.length}）`);
-  assert(JSON.stringify(minimalNames) === JSON.stringify(["bash", "edit_file", "glob", "read_file"]),
-    `minimal 工具集 = bash/edit_file/glob/read_file（实际 ${minimalNames.join(",")}）`);
+  assert(minimal.length === 6, `minimal 恰好 6 工具（实际 ${minimal.length}）`);
+  assert(
+    JSON.stringify(minimalNames) ===
+      JSON.stringify(["bash", "edit_file", "glob", "read_file", "run_js", "run_lua"]),
+    `minimal 工具集 = bash/edit_file/glob/read_file/run_lua/run_js（实际 ${minimalNames.join(",")}）`,
+  );
 
   const light = filterToolsByPreset("light");
   assert(light.length > 4 && light.length < 44, `light 工具数介于 4~44（实际 ${light.length}）`);
