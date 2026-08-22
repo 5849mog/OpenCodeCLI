@@ -36,6 +36,10 @@ import {
   Shield,
   ClipboardList,
   ScrollText,
+  Brain,
+  FilePen,
+  FilePlus,
+  FolderSearch,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -1644,26 +1648,13 @@ function EventRow({
       // Merged card: tool-call + its matching tool-result
       if (pairedResult) {
         return (
-          <ToolGroupRow
-            name={ev.toolName!}
-            args={ev.toolArgs!}
-            result={pairedResult}
-          />
+          <StepCard name={ev.toolName!} args={ev.toolArgs ?? {}} result={pairedResult} />
         );
       }
-      // Standalone tool-call (result not yet available)
-      return <ToolCallRow name={ev.toolName!} args={ev.toolArgs!} />;
+      // Standalone tool-call (result not yet available) → 运行中
+      return <StepCard name={ev.toolName!} args={ev.toolArgs ?? {}} result={null} />;
     case "tool-result":
-      return (
-        <ToolResultRow
-          name={ev.toolName!}
-          args={ev.toolArgs!}
-          output={ev.toolOutput ?? ""}
-          diff={ev.diff}
-          plan={ev.plan}
-          ok={!!ev.ok}
-        />
-      );
+      return <StepCard name={ev.toolName!} args={ev.toolArgs ?? {}} result={ev} />;
     case "error":
       return <ErrorRow text={ev.text ?? ""} />;
     case "system":
@@ -1710,43 +1701,40 @@ function StreamingBubble({ text, reasoning }: { text: string; reasoning: string 
 // ---------------------------------------------------------------------------
 
 function TurnBlock({ turn }: { turn: TurnGroup }) {
-  // 含 dispatch_subagent 的回合默认展开——委派发生时「子智能体」卡片必须
-  // 立即可见，不能藏在折叠的「思考与操作」里。
-  const hasSubagent = turn.tools.some(
-    (ev) => ev.kind === "tool-call" && ev.toolName === "dispatch_subagent",
-  );
-  const [collapsed, setCollapsed] = useState(!hasSubagent);
-  const preview = turn.analysis.split("\n").find((l) => l.trim()) ?? "";
-  const toolCount = turn.tools.length;
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="overflow-hidden rounded-md border border-[#E5E2D9] bg-[#FAF9F7]/60 dark:border-[#3a3731] dark:bg-[#1c1a17]/60"
+      className="space-y-1.5"
     >
-      <button
-        onClick={() => setCollapsed((c) => !c)}
-        className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-xs"
-      >
-        <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform", !collapsed && "rotate-90")} />
-        <Wrench className="h-3 w-3 shrink-0 text-[#B87B5A] dark:text-[#E8A87C]" />
-        <span className="shrink-0 font-medium text-[#6B6862] dark:text-zinc-400">思考与操作</span>
-        <span className="shrink-0 text-[#A8A29E] dark:text-zinc-500">· {toolCount} 个工具调用</span>
-        {collapsed && preview && (
-          <span className="ml-1 min-w-0 flex-1 truncate text-[#A8A29E] dark:text-zinc-500">{preview}</span>
-        )}
-      </button>
-      {!collapsed && (
-        <div className="space-y-2 px-3 pb-3 pt-1">
-          {turn.analysis && <MarkdownRenderer text={turn.analysis} />}
-          {turn.reasoning && turn.reasoning.trim().length > 0 && (
-            <ThinkingBlock text={turn.reasoning} streaming={false} />
-          )}
-          {turn.tools.map((ev) => (
-            <EventRow key={ev.id} ev={ev} pairedResult={ev.pairedResult} />
-          ))}
+      {/* 叙述文字：AI 的输出内容，在其应有的位置展示（不并入思考） */}
+      {turn.analysis && (
+        <div className="px-1 text-[#2D2B27] dark:text-zinc-100">
+          <MarkdownRenderer text={turn.analysis} />
         </div>
+      )}
+      {/* 思考过程：独立步骤，默认收起 */}
+      {turn.reasoning && turn.reasoning.trim().length > 0 && (
+        <ThinkingStep text={turn.reasoning} streaming={false} />
+      )}
+      {/* 工具：每个动作一行可折叠步骤卡（运行中显示 xx中） */}
+      {turn.tools.map((ev) =>
+        ev.toolName === "dispatch_subagent" ? (
+          <SubagentCard
+            key={ev.id}
+            eventId={ev.id}
+            task={typeof ev.toolArgs?.task === "string" ? ev.toolArgs.task : ""}
+            running={!ev.pairedResult}
+          />
+        ) : (
+          <StepCard
+            key={ev.id}
+            name={ev.toolName!}
+            args={ev.toolArgs ?? {}}
+            result={ev.pairedResult}
+          />
+        ),
       )}
     </motion.div>
   );
@@ -1798,6 +1786,168 @@ function CopyButton({ text }: { text: string }) {
     >
       {copied ? <Check size={14} className="text-emerald-500 dark:text-[#34d399]" /> : <Copy size={14} />}
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ZCode 式逐步卡片：每个工具/思考动作一行，默认收起，点开看细节；
+// 运行中显示「xx中」并强制展开 + 呼吸动画，完成后显示「已xx」并收起。
+// ---------------------------------------------------------------------------
+function stepMeta(name: string): {
+  icon: typeof Wrench;
+  running: string;
+  done: string;
+  kind: "terminal" | "edit" | "write" | "explore" | "tool";
+} {
+  switch (name) {
+    case "bash":
+      return { icon: TerminalIcon, running: "执行中", done: "已执行", kind: "terminal" };
+    case "edit_file":
+    case "multi_edit":
+    case "apply_patch":
+    case "insert_at":
+    case "undo_edit":
+      return { icon: FilePen, running: "编辑中", done: "已编辑", kind: "edit" };
+    case "write_file":
+    case "append_file":
+      return { icon: FilePlus, running: "写入中", done: "已写入", kind: "write" };
+    case "read_file":
+    case "glob":
+    case "search_files":
+    case "search_symbols":
+    case "list_files":
+    case "list_dirs":
+    case "view_outline":
+    case "read_multiple_files":
+      return { icon: FolderSearch, running: "探索中", done: "探索", kind: "explore" };
+    default:
+      return { icon: Wrench, running: "执行中", done: name, kind: "tool" };
+  }
+}
+
+function ThinkingStep({ text, streaming }: { text: string; streaming: boolean }) {
+  const deferredText = useDeferredValue(text);
+  const isStale = deferredText !== text;
+  const [collapsed, setCollapsed] = useState(!streaming && text.length > 400);
+  const preview = text.split("\n").find((l) => l.trim()) ?? text;
+  const shown = streaming ? deferredText : text;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 2 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.15 }}
+      className="overflow-hidden rounded-lg border border-[#E58F67]/25 bg-[#E58F67]/5 dark:border-[#E58F67]/25"
+    >
+      <button
+        onClick={() => !streaming && setCollapsed((c) => !c)}
+        disabled={streaming}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-[#8B7355] disabled:cursor-default dark:text-[#E8A87C]"
+      >
+        <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform", !collapsed && "rotate-90")} />
+        <Brain className="h-3.5 w-3.5 text-[#E58F67]/80" />
+        <span className="font-medium">{streaming ? "思考中" : "思考过程"}</span>
+        {streaming && (
+          <span className="flex gap-0.5 pl-1">
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "0ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "120ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "240ms" }} />
+          </span>
+        )}
+        {!streaming && collapsed && <span className="min-w-0 truncate pl-1 text-[#A8A29E]">{preview}</span>}
+        {!streaming && <span className="ml-auto text-[#A8A29E]">{collapsed ? "展开" : "收起"}</span>}
+      </button>
+      {(!collapsed || streaming) && (
+        <pre
+          className="max-h-64 overflow-auto whitespace-pre-wrap break-words px-3 pb-2.5 pt-0.5 font-mono text-xs leading-relaxed text-[#6B6862] dark:text-zinc-400 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#3a3731]"
+          style={{ opacity: isStale ? 0.9 : 1 }}
+        >
+          {shown}
+        </pre>
+      )}
+    </motion.div>
+  );
+}
+
+function StepCard({
+  name,
+  args,
+  result,
+}: {
+  name: string;
+  args: Record<string, unknown>;
+  result?: SessionEvent | null;
+}) {
+  const meta = stepMeta(name);
+  const running = !result;
+  const [collapsed, setCollapsed] = useState(true);
+  const expanded = running || !collapsed;
+  const ok = result?.ok ?? false;
+  const output = result?.toolOutput ?? "";
+  const diff = result?.diff ?? null;
+  const path = diff?.path ?? (typeof args.path === "string" ? args.path : null);
+  const command = typeof args.command === "string" ? args.command : null;
+  const Icon = meta.icon;
+
+  let metaText = "";
+  if (meta.kind === "terminal" && command) metaText = `$ ${command}`;
+  else if (path) metaText = path;
+  else if (meta.kind === "explore" && output) {
+    const count = output.split("\n").filter((l) => l.trim()).length;
+    metaText = count > 0 ? `${count} 个文件` : "";
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.15 }}
+      className="overflow-hidden rounded-lg border border-[#E5E2D9] bg-[#FFFFFF]/50 dark:border-[#3a3731] dark:bg-[#1c1a17]/60"
+    >
+      <button
+        onClick={() => !running && setCollapsed((c) => !c)}
+        disabled={running}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs disabled:cursor-default"
+      >
+        <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 text-[#8B8884] transition-transform", expanded && "rotate-90")} />
+        <Icon className="h-3.5 w-3.5 shrink-0 text-[#E58F67]" />
+        <span className={cn("shrink-0 font-medium", running ? "text-[#E58F67]" : "text-zinc-200")}>
+          {running ? meta.running : meta.done}
+        </span>
+        {metaText && <span className="min-w-0 truncate font-mono text-[#A8A29E]">{metaText}</span>}
+        {running && (
+          <span className="ml-auto flex gap-0.5">
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "0ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "120ms" }} />
+            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "240ms" }} />
+          </span>
+        )}
+        {!running && <span className="ml-auto text-[#A8A29E]">{expanded ? "收起" : "展开"}</span>}
+      </button>
+      {expanded && (
+        <div className="border-t border-[#E5E2D9] px-3 py-2 dark:border-[#3a3731]">
+          {running ? (
+            <div className="space-y-0.5 text-[#6B6862] dark:text-zinc-400">
+              {Object.entries(args).slice(0, 6).map(([k, v]) => (
+                <div key={k} className="flex gap-2">
+                  <span className="shrink-0 text-[#8B8884] dark:text-zinc-500">{k}:</span>
+                  <span className="break-all text-[#3D3B37] dark:text-zinc-300">{formatArgValue(v)}</span>
+                </div>
+              ))}
+            </div>
+          ) : result?.plan ? (
+            <div className="text-xs text-[#A8A29E] dark:text-zinc-500">计划已更新 · 可在右侧 Plan 面板查看</div>
+          ) : diff ? (
+            <DiffView before={diff.before} after={diff.after} />
+          ) : output ? (
+            <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-[#6B6862] dark:text-zinc-400 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+              {output}
+            </pre>
+          ) : (
+            <div className="text-xs text-[#A8A29E] dark:text-zinc-500">{ok ? "完成" : "失败"}</div>
+          )}
+        </div>
+      )}
+    </motion.div>
   );
 }
 
