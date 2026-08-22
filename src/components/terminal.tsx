@@ -183,6 +183,28 @@ export function Terminal() {
     return id;
   }, [events]);
 
+  // 每个 assistant-message 所属「回合」的完整 AI 文本（思考 + 叙述 + 答案），
+  // 供复制按钮用——否则只复制到最后一条无工具调用的部分。
+  const assistantTurnTexts = useMemo(() => {
+    const map = new Map<string, string>();
+    let turnText = "";
+    for (const ev of events) {
+      if (ev.kind === "user" || ev.kind === "error" || ev.kind === "system") {
+        turnText = "";
+        continue;
+      }
+      if (ev.kind === "assistant-message") {
+        const parts: string[] = [];
+        if (ev.reasoning?.trim()) parts.push(ev.reasoning.trim());
+        if (ev.text?.trim()) parts.push(ev.text.trim());
+        const text = parts.join("\n\n");
+        if (text) turnText = turnText ? `${turnText}\n\n${text}` : text;
+        map.set(ev.id, turnText);
+      }
+    }
+    return map;
+  }, [events]);
+
   // Auto-scroll to bottom on new events when user is near the bottom.
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -813,6 +835,7 @@ export function Terminal() {
                 ev={ev}
                 pairedResult={ev.pairedResult}
                 canRegenerate={ev.kind === "assistant-message" && ev.id === lastAssistantEventId}
+                fullText={ev.kind === "assistant-message" ? assistantTurnTexts.get(ev.id) : undefined}
                 onModifyUser={(t) => {
                   setInput(t);
                   setMentionQuery(null);
@@ -1632,11 +1655,13 @@ function EventRow({
   pairedResult,
   canRegenerate,
   onModifyUser,
+  fullText,
 }: {
   ev: SessionEvent;
   pairedResult?: SessionEvent;
   canRegenerate?: boolean;
   onModifyUser?: (text: string) => void;
+  fullText?: string;
 }) {
   switch (ev.kind) {
     case "user":
@@ -1649,6 +1674,7 @@ function EventRow({
           streaming={false}
           ts={ev.ts}
           canRegenerate={canRegenerate}
+          fullText={fullText}
         />
       );
     case "tool-call":
@@ -2067,12 +2093,14 @@ function AssistantRow({
   streaming,
   ts,
   canRegenerate,
+  fullText,
 }: {
   text: string;
   reasoning?: string;
   streaming: boolean;
   ts?: number;
   canRegenerate?: boolean;
+  fullText?: string;
 }) {
   const deferredText = useDeferredValue(text);
   const isStale = deferredText !== text;
@@ -2093,7 +2121,7 @@ function AssistantRow({
       </div>
       {!streaming && (
         <div className="flex items-center gap-0.5 pl-1 text-[#A8A29E] dark:text-zinc-500">
-          <CopyButton text={text || reasoning || ""} />
+          <CopyButton text={fullText || text || reasoning || ""} />
           {canRegenerate && (
             <button
               onClick={() => void regenerate()}
