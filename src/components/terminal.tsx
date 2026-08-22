@@ -31,7 +31,7 @@ import {
   XCircle,
   Wrench,
   Sparkles,
-  Gauge,
+  ClipboardList,
   ScrollText,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -788,14 +788,6 @@ export function Terminal() {
           >
             <ScrollText className="h-3.5 w-3.5" />
           </button>
-          {/* Token 用量面板 — 图形入口（命令 /tokens 仍可用） */}
-          <button
-            onClick={() => setTokenSheetOpen(true)}
-            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
-            title="Token 用量面板"
-          >
-            <Gauge className="h-3.5 w-3.5" />
-          </button>
           <button
             onClick={reset}
             className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
@@ -881,7 +873,7 @@ export function Terminal() {
           {/* Payload inspector — 查看/编辑上次发送给 AI 的完整上下文（/inspect 打开） */}
           <PayloadInspector open={payloadOpen} onClose={() => setPayloadOpen(false)} />
 
-          {/* Token 用量面板 — 右侧滑出（header Gauge 按钮 / 输入区 token 计数打开） */}
+          {/* Token 用量面板 — 右侧滑出（输入区 token 计数 / /tokens 命令打开） */}
           <TokenSheet open={tokenSheetOpen} onClose={() => setTokenSheetOpen(false)} />
       </div>
 
@@ -986,24 +978,23 @@ export function Terminal() {
         </div>
         <div className="mt-2 flex items-center justify-between px-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
           <span className="flex items-center gap-3">
-            {lastUsage ? (
+            {totalTokens > 0 && (
               <button
                 onClick={() => setTokenSheetOpen(true)}
-                title={`上次请求 ${lastUsage.prompt_tokens.toLocaleString()} prompt + ${lastUsage.completion_tokens.toLocaleString()} completion · 本会话累计 ${totalTokens.toLocaleString()} tokens（账单口径）· 点击查看 Token 面板`}
+                title={`本会话累计 ${totalTokens.toLocaleString()} tokens · 点击查看 Token 面板`}
                 className="cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
               >
-                {lastUsage.total_tokens.toLocaleString()} tokens
+                累计 {totalTokens.toLocaleString()}
               </button>
-            ) : (
-              totalTokens > 0 && (
-                <button
-                  onClick={() => setTokenSheetOpen(true)}
-                  title={`本会话累计 ${totalTokens.toLocaleString()} tokens · 点击查看 Token 面板`}
-                  className="cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
-                >
-                  {totalTokens.toLocaleString()} tokens
-                </button>
-              )
+            )}
+            {lastUsage && (
+              <button
+                onClick={() => setTokenSheetOpen(true)}
+                title={`上次请求 ${lastUsage.prompt_tokens.toLocaleString()} prompt + ${lastUsage.completion_tokens.toLocaleString()} completion（账单口径）· 点击查看 Token 面板`}
+                className="cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+              >
+                本轮 {lastUsage.total_tokens.toLocaleString()}
+              </button>
             )}
             {isStreaming && (
               <span className="flex items-center gap-1.5">
@@ -2085,9 +2076,9 @@ function PlanHeaderBadge() {
     <button
       onClick={() => useVfsView.getState().setRightPanelTab("plan")}
       className="flex items-center gap-1.5 rounded-full border border-[#E58F67]/20 bg-[#E58F67]/8 px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium text-[#B87B5A] hover:bg-[#E58F67]/15"
-      title={`Plan: ${stats.done}/${stats.total} steps done`}
+      title={`计划进度，点击查看计划面板 · ${stats.done}/${stats.total} 步完成`}
     >
-      <span>📋</span>
+      <ClipboardList className="h-3.5 w-3.5" />
       <span className="tabular-nums">{stats.done}/{stats.total}</span>
       <div className="h-1.5 w-10 overflow-hidden rounded-full bg-zinc-700">
         <div

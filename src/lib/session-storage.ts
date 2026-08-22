@@ -32,6 +32,8 @@ export interface SessionMeta {
   updatedAt: number;
   totalTokens: number;
   messageCount: number;
+  /** 运行模式（full/light/minimal）——会话创建时锁定；旧会话缺省按 full。 */
+  agentPreset?: "full" | "light" | "minimal";
 }
 
 export interface PersistedSession {
@@ -138,6 +140,7 @@ function metaOf(s: PersistedSession): SessionMeta {
     updatedAt: s.updatedAt,
     totalTokens: s.totalTokens,
     messageCount: s.messages.length,
+    agentPreset: s.agentPreset ?? "full",
   };
 }
 

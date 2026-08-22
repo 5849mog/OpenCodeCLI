@@ -251,6 +251,7 @@ function FileBagInner() {
 
         {/* Files toolbar — only show when on files tab */}
         {rightPanelTab === "files" && (<>
+        <div className="h-5 w-px bg-[#E5E2D9] dark:bg-[#3a3731]" />
         <button
           onClick={() => setTreeCollapsed(!treeCollapsed)}
           className="flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27] tablet:flex desktop:hidden dark:text-zinc-400 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
@@ -261,10 +262,10 @@ function FileBagInner() {
         <button
           onClick={handleUploadClick}
           className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-400 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
-          title="Upload files"
+          title="上传文件"
         >
           <Upload className="h-3 w-3" />
-          <span className="hidden sm:inline">Files</span>
+          <span className="hidden sm:inline">上传</span>
         </button>
         <button
           onClick={handleFolderUploadClick}

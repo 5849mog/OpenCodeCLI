@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useSession } from "@/store/session";
 import type { SessionMeta } from "@/lib/session-storage";
+import { presetBadgeLabel } from "@/lib/preset-badge";
 import { vfs } from "@/lib/vfs";
 import { cn } from "@/lib/utils";
 
@@ -102,6 +103,11 @@ function SessionRow({
         />
       ) : (
         <span className="truncate">{session.title || "新会话"}</span>
+      )}
+      {!renaming && (
+        <span className="shrink-0 text-[10px] text-[#8B8884] dark:text-zinc-500">
+          {presetBadgeLabel(session.agentPreset)}
+        </span>
       )}
       <span className="ml-auto shrink-0 text-[10px] text-[#A8A29E] dark:text-zinc-500">{formatRelativeTime(session.updatedAt)}</span>
       {!renaming && (
@@ -173,6 +179,7 @@ export default function Home() {
   const init = useSession((s) => s.init);
   const config = useSession((s) => s.config);
   const sessionId = useSession((s) => s.sessionId);
+  const agentPreset = useSession((s) => s.agentPreset);
   const title = useSession((s) => s.title);
   const sessions = useSession((s) => s.sessions);
   const newSession = useSession((s) => s.newSession);
@@ -315,9 +322,12 @@ export default function Home() {
               <div className="flex items-center gap-2 rounded-lg bg-[#E58F67]/8 px-3 py-2 text-sm text-[#2D2B27] dark:bg-[#E58F67]/10 dark:text-zinc-100">
                 <MessageSquare className="h-3.5 w-3.5 shrink-0 text-[#E58F67]" />
                 <span className="truncate">{title || "新会话"}</span>
-                {config.hasApiKey && (
-                  <span className="ml-auto text-[10px] text-[#A8A29E] dark:text-zinc-500">{config.model}</span>
-                )}
+                <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                  <span className="text-[10px] text-[#8B8884] dark:text-zinc-500">{presetBadgeLabel(agentPreset)}</span>
+                  {config.hasApiKey && (
+                    <span className="text-[10px] text-[#A8A29E] dark:text-zinc-500">{config.model}</span>
+                  )}
+                </span>
               </div>
               {/* History sessions */}
               <div className="mb-1 mt-3 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#A8A29E] dark:text-zinc-500">
