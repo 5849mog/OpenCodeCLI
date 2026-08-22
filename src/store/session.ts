@@ -415,6 +415,7 @@ async function flushPersist(get: () => SessionState): Promise<void> {
     compactCount: s.compactCount ?? 0,
     usageHistory: s.usageHistory ?? [],
     vfsChangeLog: s.vfsChangeLog ?? [],
+    agentPreset: s.agentPreset ?? "full",
     createdAt: s.events[0]?.ts ?? Date.now(),
     updatedAt: Date.now(),
   };

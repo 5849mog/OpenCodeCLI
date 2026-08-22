@@ -722,12 +722,12 @@ export function Terminal() {
               )}
             </div>
           )}
-          {agentPreset && agentPreset !== "full" && (
+          {agentPreset && (
             <span
               className="shrink-0 rounded-md px-2 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium"
               title="运行模式（创建时锁定，切换需新建会话）"
             >
-              {agentPreset === "minimal" ? "⚡ 极简" : "✨ 精简"}
+              {agentPreset === "minimal" ? "⚡ 极简" : agentPreset === "light" ? "✨ 精简" : "🟢 完整"}
             </span>
           )}
         </div>

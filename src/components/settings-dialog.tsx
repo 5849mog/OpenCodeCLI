@@ -326,6 +326,7 @@ export function SettingsDialog({
             lastUsage: rec.lastUsage ?? null,
             compactedReleases: rec.compactedReleases ?? 0,
             compactCount: rec.compactCount ?? 0,
+            agentPreset: rec.agentPreset ?? "full",
             createdAt: rec.createdAt ?? Date.now(),
             updatedAt: rec.updatedAt ?? Date.now(),
           });
