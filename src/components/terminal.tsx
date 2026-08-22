@@ -31,6 +31,9 @@ import {
   XCircle,
   Wrench,
   Sparkles,
+  Folder,
+  RefreshCw,
+  PanelRight,
   ClipboardList,
   ScrollText,
 } from "lucide-react";
@@ -156,6 +159,12 @@ export function Terminal() {
   const attachInputRef = useRef<HTMLInputElement>(null);
   // 在途的 Files API 上传（避免并发 setState 竞态）
   const filesUploading = useRef(0);
+  // 最后一个 assistant-message（最终答案）id——只有它能在下方显示「重改」。
+  const lastAssistantEventId = useMemo(() => {
+    let id: string | null = null;
+    for (const ev of events) if (ev.kind === "assistant-message") id = ev.id;
+    return id;
+  }, [events]);
 
   // Auto-scroll to bottom on new events when user is near the bottom.
   useLayoutEffect(() => {
@@ -679,92 +688,21 @@ export function Terminal() {
     <div className="flex h-full flex-col bg-background text-foreground font-mono text-[length:var(--font-size-base)] leading-relaxed">
       {/* Header bar — model name centered, mode toggle right */}
       <div className="flex items-center justify-between border-b border-[#E5E2D9] px-4 py-2.5 text-xs dark:border-[#3a3731]">
-        <div className="flex items-center gap-2 text-[#6B6862] dark:text-zinc-400">
-          {config.hasApiKey && (
-            <div className="relative" ref={modelMenuRef}>
-              <button
-                onClick={() => setModelMenuOpen((v) => !v)}
-                className="flex max-w-[220px] items-center gap-1.5 rounded-md bg-[#F5F3EE] px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium text-[#8B7355] transition-colors hover:bg-[#F0EDE5] dark:bg-[#262320] dark:text-[#E8A87C] dark:hover:bg-[#2a2723]"
-                title="切换模型"
-              >
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#E58F67]" />
-                <span className="truncate">{config.model}</span>
-                <ChevronDown className="h-3 w-3 shrink-0" />
-              </button>
-              {modelMenuOpen && (
-                <div className="absolute left-0 top-full z-50 mt-1.5 max-h-64 w-64 overflow-y-auto rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
-                  {headerModelChoices.length === 0 ? (
-                    <div className="px-3 py-2 text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
-                      暂无模型列表——在设置里点 Test 拉取
-                    </div>
-                  ) : (
-                    headerModelChoices.map((m) => (
-                      <button
-                        key={m}
-                        onClick={() => {
-                          const visionLike = /vision|gpt-4o|gemini|claude/i.test(m);
-                          setConfig(visionLike ? { model: m, supportVision: true } : { model: m });
-                          setModelMenuOpen(false);
-                          toast.success(`模型已切换为 ${m}`);
-                        }}
-                        className={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-[length:var(--font-size-ui-sm)] transition-colors ${
-                          m === config.model
-                            ? "bg-[#E58F67]/10 text-[#E58F67]"
-                            : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]"
-                        }`}
-                      >
-                        <span className="min-w-0 flex-1 truncate">{m}</span>
-                        {m === config.model && <Check className="h-3 w-3 shrink-0" />}
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-          {agentPreset && (
-            <span
-              className="shrink-0 rounded-md px-2 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium"
-              title="运行模式（创建时锁定，切换需新建会话）"
-            >
-              {agentPreset === "minimal" ? "⚡ 极简" : agentPreset === "light" ? "✨ 精简" : "🟢 完整"}
-            </span>
-          )}
+        <div className="flex items-center gap-2 text-[#6B6862] dark:text-zinc-500">
+          <TerminalIcon className="h-3.5 w-3.5 text-[#E58F67]" />
+          <span className="font-medium">Open Code</span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Mode toggle — sliding Switch with dual labels (Bypass | Plan) */}
-          <div
-            className="flex items-center gap-1.5 rounded-full border border-[#E5E2D9] bg-[#F5F3EE] px-2.5 py-1 text-[length:var(--font-size-ui-sm)] font-medium dark:border-[#3a3731] dark:bg-[#262320]"
-            title="Shift+Tab to toggle"
+          <button
+            onClick={() =>
+              useVfsView.getState().setRightPanelOpen(!useVfsView.getState().rightPanelOpen)
+            }
+            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            title="打开 / 收起文件袋"
           >
-            <span
-              className={cn(
-                "transition-colors",
-                mode === "bypass" ? "text-[#2D2B27] dark:text-zinc-100" : "text-[#8B8884] dark:text-zinc-500",
-              )}
-            >
-              ⚡ Bypass
-            </span>
-            <Switch
-              checked={mode === "plan"}
-              onCheckedChange={() => {
-                const next = mode === "plan" ? "bypass" : "plan";
-                toggleMode();
-                toast(next === "plan" ? "已切换到 Plan 模式 — 只读" : "已切换到 Bypass 模式");
-              }}
-              className="scale-[0.85]"
-              aria-label="Toggle Plan mode"
-            />
-            <span
-              className={cn(
-                "transition-colors",
-                mode === "plan" ? "text-[#E58F67]" : "text-[#8B8884] dark:text-zinc-500",
-              )}
-            >
-              📋 Plan
-            </span>
-          </div>
-              {/* Plan progress indicator — click opens the Plan tab in the right panel */}
+            <PanelRight className="h-3.5 w-3.5" />
+          </button>
+          {/* Plan progress indicator — click opens the Plan tab in the right panel */}
           <PlanHeaderBadge />
           <button
             onClick={() => handleSlashCommand("/export json")}
@@ -814,13 +752,25 @@ export function Terminal() {
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto px-4 py-3 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] [&::-webkit-scrollbar-track]:bg-transparent"
       >
-        {events.length === 0 && !streamingText && !streamingReasoning && <EmptyState />}
+        {events.length === 0 && !streamingText && !streamingReasoning && (
+          <EmptyState
+            onUsePrompt={(t) => {
+              setInput(t);
+              textareaRef.current?.focus();
+            }}
+          />
+        )}
         <div className="space-y-4">
           {useMemo(() => groupAssistantTurns(groupToolEvents(events)), [events]).map((ev) =>
             ev.kind === "turn" ? (
               <TurnBlock key={ev.id} turn={ev} />
             ) : (
-              <EventRow key={ev.id} ev={ev} pairedResult={ev.pairedResult} />
+              <EventRow
+                key={ev.id}
+                ev={ev}
+                pairedResult={ev.pairedResult}
+                canRegenerate={ev.kind === "assistant-message" && ev.id === lastAssistantEventId}
+              />
             ),
           )}
           {/* Live streaming bubble — collapsed "analyzing" card with a single
@@ -880,8 +830,8 @@ export function Terminal() {
       {/* Input */}
       {/* Input area — modern: soft glass panel, focus glow, gradient send */}
       <div className="border-t border-[#E5E2D9] bg-gradient-to-b from-[#FFFFFF] to-[#FAF9F7] px-4 py-3 dark:border-[#3a3731] dark:from-[#161512] dark:to-[#121110]">
-        <div className="group relative flex items-end gap-2.5 rounded-2xl border border-[#E5E2D9] bg-[#FAF9F7]/80 px-4 py-3 shadow-sm backdrop-blur transition-all duration-200 focus-within:border-[#E58F67]/60 focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.08),0_4px_20px_rgba(0,0,0,0.06)] dark:border-[#3a3731] dark:bg-[#1c1a17]/70 dark:shadow-none dark:focus-within:border-[#E58F67]/50 dark:focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.12),0_8px_30px_rgba(0,0,0,0.4)]">
-          {/* 附件 chips（输入框上方） */}
+        <div className="group relative flex flex-col gap-2 rounded-2xl border border-[#E5E2D9] bg-[#FAF9F7]/80 p-3 shadow-sm backdrop-blur transition-all duration-200 focus-within:border-[#E58F67]/60 focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.08),0_4px_20px_rgba(0,0,0,0.06)] dark:border-[#3a3731] dark:bg-[#1c1a17]/70 dark:shadow-none dark:focus-within:border-[#E58F67]/50 dark:focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.12),0_8px_30px_rgba(0,0,0,0.4)]">
+          {/* 附件 chips（命令框上方） */}
           {attachments.length > 0 && (
             <div className="absolute bottom-full left-0 mb-2 flex max-w-full flex-wrap gap-1.5">
               {attachments.map((a) => (
@@ -914,15 +864,142 @@ export function Terminal() {
               ))}
             </div>
           )}
-          {/* 附件选择按钮 */}
-          <button
-            onClick={() => attachInputRef.current?.click()}
-            disabled={isStreaming || isCompacting || uploading}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-[#8B8884] transition-colors hover:bg-[#F0EDE5] hover:text-[#E58F67] disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-[#E58F67]"
-            title={uploading ? "正在上传图片到 Files API…" : "上传文件（图片 / 文本，≤10MB）"}
-          >
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-          </button>
+          {/* 顶行：工作区 + 命令/能力指示 */}
+          <div className="flex items-center justify-between text-[length:var(--font-size-ui-sm)] text-[#6B6862] dark:text-zinc-400">
+            <button
+              onClick={() => useVfsView.getState().setRightPanelTab("files")}
+              className="flex items-center gap-1.5 rounded px-1.5 py-1 transition-colors hover:bg-[#F0EDE5] dark:hover:bg-[#2a2723]"
+              title="文件袋（虚拟工作区）"
+            >
+              <Folder className="h-3.5 w-3.5 text-[#E8A87C]" />
+              <span className="font-medium">OpenCodeCLI</span>
+              <ChevronDown className="h-3 w-3" />
+            </button>
+            <Sparkles className="h-3.5 w-3.5 text-[#8B8884] dark:text-zinc-500" />
+          </div>
+          <div className="h-px w-full bg-[#E5E2D9] dark:bg-[#3a3731]" />
+          {/* 中区：输入 */}
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => onInputChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            rows={1}
+            placeholder={
+              isStreaming
+                ? "agent is working…"
+                : "向 ZCode 提问，使用 @ 添加上下文，使用 / 选择命令或能力"
+            }
+            disabled={isStreaming || isCompacting}
+            className="max-h-[200px] w-full resize-none bg-transparent text-[length:var(--font-size-base)] text-[#1A1815] placeholder:text-[#A8A29E] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+          />
+          {/* 底排：控制簇 + 发送 */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* 附件选择按钮 */}
+              <button
+                onClick={() => attachInputRef.current?.click()}
+                disabled={isStreaming || isCompacting || uploading}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-[#8B8884] transition-colors hover:bg-[#F0EDE5] hover:text-[#E58F67] disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-[#E58F67]"
+                title={uploading ? "正在上传图片到 Files API…" : "上传文件（图片 / 文本，≤10MB）"}
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              </button>
+              {/* 预设徽标 */}
+              {agentPreset && (
+                <span
+                  className="shrink-0 rounded-md px-2 py-1 text-[length:var(--font-size-ui-sm)] font-medium text-[#8B7355] dark:text-[#E8A87C]"
+                  title="运行模式（创建时锁定，切换需新建会话）"
+                >
+                  {agentPreset === "minimal" ? "⚡ 极简" : agentPreset === "light" ? "✨ 精简" : "🟢 完整"}
+                </span>
+              )}
+              {/* 模式开关 */}
+              <div
+                className="flex items-center gap-1.5 rounded-full border border-[#E5E2D9] bg-[#F5F3EE] px-2.5 py-1 text-[length:var(--font-size-ui-sm)] font-medium dark:border-[#3a3731] dark:bg-[#262320]"
+                title="Shift+Tab to toggle"
+              >
+                <span
+                  className={cn(
+                    "transition-colors",
+                    mode === "bypass" ? "text-[#2D2B27] dark:text-zinc-100" : "text-[#8B8884] dark:text-zinc-500",
+                  )}
+                >
+                  ⚡ Bypass
+                </span>
+                <Switch
+                  checked={mode === "plan"}
+                  onCheckedChange={() => {
+                    const next = mode === "plan" ? "bypass" : "plan";
+                    toggleMode();
+                    toast(next === "plan" ? "已切换到 Plan 模式 — 只读" : "已切换到 Bypass 模式");
+                  }}
+                  className="scale-[0.85]"
+                  aria-label="Toggle Plan mode"
+                />
+                <span
+                  className={cn(
+                    "transition-colors",
+                    mode === "plan" ? "text-[#E58F67]" : "text-[#8B8884] dark:text-zinc-500",
+                  )}
+                >
+                  📋 Plan
+                </span>
+              </div>
+              {/* 模型选择器 */}
+              {config.hasApiKey && (
+                <div className="relative" ref={modelMenuRef}>
+                  <button
+                    onClick={() => setModelMenuOpen((v) => !v)}
+                    className="flex max-w-[180px] items-center gap-1.5 rounded-md bg-[#F5F3EE] px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium text-[#8B7355] transition-colors hover:bg-[#F0EDE5] dark:bg-[#262320] dark:text-[#E8A87C] dark:hover:bg-[#2a2723]"
+                    title="切换模型"
+                  >
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#E58F67]" />
+                    <span className="truncate">{config.model}</span>
+                    <ChevronDown className="h-3 w-3 shrink-0" />
+                  </button>
+                  {modelMenuOpen && (
+                    <div className="absolute left-0 top-full z-50 mt-1.5 max-h-64 w-64 overflow-y-auto rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
+                      {headerModelChoices.length === 0 ? (
+                        <div className="px-3 py-2 text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
+                          暂无模型列表——在设置里点 Test 拉取
+                        </div>
+                      ) : (
+                        headerModelChoices.map((m) => (
+                          <button
+                            key={m}
+                            onClick={() => {
+                              const visionLike = /vision|gpt-4o|gemini|claude/i.test(m);
+                              setConfig(visionLike ? { model: m, supportVision: true } : { model: m });
+                              setModelMenuOpen(false);
+                              toast.success(`模型已切换为 ${m}`);
+                            }}
+                            className={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-[length:var(--font-size-ui-sm)] transition-colors ${
+                              m === config.model
+                                ? "bg-[#E58F67]/10 text-[#E58F67]"
+                                : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]"
+                            }`}
+                          >
+                            <span className="min-w-0 flex-1 truncate">{m}</span>
+                            {m === config.model && <Check className="h-3 w-3 shrink-0" />}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* 发送 */}
+            <button
+              onClick={submit}
+              disabled={(!input.trim() && attachments.length === 0) || isStreaming || isCompacting}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#E88A5F] to-[#C96A45] text-white shadow-md shadow-[#E58F67]/30 transition-all hover:from-[#F09A70] hover:to-[#E58F67] hover:shadow-lg hover:shadow-[#E58F67]/40 active:scale-95 disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#D6D3CE] disabled:text-[#A8A29E] disabled:shadow-none dark:disabled:bg-[#3a3731]"
+              title="Send (Enter)"
+            >
+              <ArrowUp className="h-3.5 w-3.5" />
+            </button>
+          </div>
           <input
             ref={attachInputRef}
             type="file"
@@ -953,28 +1030,6 @@ export function Terminal() {
               ))}
             </div>
           )}
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => onInputChange(e.target.value)}
-            onKeyDown={onKeyDown}
-            rows={1}
-            placeholder={
-              isStreaming
-                ? "agent is working…"
-                : "输入消息…  (@ 提及文件)"
-            }
-            disabled={isStreaming || isCompacting}
-            className="max-h-[200px] flex-1 resize-none bg-transparent text-[length:var(--font-size-base)] text-[#1A1815] placeholder:text-[#A8A29E] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
-          />
-          <button
-            onClick={submit}
-            disabled={(!input.trim() && attachments.length === 0) || isStreaming || isCompacting}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#E88A5F] to-[#C96A45] text-white shadow-md shadow-[#E58F67]/30 transition-all hover:from-[#F09A70] hover:to-[#E58F67] hover:shadow-lg hover:shadow-[#E58F67]/40 active:scale-95 disabled:cursor-not-allowed disabled:bg-none disabled:bg-[#D6D3CE] disabled:text-[#A8A29E] disabled:shadow-none dark:disabled:bg-[#3a3731]"
-            title="Send (Enter)"
-          >
-            <ArrowUp className="h-3.5 w-3.5" />
-          </button>
         </div>
         <div className="mt-2 flex items-center justify-between px-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
           <span className="flex items-center gap-3">
@@ -1280,36 +1335,33 @@ function QuestionPanel({
 
 // ---------------------------------------------------------------------------
 
-function EmptyState() {
+function EmptyState({ onUsePrompt }: { onUsePrompt?: (text: string) => void }) {
+  const hour = new Date().getHours();
+  const greeting = hour < 6 ? "夜深了" : hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好";
+  const prompts = [
+    "分析这个项目的结构并给出改进建议",
+    "为这个仓库写一个 README 概览",
+    "解释这段代码是做什么的",
+  ];
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 py-12 text-center text-[#8B8884]">
-      <div className="rounded-full border border-[#E58F67]/25 bg-gradient-to-b from-[#2a2723] to-[#1c1a17] p-4 shadow-lg shadow-black/20 dark:border-[#E58F67]/25 dark:from-[#2a2723] dark:to-[#161512]">
-        <TerminalIcon className="h-7 w-7 text-[#E58F67]" />
+    <div className="flex h-full flex-col items-center justify-center gap-4 px-6 py-12 text-center">
+      <div className="flex items-center gap-2 text-[length:var(--font-size-base)] font-medium text-[#8B8884] dark:text-zinc-400">
+        <TerminalIcon className="h-4 w-4 text-[#E58F67]" />
+        <span>{greeting}，接下来交给我吧</span>
       </div>
-      <div>
-        <div className="bg-gradient-to-r from-[#F5F3EE] via-[#E8A87C] to-[#E58F67] bg-clip-text text-xl font-semibold tracking-tight text-transparent dark:from-zinc-100 dark:via-[#E8A87C] dark:to-[#E58F67]">
-          Welcome to Open Code Web
-        </div>
-        <div className="mt-1.5 text-xs text-[#6B6862] dark:text-zinc-400">
-          A browser-based, near 1:1 replica of the Open Code CLI.
-        </div>
-        <div className="mt-1.5 text-xs text-[#6B6862] dark:text-zinc-400">
-          The <span className="font-medium text-[#E58F67] dark:text-[#E8A87C]">文件袋</span> on the right is your virtual workspace.
-        </div>
+      <div className="flex max-w-xl flex-wrap items-center justify-center gap-2 text-[length:var(--font-size-ui-sm)]">
+        {prompts.map((p) => (
+          <button
+            key={p}
+            onClick={() => onUsePrompt?.(p)}
+            className="rounded-full border border-[#3a3731] bg-[#262320] px-3.5 py-1.5 text-[#A8A29E] transition-colors hover:border-[#E58F67]/40 hover:text-[#E8A87C] dark:border-[#3a3731] dark:bg-[#262320] dark:hover:border-[#E58F67]/40 dark:hover:text-[#E8A87C]"
+          >
+            {p}
+          </button>
+        ))}
       </div>
-      <div className="mt-2 grid gap-1.5 text-left text-[length:var(--font-size-ui-sm)] text-[#8B8884] dark:text-zinc-400">
-        <div className="flex items-center gap-2">
-          <Upload className="h-3.5 w-3.5 shrink-0 text-[#7dd3fc]" />
-          <span>Upload files <span className="text-[#E58F67] dark:text-[#E8A87C]">→</span> they appear in the <span className="text-[#8B7355] dark:text-[#E8A87C]">文件袋</span></span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#a78bfa]" />
-          <span>Ask the AI to <span className="text-zinc-500 dark:text-zinc-300">build, edit, or refactor</span> your project</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Download className="h-3.5 w-3.5 shrink-0 text-[#34d399]" />
-          <span>Download the result as a <span className="font-mono text-[#8B7355] dark:text-[#E8A87C]">zip</span> when done</span>
-        </div>
+      <div className="text-[length:var(--font-size-ui-sm)] text-[#6B6862] dark:text-zinc-500">
+        使用 @ 提及文件，或输入 / 使用命令
       </div>
     </div>
   );
@@ -1445,16 +1497,24 @@ function groupAssistantTurns(
 function EventRow({
   ev,
   pairedResult,
+  canRegenerate,
 }: {
   ev: SessionEvent;
   pairedResult?: SessionEvent;
+  canRegenerate?: boolean;
 }) {
   switch (ev.kind) {
     case "user":
       return <UserRow text={ev.text ?? ""} attachments={ev.attachments} />;
     case "assistant-message":
       return (
-        <AssistantRow text={ev.text ?? ""} reasoning={ev.reasoning} streaming={false} />
+        <AssistantRow
+          text={ev.text ?? ""}
+          reasoning={ev.reasoning}
+          streaming={false}
+          ts={ev.ts}
+          canRegenerate={canRegenerate}
+        />
       );
     case "tool-call":
       // dispatch_subagent → 专用「子智能体」卡片（运行中 / 完成态都长这样），
@@ -1616,24 +1676,22 @@ function CopyButton({ text }: { text: string }) {
 function UserRow({ text, attachments }: { text: string; attachments?: Array<{ name: string; path: string; dataUrl?: string; fileId?: string }> }) {
   const imgs = (attachments ?? []).filter((a) => a.dataUrl);
   return (
-    <div className="group flex gap-2">
-      <span className="shrink-0 pt-0.5 text-[#E58F67]">&gt;</span>
-      <div className="flex-1 min-w-0 text-[#1A1815] dark:text-zinc-100">
-        {imgs.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-2">
-            {imgs.map((a) => (
-              <img
-                key={a.path}
-                src={a.dataUrl}
-                alt={a.name}
-                className="max-h-40 max-w-[240px] rounded-lg border border-[#E5E2D9] object-contain shadow dark:border-[#3a3731]"
-              />
-            ))}
-          </div>
-        )}
+    <div className="flex flex-col items-end gap-1">
+      {imgs.length > 0 && (
+        <div className="flex flex-wrap justify-end gap-2">
+          {imgs.map((a) => (
+            <img
+              key={a.path}
+              src={a.dataUrl}
+              alt={a.name}
+              className="max-h-40 max-w-[240px] rounded-lg border border-[#E5E2D9] object-contain shadow dark:border-[#3a3731]"
+            />
+          ))}
+        </div>
+      )}
+      <div className="max-w-[75%] rounded-2xl rounded-br-md bg-[#F5F3EE] px-4 py-2.5 text-[#2D2B27] dark:bg-[#262320] dark:text-zinc-100">
         <CollapsibleText text={text} render={(t) => <MarkdownRenderer text={t} />} />
       </div>
-      <CopyButton text={text} />
     </div>
   );
 }
@@ -1693,26 +1751,52 @@ function AssistantRow({
   text,
   reasoning,
   streaming,
+  ts,
+  canRegenerate,
 }: {
   text: string;
   reasoning?: string;
   streaming: boolean;
+  ts?: number;
+  canRegenerate?: boolean;
 }) {
   const deferredText = useDeferredValue(text);
   const isStale = deferredText !== text;
   const showReasoning = !!reasoning && reasoning.trim().length > 0;
+  const regenerate = useSession((s) => s.regenerate);
   if (!text && !showReasoning) return null;
   return (
-    <div className="group flex gap-2">
-      <span className="shrink-0 pt-0.5 text-[#8B7355] dark:text-[#E8A87C]">⟫</span>
-      <div className="flex-1 min-w-0 break-words text-[#2D2B27] dark:text-zinc-100" style={{ opacity: isStale ? 0.95 : 1 }}>
+    <div className="flex flex-col gap-1.5">
+      <div
+        className="min-w-0 break-words rounded-2xl rounded-tl-md border border-[#E5E2D9] bg-[#FAF9F7]/60 px-4 py-2.5 text-[#2D2B27] dark:border-[#3a3731] dark:bg-[#1c1a17]/60 dark:text-zinc-100"
+        style={{ opacity: isStale ? 0.95 : 1 }}
+      >
         {showReasoning && <ThinkingBlock text={reasoning!} streaming={streaming} />}
         {text && <MarkdownRenderer text={streaming ? deferredText : text} />}
         {streaming && (
           <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-emerald-400 align-middle dark:bg-[#34d399]" />
         )}
       </div>
-      <CopyButton text={text || reasoning || ""} />
+      {!streaming && (
+        <div className="flex items-center gap-1.5 pl-1 text-[#A8A29E] dark:text-zinc-500">
+          <CopyButton text={text || reasoning || ""} />
+          {canRegenerate && (
+            <button
+              onClick={() => void regenerate()}
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[length:var(--font-size-ui-sm)] transition-colors hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:hover:bg-[#2a2723] dark:hover:text-zinc-300"
+              title="重新生成"
+            >
+              <RefreshCw className="h-3 w-3" />
+              <span>重改</span>
+            </button>
+          )}
+          {ts && (
+            <span className="text-[10px]">
+              {new Date(ts).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

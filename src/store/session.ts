@@ -379,6 +379,8 @@ interface SessionState {
   refreshSessionList: () => Promise<void>;
   abort: () => void;
   send: (text: string, attachments?: UploadedAttachment[]) => Promise<void>;
+  /** 重改：丢弃最后一轮 Q→A，用同一个用户消息重新跑一遍。 */
+  regenerate: () => Promise<void>;
   /** 真正的上下文压缩：LLM 摘要旧对话并写回 store（/compact 命令调用）。 */
   compact: () => Promise<void>;
   toggleMode: () => void;
@@ -1035,6 +1037,74 @@ export const useSession = create<SessionState>((set, get) => ({
         agentIteration: 0,
       });
       // Persist the final state of this turn.
+      schedulePersist(get);
+    }
+  },
+
+  /** 重改：找到最后一轮 user 提问，丢弃其后全部消息/事件，用同一提问重跑。 */
+  regenerate: async () => {
+    if (get().isStreaming) return;
+    const s = get();
+    let lastUserMsgIdx = -1;
+    for (let i = s.messages.length - 1; i >= 0; i--) {
+      if (s.messages[i].role === "user") {
+        lastUserMsgIdx = i;
+        break;
+      }
+    }
+    if (lastUserMsgIdx < 0) return;
+    const lastUserMsg = s.messages[lastUserMsgIdx];
+    let lastUserEventIdx = -1;
+    for (let i = s.events.length - 1; i >= 0; i--) {
+      if (s.events[i].kind === "user") {
+        lastUserEventIdx = i;
+        break;
+      }
+    }
+    const newMessages = [...s.messages.slice(0, lastUserMsgIdx), lastUserMsg];
+    const newEvents = lastUserEventIdx >= 0 ? s.events.slice(0, lastUserEventIdx) : [...s.events];
+    if (lastUserEventIdx >= 0 && s.events[lastUserEventIdx]) {
+      newEvents.push({ ...s.events[lastUserEventIdx], id: nextId(), ts: Date.now() });
+    }
+    const ac = new AbortController();
+    set({
+      messages: newMessages,
+      events: newEvents,
+      isStreaming: true,
+      abortController: ac,
+      agentStatus: "Thinking…",
+      agentIteration: 0,
+      streamingText: null,
+      streamingReasoning: null,
+    });
+    try {
+      await runAgentLoop(set, get, ac.signal);
+    } catch (e) {
+      const isAbort = e instanceof Error && e.name === "AbortError";
+      const errEvent: SessionEvent = {
+        id: nextId(),
+        kind: "error",
+        text: isAbort ? "Stopped by user." : e instanceof Error ? classifyApiError(e) : String(e),
+        ts: Date.now(),
+      };
+      set((st) => ({
+        events: [...st.events, errEvent],
+        isStreaming: false,
+        abortController: null,
+        agentStatus: "",
+        streamingText: null,
+        streamingReasoning: null,
+        agentIteration: 0,
+      }));
+    } finally {
+      set({
+        isStreaming: false,
+        abortController: null,
+        agentStatus: "",
+        streamingText: null,
+        streamingReasoning: null,
+        agentIteration: 0,
+      });
       schedulePersist(get);
     }
   },

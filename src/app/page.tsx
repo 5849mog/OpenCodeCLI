@@ -1,11 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import { Terminal } from "@/components/terminal";
 import { FileBag } from "@/components/file-bag";
 import { SettingsDialog } from "@/components/settings-dialog";
@@ -41,6 +36,7 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { useSession } from "@/store/session";
+import { useVfsView } from "@/store/vfs-view";
 import type { SessionMeta } from "@/lib/session-storage";
 import { presetBadgeLabel } from "@/lib/preset-badge";
 import { vfs } from "@/lib/vfs";
@@ -175,12 +171,13 @@ export default function Home() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [panelDirection, setPanelDirection] = useState<"horizontal" | "vertical">("horizontal");
+  const [, setPanelDirection] = useState<"horizontal" | "vertical">("horizontal");
   const init = useSession((s) => s.init);
   const config = useSession((s) => s.config);
   const sessionId = useSession((s) => s.sessionId);
   const agentPreset = useSession((s) => s.agentPreset);
   const title = useSession((s) => s.title);
+  const rightPanelOpen = useVfsView((s) => s.rightPanelOpen);
   const sessions = useSession((s) => s.sessions);
   const newSession = useSession((s) => s.newSession);
   const switchSession = useSession((s) => s.switchSession);
@@ -396,15 +393,22 @@ export default function Home() {
 
       {/* Main area — terminal + file bag */}
       <main className="min-w-0 flex-1">
-        <ResizablePanelGroup direction={panelDirection} className="h-full">
-          <ResizablePanel defaultSize={panelDirection === "horizontal" ? 62 : 55} minSize={30}>
+        <div className="flex h-full min-w-0">
+          <div className="min-w-0 flex-1">
             <Terminal />
-          </ResizablePanel>
-          <ResizableHandle withHandle className="bg-[#E5E2D9] dark:bg-[#3a3731]" />
-          <ResizablePanel defaultSize={panelDirection === "horizontal" ? 38 : 45} minSize={25}>
-            <FileBag />
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          </div>
+          {/* 右栏：默认隐藏，顶部右上角按钮滑入 */}
+          <div
+            className={cn(
+              "h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-out",
+              rightPanelOpen ? "w-[380px] max-w-[90vw]" : "w-0",
+            )}
+          >
+            <div className="h-full w-[380px] max-w-[90vw]">
+              <FileBag />
+            </div>
+          </div>
+        </div>
       </main>
 
       <SettingsDialog

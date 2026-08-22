@@ -25,6 +25,8 @@ interface VfsViewState {
   rightPanelTab: "files" | "plan" | "subagents" | "audit";
   /** The subagent run to highlight in the 子智能体 panel (tool-call event id). */
   subagentFocus: string | null;
+  /** 右栏是否从右侧滑入（默认隐藏，顶部右上角按钮切换）。 */
+  rightPanelOpen: boolean;
 
   bump: () => void;
   select: (path: string | null) => void;
@@ -32,6 +34,7 @@ interface VfsViewState {
   init: () => void;
   setRightPanelTab: (tab: "files" | "plan" | "subagents" | "audit") => void;
   setSubagentFocus: (id: string | null) => void;
+  setRightPanelOpen: (open: boolean) => void;
 
   // Tab management
   openTab: (path: string) => void;
@@ -49,12 +52,15 @@ export const useVfsView = create<VfsViewState>((set, get) => ({
   expandedDirs: new Set<string>([""]),
   rightPanelTab: "files",
   subagentFocus: null,
+  rightPanelOpen: false,
 
   bump: () => set((s) => ({ version: s.version + 1 })),
 
   setRightPanelTab: (tab) => set({ rightPanelTab: tab }),
 
   setSubagentFocus: (id) => set({ subagentFocus: id }),
+
+  setRightPanelOpen: (open) => set({ rightPanelOpen: open }),
 
   select: (path) => {
     if (path) get().openTab(path);
