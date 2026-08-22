@@ -27,6 +27,7 @@ import {
   Check,
   CheckCircle2,
   X,
+  ChevronDown,
   XCircle,
   Wrench,
   Sparkles,
@@ -114,6 +115,7 @@ export function Terminal() {
   const lastUsage = useSession((s) => s.lastUsage);
   const config = useSession((s) => s.config);
   const setConfig = useSession((s) => s.setConfig);
+  const availableModels = useSession((s) => s.availableModels);
   const mode = useSession((s) => s.mode);
   const toggleMode = useSession((s) => s.toggleMode);
   const streamingText = useSession((s) => s.streamingText);
@@ -132,6 +134,14 @@ export function Terminal() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  // 模型切换下拉（header）
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
+  // header 可选的模型：provider 拉取的 + 当前模型（可能手动输入不在列表）
+  const headerModelChoices = useMemo(
+    () => Array.from(new Set([...(availableModels ?? []), config.model].filter(Boolean))),
+    [availableModels, config.model],
+  );
   // @mention state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
@@ -154,6 +164,18 @@ export function Terminal() {
       el.scrollTop = el.scrollHeight;
     }
   }, [events, streamingText, streamingReasoning, autoScroll]);
+
+  // 点击 header 模型下拉外部 → 关闭
+  useEffect(() => {
+    if (!modelMenuOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
+        setModelMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [modelMenuOpen]);
 
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -658,10 +680,46 @@ export function Terminal() {
       <div className="flex items-center justify-between border-b border-[#E5E2D9] px-4 py-2.5 text-xs dark:border-[#3a3731]">
         <div className="flex items-center gap-2 text-[#6B6862] dark:text-zinc-400">
           {config.hasApiKey && (
-            <span className="flex items-center gap-1.5 rounded-md bg-[#F5F3EE] px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium text-[#8B7355] dark:bg-[#262320] dark:text-[#E8A87C]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#E58F67]" />
-              {config.model}
-            </span>
+            <div className="relative" ref={modelMenuRef}>
+              <button
+                onClick={() => setModelMenuOpen((v) => !v)}
+                className="flex max-w-[220px] items-center gap-1.5 rounded-md bg-[#F5F3EE] px-3 py-1.5 text-[length:var(--font-size-ui-sm)] font-medium text-[#8B7355] transition-colors hover:bg-[#F0EDE5] dark:bg-[#262320] dark:text-[#E8A87C] dark:hover:bg-[#2a2723]"
+                title="切换模型"
+              >
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#E58F67]" />
+                <span className="truncate">{config.model}</span>
+                <ChevronDown className="h-3 w-3 shrink-0" />
+              </button>
+              {modelMenuOpen && (
+                <div className="absolute left-0 top-full z-50 mt-1.5 max-h-64 w-64 overflow-y-auto rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
+                  {headerModelChoices.length === 0 ? (
+                    <div className="px-3 py-2 text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
+                      暂无模型列表——在设置里点 Test 拉取
+                    </div>
+                  ) : (
+                    headerModelChoices.map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => {
+                          const visionLike = /vision|gpt-4o|gemini|claude/i.test(m);
+                          setConfig(visionLike ? { model: m, supportVision: true } : { model: m });
+                          setModelMenuOpen(false);
+                          toast.success(`模型已切换为 ${m}`);
+                        }}
+                        className={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-[length:var(--font-size-ui-sm)] transition-colors ${
+                          m === config.model
+                            ? "bg-[#E58F67]/10 text-[#E58F67]"
+                            : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]"
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{m}</span>
+                        {m === config.model && <Check className="h-3 w-3 shrink-0" />}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
         <div className="flex items-center gap-2">

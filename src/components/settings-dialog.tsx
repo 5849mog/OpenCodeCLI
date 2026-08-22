@@ -5,8 +5,8 @@
  * Settings persist to localStorage.
  */
 
-import { useEffect, useRef, useState } from "react";
-import { X, Settings, Eye, EyeOff, Zap, Download, Upload, Lock, RefreshCw, Trash2, FileText, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { X, Settings, Eye, EyeOff, Zap, Download, Upload, Lock, RefreshCw, Trash2, FileText, Loader2, ChevronDown, Check } from "lucide-react";
 import { useSession } from "@/store/session";
 import { fetchModels, fetchBalance, type BalanceResult } from "@/lib/ai-client";
 import { apiKeyVault } from "@/lib/api-key-vault";
@@ -79,6 +79,8 @@ export function SettingsDialog({
   const config = useSession((s) => s.config);
   const setConfig = useSession((s) => s.setConfig);
   const refreshSessionList = useSession((s) => s.refreshSessionList);
+  const setAvailableModels = useSession((s) => s.setAvailableModels);
+  const availableModels = useSession((s) => s.availableModels);
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -105,6 +107,20 @@ export function SettingsDialog({
   const [filesLoading, setFilesLoading] = useState(false);
   const [filesError, setFilesError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // ── 模型选择器：可见可点的模型列表（替代原生 datalist） ──
+  const [showModelList, setShowModelList] = useState(false);
+  const modelChoices = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(PRESETS.find((p) => p.baseUrl === config.baseUrl)?.models ?? []),
+          ...fetchedModels,
+          ...(config.model ? [config.model] : []),
+        ]),
+      ),
+    [config.baseUrl, config.model, fetchedModels],
+  );
 
   // The /user/balance endpoint is DeepSeek-specific — only surface the card
   // when the configured base URL points at deepseek.com.
@@ -185,16 +201,40 @@ export function SettingsDialog({
     toast.success("已清空 Files API 文件");
   };
 
-  // Auto-query balance when the dialog opens for a DeepSeek base URL.
+  // Auto-query balance + models when the dialog opens with a key configured.
   useEffect(() => {
-    if (open && isDeepSeek && apiKeyVault.getKey()) {
-      void queryBalance();
-      void loadFiles();
+    if (open && apiKeyVault.getKey()) {
+      void loadModels(true);
+      if (isDeepSeek) {
+        void queryBalance();
+        void loadFiles();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, config.baseUrl]);
 
   if (!open) return null;
+
+  const loadModels = async (silent = false): Promise<string[]> => {
+    const key = apiKeyVault.getKey();
+    if (!key || !config.baseUrl) return [];
+    try {
+      const models = await fetchModels({
+        baseUrl: config.baseUrl,
+        apiKey: key,
+      });
+      setFetchedModels(models);
+      setAvailableModels(models);
+      if (models.length > 0 && (!config.model || !models.includes(config.model))) {
+        setConfig({ model: models[0] });
+        if (!silent) toast.info(`Auto-set model to: ${models[0]}`);
+      }
+      return models;
+    } catch (e) {
+      if (!silent) toast.error(e instanceof Error ? e.message : String(e));
+      return [];
+    }
+  };
 
   const testConnection = async () => {
     setTesting(true);
@@ -205,18 +245,9 @@ export function SettingsDialog({
         setConfig({ hasApiKey: true });
         setKeyDirty(false);
       }
-      const models = await fetchModels({
-        baseUrl: config.baseUrl,
-        apiKey: apiKeyVault.getKey() ?? "",
-      });
-      setFetchedModels(models);
+      const models = await loadModels();
       if (models.length > 0) {
         toast.success(`Connection OK — ${models.length} models available`);
-        // Suggest the first model if the current model is empty or invalid
-        if (!config.model || !models.includes(config.model)) {
-          setConfig({ model: models[0] });
-          toast.info(`Auto-set model to: ${models[0]}`);
-        }
       } else {
         toast.warning("Connection works, but no models returned");
       }
@@ -410,7 +441,7 @@ export function SettingsDialog({
           </Field>
 
           {/* Model */}
-          <Field label="Model" hint="Must be a model name your provider supports">
+          <Field label="Model" hint="点下方模型名直接选择；也可手动输入任意模型名">
             <div className="flex gap-2">
               <input
                 value={config.model}
@@ -426,26 +457,65 @@ export function SettingsDialog({
                   );
                 }}
                 placeholder="gpt-4o"
-                list="model-suggestions"
                 className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
               />
-              <datalist id="model-suggestions">
-                {Array.from(
-                  new Set([
-                    ...(PRESETS.find((p) => p.baseUrl === config.baseUrl)?.models ?? []),
-                    ...fetchedModels,
-                  ]),
-                ).map((m) => <option key={m} value={m} />)}
-              </datalist>
               <button
                 onClick={testConnection}
                 disabled={testing || !keyInput}
                 className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-3 text-sm text-[#3D3B37] dark:text-zinc-300 hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:hover:bg-[#2a2723] disabled:opacity-40"
+                title="测试连接并拉取可用模型列表"
               >
                 <Zap className="h-3.5 w-3.5" />
                 {testing ? "Testing…" : "Test"}
               </button>
+              <button
+                onClick={() => {
+                  setShowModelList((v) => !v);
+                  if (fetchedModels.length === 0 && apiKeyVault.getKey()) void loadModels(true);
+                }}
+                disabled={testing}
+                className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-2.5 text-sm text-[#3D3B37] hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:text-zinc-300 dark:hover:bg-[#2a2723] disabled:opacity-40"
+                title="显示可选模型列表"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+                {showModelList ? "收起" : "模型列表"}
+              </button>
             </div>
+            {showModelList && (
+              <div className="mt-2 max-h-48 overflow-y-auto rounded border border-[#E5E2D9] bg-[#FFFFFF] dark:border-[#3a3731] dark:bg-[#1c1a17]">
+                {modelChoices.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-[#A8A29E] dark:text-zinc-500">
+                    {fetchedModels.length === 0 && !apiKeyVault.getKey()
+                      ? "先填入 API key，点 Test 拉取模型列表。"
+                      : "暂无模型——点 Test 尝试拉取。"}
+                  </div>
+                ) : (
+                  modelChoices.map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => {
+                        const visionLike = /vision|gpt-4o|gemini|claude/i.test(m);
+                        setConfig(visionLike ? { model: m, supportVision: true } : { model: m });
+                        setShowModelList(false);
+                      }}
+                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-xs transition-colors ${
+                        m === config.model
+                          ? "bg-[#E58F67]/10 text-[#E58F67]"
+                          : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]"
+                      }`}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{m}</span>
+                      {m === config.model && <Check className="h-3 w-3 shrink-0" />}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+            {fetchedModels.length > 0 && (
+              <div className="mt-1 text-[11px] text-[#A8A29E] dark:text-zinc-500">
+                {fetchedModels.length} 个可用模型已拉取
+              </div>
+            )}
           </Field>
 
           {/* Temperature + max tokens */}

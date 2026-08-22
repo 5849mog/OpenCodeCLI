@@ -359,6 +359,9 @@ interface SessionState {
 
   init: () => void;
   setConfig: (patch: Partial<AiConfig>) => void;
+  /** 从 provider /models 端点拉取到的可用模型列表（设置面板写入，主对话 header 切换器读取）。 */
+  availableModels: string[];
+  setAvailableModels: (models: string[]) => void;
   /** Clear the current session's content but keep its entry. Alias of clearSession. */
   reset: () => void;
   clearSession: () => Promise<void>;
@@ -658,6 +661,8 @@ export const useSession = create<SessionState>((set, get) => ({
   lastSentPayload: null,
   pendingOverrideMessages: null,
   setPendingOverrideMessages: (msgs) => set({ pendingOverrideMessages: msgs }),
+  availableModels: [],
+  setAvailableModels: (models) => set({ availableModels: models }),
 
   init: () => {
     const cfg = loadConfig();

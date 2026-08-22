@@ -15,6 +15,8 @@
  * terminal.tsx.
  */
 
+import { validateExternalUrl } from "./url-guard";
+
 export interface UploadFileResult {
   ok: boolean;
   fileId?: string;
@@ -54,6 +56,10 @@ async function authFetch(
   apiKey: string,
   init: RequestInit = {},
 ): Promise<Response> {
+  const blocked = validateExternalUrl(url);
+  if (blocked) {
+    throw new Error(`[files-api] ${blocked}`);
+  }
   return fetch(url, {
     ...init,
     headers: { Authorization: `Bearer ${apiKey}`, ...(init.headers ?? {}) },

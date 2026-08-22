@@ -10,6 +10,8 @@
  * path is OpenAI-compatible.
  */
 
+import { validateExternalUrl } from "./url-guard";
+
 /**
  * OpenAI-compatible content part. `content` can be a plain string (legacy /
  * non-vision models) or an array of these parts (required for vision models).
@@ -376,6 +378,8 @@ export async function fetchModels(
   config: Pick<AiClientConfig, "baseUrl" | "apiKey" | "headers">,
 ): Promise<string[]> {
   const url = joinUrl(config.baseUrl, "/models");
+  const blocked = validateExternalUrl(url);
+  if (blocked) throw new Error(blocked);
   const resp = await fetch(url, {
     headers: {
       Authorization: `Bearer ${config.apiKey}`,
@@ -423,10 +427,8 @@ export async function fetchBalance(
   } catch {
     throw new Error(`Invalid Base URL: ${config.baseUrl}`);
   }
-  // Browser-side fetch: only http/https is ever constructed from a URL.
-  if (base.protocol !== "https:" && base.protocol !== "http:") {
-    throw new Error(`Unsupported URL protocol: ${base.protocol}`);
-  }
+  const blocked = validateExternalUrl(config.baseUrl);
+  if (blocked) throw new Error(blocked);
   const url = `${base.origin}/user/balance`;
   const resp = await fetch(url, {
     headers: {
