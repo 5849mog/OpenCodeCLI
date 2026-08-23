@@ -1,0 +1,36 @@
+<svg width="1280" height="400" viewBox="0 0 1280 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景：产品同款深色中性黑 -->
+  <rect width="1280" height="400" fill="#0A0A0A"/>
+  <!-- 细网格 -->
+  <g stroke="#161616" stroke-width="1">
+    <path d="M0 80H1280 M0 160H1280 M0 240H1280 M0 320H1280"/>
+    <path d="M80 0V400 M160 0V400 M240 0V400 M320 0V400 M400 0V400 M480 0V400 M560 0V400 M640 0V400 M720 0V400 M800 0V400 M880 0V400 M960 0V400 M1040 0V400 M1120 0V400 M1200 0V400"/>
+  </g>
+  <!-- 橙色强调竖线 -->
+  <rect x="0" y="0" width="6" height="400" fill="#E58F67"/>
+  <!-- 标题 -->
+  <text x="96" y="168" font-family="system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="64" font-weight="700" fill="#F0F0F0">Open Code Web</text>
+  <text x="100" y="224" font-family="system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="26" fill="#8A8A8A">浏览器里的 AI 编程副驾 · 无需服务器 · iPad 即可写代码</text>
+  <!-- 特性胶囊 -->
+  <g font-family="system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif" font-size="17" fill="#A6A6A6">
+    <rect x="96" y="268" width="168" height="42" rx="21" stroke="#2A2A2A" fill="#111111"/>
+    <text x="128" y="294">纯前端静态部署</text>
+    <rect x="280" y="268" width="216" height="42" rx="21" stroke="#2A2A2A" fill="#111111"/>
+    <text x="316" y="294">DeepSeek 真分词器</text>
+    <rect x="512" y="268" width="172" height="42" rx="21" stroke="#2A2A2A" fill="#111111"/>
+    <text x="542" y="294">ZCode 式界面</text>
+    <rect x="700" y="268" width="196" height="42" rx="21" stroke="#2A2A2A" fill="#111111"/>
+    <text x="734" y="294">WASM 原生工具链</text>
+  </g>
+  <!-- 终端卡片（右侧） -->
+  <rect x="780" y="86" width="404" height="228" rx="14" fill="#161616" stroke="#2A2A2A"/>
+  <circle cx="808" cy="114" r="6" fill="#E58F67"/>
+  <circle cx="828" cy="114" r="6" fill="#333333"/>
+  <circle cx="848" cy="114" r="6" fill="#333333"/>
+  <g font-family="Consolas,'SF Mono',Menlo,monospace" font-size="17">
+    <text x="808" y="162" fill="#8A8A8A">$ open-code ask “写一个 love.txt”</text>
+    <text x="808" y="198" fill="#A6A6A6">▸ 思考中 · 已用 1,284 tokens …</text>
+    <text x="808" y="234" fill="#A6A6A6">▸ 已编辑 love.txt +7 -0</text>
+    <text x="808" y="270" fill="#E58F67">✓ 任务结束 · 2 个文件已更改 +58 -116</text>
+  </g>
+</svg>
