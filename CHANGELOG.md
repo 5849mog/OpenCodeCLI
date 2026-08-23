@@ -1,9 +1,12 @@
 # 🚀 OpenCodeCLI 成长日志
 
-> 由 Git 历史自动整理，共 **155** 次提交。最新在最上方。
+> 由 Git 历史自动整理，共 **188** 次提交。最新在最上方。
 
 | 日期 | 提交数 | 高亮 |
 |------|--------|------|
+| 2026-08-23 | 11 | 6 个新功能、4 个修复 |
+| 2026-08-22 | 20 | 9 个新功能、11 个修复 |
+| 2026-08-19 | 2 | 1 个新功能 |
 | 2026-08-18 | 12 | 9 个新功能 |
 | 2026-08-17 | 8 | 3 个新功能、4 个修复 |
 | 2026-08-16 | 7 | 6 个新功能、1 个修复 |
@@ -24,6 +27,306 @@
 | 2026-07-28 | 3 | 1 个新功能、1 个修复 |
 
 ---
+
+## 📅 2026-08-23
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/48642fc45bfdd10d94dba5c308bcff69dabf0d55">48642fc</a> — feat(tokenizer): 扩展真分词器用法 — 实时输入计数 + /tokens 与 /compact 精度化</summary>
+
+> - 输入框底部工具栏加 ≈N tokens 实时徽标（300ms 防抖）：输入文本走 countTokens 精确计数
+> - 附件兼容：图片按 vision 固定 384/张（与 content 计数一致）；文本/代码文件在附件时用真分词器
+> 预计算内容 token（UploadedAttachment.tokens），未就绪自动回退字符估算
+> - /tokens：读真实 tokenBudget（去掉 ~60,000 硬编码）+ 分词器精确统计当前上下文占用
+> - /compact：tokensBefore/tokensAfter 改走 contextCounter（就绪时精确，否则估算兜底）
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/ba4b4f831b7f762839d2a21c09fedd8c3c47a2a7">ba4b4f8</a> — fix(ui): 删除对话顶栏残留的 OpenCodeCLI-main / main 上下文 chips，只留标题与⋯菜单</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/60e4a929556e805753046ec3410ea5c42c3bdddc">60e4a92</a> — fix(ui): 折叠时机改为整轮完全完成后 —— 流式输出中/步骤间保持正常展示</summary>
+
+> 整轮完成判据 = 流已结束 && 全部工具有结果 && 总结已落地。之前仅按工具配对判断，
+> 会在上一步完成、下一步未开始（模型思考间隙）或总结还在流式时过早收起。
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/03a0c091a68edf4703d2b4b86bb0e8267d5f2709">03a0c09</a> — feat(ui): 整轮对话折叠 — 每轮一个「已工作 X 秒」头部，任务结束后完全隐藏执行轨迹</summary>
+
+> - groupRounds：用户消息→下一用户消息之间 = 一个轮次（执行轨迹 + 收尾总结）
+> - RoundBlock：整轮显示一个「已工作 X 秒 ⌄」折叠头（各片段耗时合计）
+> - 收尾总结始终可见；执行轨迹（叙述/思考/工具步骤卡）默认收起，点开向下滑出
+> - 任务运行中实时展开、完成后自动收起；收起态保留「N 个文件已更改 +N -M」统计行
+> - 连续纯文本消息各自成轮；复制/点赞/点踩/重新生成/时间戳移到轮次总结下
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/783780491bbf5bd48af69250a2f49fc11134fa79">7837804</a> — feat(ui): 设置界面重构为 ZCode 式全屏设置页 — 左侧分类导航 + 右侧内容页 + 卡片化区块</summary>
+
+> - 从居中模态框改为全屏设置页：左侧导航（返回工作区 + 基础设置/Agent 能力/数据与统计分组）
+> - 七个页面：模型设置 / 运行模式 / 搜索与抓取 / 自定义指令 / 安全 / 会话与备份 / 账户与用量
+> - 页面标题 + 状态徽标（provider/模式/搜索商），卡片化 Section（标题在外 + 圆角卡片）
+> - 全部布尔项改 ZCode 式 Switch 开关（自动压缩 / Thinking / Vision / Jina / 空闲锁定）
+> - API Key / Search Key 增加「保存」按钮（写入加密 vault），关闭=返回工作区时统一落盘
+> - 保留全部原有设置逻辑：预设、模型列表、Test、余额、Files API、导入导出、AES-GCM 锁定
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/ae6c7e45d9b3f653d54e20be2076b1e4d0e47ae1">ae6c7e4</a> — feat(ui): 对话折叠 — 任务结束后默认只显示总结，点击「已工作 X 秒」向下弹出完整执行轨迹</summary>
+
+> - TurnBlock 默认收起（工具运行中保持展开实时可见），点击头部「已工作 X 分 X 秒 ›」展开/收起
+> - 展开态：左侧时间线描边，完整显示叙述/思考过程/工具步骤卡
+> - 收起态：一行总结「N 个文件已更改 +N -M」（复用 lineDiff 真实计算）
+> - 与 ZCode 对话折叠细节对齐：尾部总结 + 变化摘要，中间执行内容按需展开
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/3bf0602ffb86f33186c8e83184cebce9ce826e31">3bf0602</a> — fix(ui): 侧栏会话平铺列表 + 输入框去项目顶栏 + Skill 改名 + 新增文件袋入口</summary>
+
+> - 会话列表：去掉项目节点(OpenCodeCLI-main/数戳)与树形分组，直接平铺，当前会话置顶橙色圆点高亮
+> - 输入框：删除顶部「📁 OpenCodeCLI-main ⌄」工具栏行，输入区收窄为 56px，两层结构(ZCode 对话式)
+> - 导航第三行「插件市场」→「Skill」(Sparkles 图标)
+> - 顶部导航新增「文件袋」行(FolderOpen)，右侧面板跟随高亮切换
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/713f5f21e02e12fe2ebcfbf5d3fb02551bee56d6">713f5f2</a> — feat(ui): ZCode 1:1 复刻 — 三明治输入框/首页建议区与功能卡片/对话顶栏上下文/项目树侧栏</summary>
+
+> - 输入框改三明治结构：顶栏(📁OpenCodeCLI-main+⚡)｜输入区｜底栏(+、橙色圆形完全访问徽标、⚙模型、⚡思考、圆形发送)
+> - 首页空状态：低透明度几何 Logo + 问候语 + 快捷建议×3 + 闲时任务订阅行 + Git站会摘要/CI报告/自定义 三卡片
+> - 对话页顶栏：会话标题 + 📁项目/⚡分支 chips + ⋯菜单(重命名/导出/清空)，删除旧品牌块
+> - AI 回复：已工作 X 秒 行 + 点赞/点踩；用户消息改 ZCode 式圆角气泡
+> - 侧栏：新建任务⌘N/搜索⌘K/插件市场 导航 + 项目树(可折叠/排序/新建) + 底部用户区(头像+名称+设置)
+> - 占位文案：首页「向 Open Code 提问…」/对话页「提出后续修改要求」
+> - 会话列表去掉完整/计划徽标，当前会话左侧橙色圆点高亮
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/4be54c59406566b7d3ed54092c0897dee866fb6e">4be54c5</a> — fix(ui): 输入框像素级对标 ZCode + 删除顶部品牌块</summary>
+
+> - 圆筒感根因：Tailwind 4 的 rounded-xl 实为 16px 圆角 → 改 rounded-[10px] 方圆形（ZCode 规格）
+> - 边框暗化 #3D3D3D（原 #333 偏亮的视觉胶囊感来自圆角+细边框叠加），底色 #1A1A1A，hover #4A4A4A
+> - + 按钮改 ZCode 式 30px 圆形细线描边按钮（圈+加号）
+> - header 左侧品牌块（TerminalIcon+Open Code）删除——顶部不再有名字块，品牌只留侧栏；空状态本就无 header
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/442a204ee833f89ac311a93987da0b812cc662a0">442a204</a> — feat(ui): 复刻 ZCode 布局 — Hero 居中输入框 + 单行命令框 + 侧栏对标重构</summary>
+
+> - 空状态：问候语 + 输入框垂直居中（ZCode 式 Hero），隐藏终端 header，去掉 chips/副标题
+> - 输入框单行内联造型：[+ 上传][textarea 自适应][模式⌄][模型⌄][思考⌄][↑] 同行，rounded-xl 扁平质感，聚焦橙色微光
+> - 有对话时输入框与事件流同为 max-w-3xl 居中列，内容与输入框同宽对齐
+> - 侧栏：新建任务/搜索会话/文件袋三条朴素动作行（替代边框按钮）；会话列表去分区标题、当前会话高亮置顶；新增标题搜索过滤（Esc/X 关闭）；当前会话未入列时兜底伪 meta 行
+> - 弹窗组件挂根级渲染，不随 Hero 条件移动；useMemo 提升至组件体避免条件 hook
+
+</details>
+
+<details open>
+<summary>• <a href="https://github.com/5849mog/OpenCodeCLI/commit/0cd8ccb6b7111eca1ec76e3e1a872241e6b8156e">0cd8ccb</a> — theme: 全局切换中性纯黑主题（保留橙色主调）</summary>
+
+> - 主区 #0A0A0A / 面板 #161616 / 侧栏 #202020（亮一档浮起来）
+> - 边框 #333、文字灰阶全中性化，暖棕点缀改柔橙 #C08A5F
+> - 16 文件 1068 处映射替换，旧暖色 hex 归零（#E58F67 橙色家族保留）
+
+</details>
+
+## 📅 2026-08-22
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/1d2e8ef6c48acfd97dfb6cf7e9fda28e3cec11b3">1d2e8ef</a> — fix(preset): run_lua/run_js 加入精简与极简白名单 + 提示词泛化工具枚举（消除'提示说有但函数列表没有'矛盾），修复精简/极简下无法运行脚本</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/c5e722af8a80ff21d05e09d432707ca0cebbe489">c5e722a</a> — fix(ui): 新文件 diff 不再显示幽灵空删除行 + 已编辑摘要 +N 绿/-M 红</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/05efee3b1df3bb9cad65948a627e90e6f6272f35">05efee3</a> — feat(ui): 用户消息原地修改 — 点铅笔泡泡内编辑(取消X/发送↑)，发送后替换该消息、清空其后内容并从该消息重建对话</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/6a469918f011e4b28725cdff1e3e0c8821f46ab6">6a46991</a> — feat(ui): 思考流式（思考中实时→自动闭合思考过程+真实时长）+ 终端命令不进摘要 + 已编辑(文件+目录+真实+N/-M) + 探索N文件/N搜索 + 扩展名图标 + 左右留白</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/ddd49a9d6010eb9bae3ac14f6d08415c09c9b3c1">ddd49a9</a> — fix(ui): AI 回复复制改为完整回合文本（思考+叙述+答案，跨工具调用）</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/af91d2446a49664cbb5de6c69d60b08489ef35a8">af91d24</a> — fix(ui): 生成过程直接以最终形态呈现 — 流式文字直渲染正文、删除正在分析/Generating/Continuing 状态横幅、思考不再流式展示</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/1f6ece5ae8b2970a2dd95f6e23c6d20f2b188515">1f6ece5</a> — fix(ui): 对话不再乱框（AI 回复去边框改正文）+ 用户消息加复制/修改按钮 + 重试按钮只留图标与复制同排</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/f825d86c0e79dea87e2add62bde3639b7b0ea568">f825d86</a> — feat(ui): 思考强度下拉加关闭+三档(low/high/max) + 步骤卡扁平化(展开才有盒子) + 运行态前缀文字白光流光/完成变暗 + 输入区去割裂</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/fbdbf27a6fdb9bb76783c09006e007f1530da801">fbdbf27</a> — feat(ui): 对话过程改 ZCode 式逐步卡片 — 思考/终端/编辑/写入/探索分类，运行中xx中→已xx，默认收起点开看细节</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/6a67a75b2e1273aeecd6addc26f5a7f4704a2b90">6a67a75</a> — fix(ui): 新建对话也显示完整引入 hero + 输入框底排对齐 ZCode（左[+/模式]右[模型/思考/发送]、去胶囊低饱和、新增思考强度下拉）</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/741ee4a5f40063df7472e542e9c72d899bb5a582">741ee4a</a> — fix(ui): 删除工作区选择器 + 模型菜单默认带 DeepSeek 模型 + 运行模式/执行模式合并为向上弹出下拉，运行中可切</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/5c9b4c2c6faa385304e65028b949115a10eac27c">5c9b4c2</a> — fix(ui): 输入框去硬编码(占位符/工作区名可配置) + 模型菜单改向上弹出并按 provider 分组</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/0faf82d2069f2ce8e88036d2a5798ae0191e8206">0faf82d</a> — feat(ui): 对话区改版 — 命令式输入框+空状态 hero+顶栏减负+消息气泡(复制/重改)+右栏右上角滑入</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/4b0485d909c0ce7c6c3d0a79450fc742687acd38">4b0485d</a> — feat(ui): 侧栏会话模式徽标 + Token 入口收敛（输入栏累计/本轮）+ Plan 徽标换图标 + 上传按钮改名</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/803bb9c21d21863b981321703616544fbdd6c641">803bb9c</a> — fix(preset): 模式随会话持久化（flushPersist/导入补 agentPreset）+ header 恒显模式徽标（含完整模式，旧会话默认 full）</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/6353974e142fd68d5f030f34769d7a1082589597">6353974</a> — fix(preset): full 模式与重构前逐字节一致（去掉误入的 tools-guide-light 段 + 还原空行结构）</summary>
+
+> - 修复：full 误含精简版 'Your tools'（tools-guide-light），实际应为详细 tools-guide
+> - 还原 customInstructions 空块时的双空行结构，与旧模板 ${ternary} 行为一致
+> - 新增 scripts/verify-full-identity.mjs：从 dce5fbc 提取旧 buildSystemPrompt，
+> 与当前 full 输出逐字节对比（含/不含 customInstructions 两例，16 断言）
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/fa6a6631fb4eb1e6585e2fe4b037262b6ec5f09b">fa6a663</a> — feat(preset): 三种运行模式（完整/精简/极简）+ 提示词/工具插件化</summary>
+
+> - system-prompt.ts 重构：单一大字符串 → 命名段落（hard/soft 分类），
+> buildSystemPrompt(preset) 确定性组装；minimal=一句话 persona（对标
+> DeepSeek Harness），light=去说教/元信息段（保留安全边界与失败协议）
+> - PRESET_TOOLS 工具白名单 + filterToolsByPreset：full=44、light=21 核心、
+> minimal=4（bash/read_file/edit_file/glob）
+> - session 级 agentPreset：创建时锁定（newSession 用 AiConfig.defaultPreset），
+> 切换需新建会话；主循环 system+tools 按 preset 过滤（dispatch 层不变）
+> - 子代理/编排器继承主代理 preset（工具集与提示词一致）
+> - PersistedSession 持久化 agentPreset；设置面板三选一（新会话默认）+
+> header 只读标签
+> - 缓存保证：每 preset 组装字节稳定，会话内锁定持续命中前缀缓存
+> - e2e：scripts/e2e-preset.mjs（24 断言：段落包含/排除/工具集/字节稳定）
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/dce5fbc1f1629dc47439233178faea30f8c282d7">dce5fbc</a> — fix(models): 模型选择器修复 + 主对话 header 切换 + URL 安全护栏</summary>
+
+> - 修复模型选择几乎不可用：datalist 改为可见可点的模型列表（预设+拉取合并），
+> 填 key + baseUrl 打开设置即自动拉取 /models（无需手动点 Test）
+> - 设置面板加'模型列表'展开按钮，选中即切换（含 supportVision 自动推断）
+> - 主对话 header 模型徽章 → 可点击下拉切换（读取 store 的 availableModels）
+> - session store 新增 availableModels/setAvailableModels 供两处共享
+> - 新增 url-guard.ts：请求前校验 host，拒绝 localhost/环回/私有/保留地址，
+> 接入 files-api / fetchModels / fetchBalance；e2e 14 断言
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/06709e18a2e6db62728abdc920719fb789740107">06709e1</a> — feat(files-api): DeepSeek Files API 文件管理（列表 + 删除 + 清空）</summary>
+
+> - listDeepSeekFiles / deleteDeepSeekFile：列出账户已上传文件、按 file_id 删除
+> - 设置对话框新增 DeepSeek Files API 管理面板：文件名/大小/日期，单个删除 + 一键清空
+> - 解决上传图片永久占用账户 25GiB 配额的问题（retrieve-file 低价值未做）
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/cf6b9c801899d00dce9885f6b49d374bb133dfdf">cf6b9c8</a> — feat(vision): 文件上传 + 图片视觉（deepseek-v4-flash-vision-exp）</summary>
+
+> - ChatMessage.content 支持 ContentPart[]（text/image_url/file），视觉模型可接收图片
+> - Files API 客户端（uploadFileToDeepSeek）：图片上传拿 file_id，失败自动回退 base64 内联
+> - 输入框附件按钮：所有格式上传 ≤10MB，写 VFS uploads/，图片走 Files API + 缩略图 chips
+> - VFS 存图（dataUrl）+ 文件袋编辑器渲染 <img>
+> - AiConfig.supportVision 模型旗标 + 设置面板开关 + DeepSeek vision-exp 预设
+> - token 计数适配数组 content（image 384 / file 15 / text 按字数），compact/审计/子代理安全处理
+> - e2e：scripts/e2e-vision.mjs（计数正确性 5 断言）
+
+</details>
+
+## 📅 2026-08-19
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/5869b03efe6d69989c2e73aa3237eee8cfdad8e5">5869b03</a> — feat(tools): 新增 batch_rename 工具，一步批量改后缀（glob 匹配 + find→replace + dry_run 预览）</summary>
+
+> _（无详细说明）_
+
+</details>
+
+<details open>
+<summary>📝 <a href="https://github.com/5849mog/OpenCodeCLI/commit/26cf423387790bb35a43b242ba77d75011b23ac0">26cf423</a> — docs: 重新生成 CHANGELOG.md（155 条提交 / 18 天）</summary>
+
+> _（无详细说明）_
+
+</details>
 
 ## 📅 2026-08-18
 
