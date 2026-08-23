@@ -184,7 +184,7 @@ flowchart LR
 
 ## 界面预览（截图待补充）
 
-> 📷 本 README 不内嵌产品截图 —— **等你亲自拍**。把截图放入 `assets/screenshots/`（如 `home.png`、`chat.png`、`settings.png`），再取消下方注释即可展示：
+
 
 ```md
 <!--
@@ -296,7 +296,7 @@ node scripts/e2e-vision.mjs   # 5 项：视觉消息 token 计数
 
 | 文档 | 说明 |
 |---|---|
-| [CHANGELOG.md](CHANGELOG.md) | 21 天 / 188 次提交的完整成长日志，按日期倒序、每条直达 commit（`node gen-changelog.mjs` 可重新生成） |
+| [CHANGELOG.md](CHANGELOG.md) | 所有提交的完整成长日志，按日期倒序、每条直达 commit（`node gen-changelog.mjs` 可重新生成） |
 | [WEB_TOOLS_GUIDE.md](WEB_TOOLS_GUIDE.md) | web_search / fetch_url 联网能力的完整配置指南 |
 
 ---
