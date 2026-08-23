@@ -1908,7 +1908,33 @@ function StreamingBubble({ text, reasoning }: { text: string; reasoning: string 
 // between tool calls stops being the main event; click to expand.
 // ---------------------------------------------------------------------------
 
+// 回合级汇总：工具调用次数 / 改动文件数 / 真实 +/- 行数（供收起态显示总结行）
+function turnStats(turn: TurnGroup): { calls: number; files: number; add: number; rem: number } | null {
+  let calls = 0;
+  const files = new Set<string>();
+  let add = 0;
+  let rem = 0;
+  for (const ev of turn.tools) {
+    if (ev.kind !== "tool-call") continue;
+    calls++;
+    const diff = ev.pairedResult?.diff ?? null;
+    if (!diff) continue;
+    files.add(diff.path);
+    const rows = lineDiff(
+      diff.before.length === 0 ? [] : diff.before.split("\n"),
+      diff.after.split("\n"),
+    );
+    add += rows.filter((r) => r.type === "add").length;
+    rem += rows.filter((r) => r.type === "del").length;
+  }
+  return calls > 0 ? { calls, files: files.size, add, rem } : null;
+}
+
 function TurnBlock({ turn }: { turn: TurnGroup }) {
+  // 运行中保持展开（可实时看执行），结束后默认收起（ZCode 式：只给总结，点开向下弹出详情）
+  const running = turn.tools.some((ev) => !ev.pairedResult);
+  const [expanded, setExpanded] = useState(() => running);
+  const stats = useMemo(() => turnStats(turn), [turn]);
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
@@ -1916,40 +1942,64 @@ function TurnBlock({ turn }: { turn: TurnGroup }) {
       transition={{ duration: 0.15 }}
       className="space-y-1.5"
     >
-      {/* 本轮工作耗时（ZCode 式「已工作 X 秒」） */}
-      {turn.durationMs != null && turn.durationMs > 0 && (
-        <div className="flex items-center gap-1 px-1 text-[12px] text-zinc-500" title="本轮工作耗时">
-          <span>已工作 {formatDuration(turn.durationMs)}</span>
-          <ChevronRight className="h-3 w-3" />
+      {/* 「已工作 X 秒」折叠开关：收起=只看总结；展开=向下弹出完整执行详情 */}
+      {(turn.durationMs != null && turn.durationMs > 0) || running ? (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-1 pl-1 text-[12px] text-zinc-500 transition-colors hover:text-zinc-300"
+          title={expanded ? "收起执行详情" : "展开执行详情"}
+        >
+          <span>已工作 {running && turn.durationMs == null ? "…" : formatDuration(turn.durationMs ?? 0)}</span>
+          <ChevronRight className={cn("h-3 w-3 transition-transform", expanded && "rotate-90")} />
+        </button>
+      ) : null}
+      {expanded ? (
+        /* 展开态：完整执行轨迹（叙述 + 思考过程 + 工具步骤），左侧时间线描边 */
+        <div className="ml-0.5 space-y-1.5 border-l border-[#333333] pl-2.5">
+          {/* 叙述文字：AI 的输出内容，在其应有的位置展示（不并入思考） */}
+          {turn.analysis && (
+            <div className="px-1 text-[#262626] dark:text-zinc-100">
+              <MarkdownRenderer text={turn.analysis} />
+            </div>
+          )}
+          {/* 思考过程：独立步骤，默认收起 */}
+          {turn.reasoning && turn.reasoning.trim().length > 0 && (
+            <ThinkingStep text={turn.reasoning} streaming={false} durationMs={turn.durationMs} />
+          )}
+          {/* 工具：每个动作一行可折叠步骤卡（运行中显示 xx中） */}
+          {turn.tools.map((ev) =>
+            ev.toolName === "dispatch_subagent" ? (
+              <SubagentCard
+                key={ev.id}
+                eventId={ev.id}
+                task={typeof ev.toolArgs?.task === "string" ? ev.toolArgs.task : ""}
+                running={!ev.pairedResult}
+              />
+            ) : (
+              <StepCard
+                key={ev.id}
+                name={ev.toolName!}
+                args={ev.toolArgs ?? {}}
+                result={ev.pairedResult}
+              />
+            ),
+          )}
         </div>
-      )}
-      {/* 叙述文字：AI 的输出内容，在其应有的位置展示（不并入思考） */}
-      {turn.analysis && (
-        <div className="px-1 text-[#262626] dark:text-zinc-100">
-          <MarkdownRenderer text={turn.analysis} />
-        </div>
-      )}
-      {/* 思考过程：独立步骤，默认收起 */}
-      {turn.reasoning && turn.reasoning.trim().length > 0 && (
-        <ThinkingStep text={turn.reasoning} streaming={false} durationMs={turn.durationMs} />
-      )}
-      {/* 工具：每个动作一行可折叠步骤卡（运行中显示 xx中） */}
-      {turn.tools.map((ev) =>
-        ev.toolName === "dispatch_subagent" ? (
-          <SubagentCard
-            key={ev.id}
-            eventId={ev.id}
-            task={typeof ev.toolArgs?.task === "string" ? ev.toolArgs.task : ""}
-            running={!ev.pairedResult}
-          />
-        ) : (
-          <StepCard
-            key={ev.id}
-            name={ev.toolName!}
-            args={ev.toolArgs ?? {}}
-            result={ev.pairedResult}
-          />
-        ),
+      ) : (
+        /* 收起态：一行总结（工具调用数 / 改动文件数 / +N -M） */
+        stats && (
+          <div className="flex items-center gap-1.5 pl-1 text-[12px] text-zinc-500">
+            <span>
+              {stats.files > 0 ? `${stats.files} 个文件已更改` : `${stats.calls} 次工具调用`}
+            </span>
+            {(stats.add > 0 || stats.rem > 0) && (
+              <span className="font-mono text-[10px]">
+                <span className="text-emerald-400">+{stats.add}</span>{" "}
+                <span className="text-red-400">-{stats.rem}</span>
+              </span>
+            )}
+          </div>
+        )
       )}
     </motion.div>
   );
