@@ -149,6 +149,8 @@ export interface UploadedAttachment {
   fileId?: string;
   /** 是否图片（决定进 ContentPart[] 还是仅写工作区）。 */
   isImage: boolean;
+  /** 附件内容 token 估算（图片=384 固定值，文本=真分词器计数）——输入框实时计数用。 */
+  tokens?: number;
 }
 
 /** 逐次 API 用量记录（审计面板/报告用，来源分主循环/子代理/编排）。 */

@@ -94,6 +94,7 @@ import "prismjs/components/prism-sql";
 import { useSession, type SessionEvent, type QuestionPanelData, type UploadedAttachment } from "@/store/session";
 import { uploadFileToDeepSeek } from "@/lib/files-api";
 import { apiKeyVault } from "@/lib/api-key-vault";
+import { countTokens, countConversationTokensAccurate } from "@/lib/wasm/tokenizer";
 
 /** Read a File/Blob as a data: URL (base64) — used for image attachments. */
 function fileToDataUrl(file: Blob): Promise<string> {
@@ -218,6 +219,18 @@ export function Terminal() {
   const attachInputRef = useRef<HTMLInputElement>(null);
   // 在途的 Files API 上传（避免并发 setState 竞态）
   const filesUploading = useRef(0);
+  // 实时输入 token 计数：输入文本 + 附件（真分词器精确，未就绪自动回退估算；300ms 防抖）
+  const [liveTokens, setLiveTokens] = useState(0);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void (async () => {
+        const textTokens = input.trim() ? await countTokens(input) : 0;
+        const attTokens = (attachments ?? []).reduce((s, a) => s + (a.tokens ?? 0), 0);
+        setLiveTokens(textTokens + attTokens);
+      })();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [input, attachments]);
   // 最后一个 assistant-message（最终答案）id——只有它能在下方显示「重改」。
   const lastAssistantEventId = useMemo(() => {
     let id: string | null = null;
@@ -343,7 +356,13 @@ export function Terminal() {
       }
       const isImage = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name);
       const path = `uploads/${file.name}`;
-      const att: UploadedAttachment = { name: file.name, path, isImage };
+      // 附件 token 预计算：图片按 vision 固定 384（与 content 计数一致），文本用真分词器
+      const att: UploadedAttachment = {
+        name: file.name,
+        path,
+        isImage,
+        tokens: isImage ? 384 : undefined,
+      };
       // 写 VFS（图片=dataUrl，其余=文本）
       try {
         if (isImage) {
@@ -352,6 +371,8 @@ export function Terminal() {
         } else {
           const text = await file.text();
           await vfs.writeFile(path, text);
+          // 文本/代码类附件：内容 token（真分词器精确；未就绪时自动回退字符估算）
+          att.tokens = await countTokens(text);
         }
       } catch {
         toast.error(`写入工作区失败: ${file.name}`);
@@ -465,25 +486,38 @@ export function Terminal() {
         pushSystem(buildHelpText());
         break;
 
-      case "tokens":
-        pushSystem(
-          lastUsage
-            ? [
-                `Tokens used this session: ${totalTokens.toLocaleString()} total (real API usage)`,
-                `  • Last request: ${lastUsage.prompt_tokens.toLocaleString()} prompt + ${lastUsage.completion_tokens.toLocaleString()} completion = ${lastUsage.total_tokens.toLocaleString()} total`,
-                `  • Compaction: ${compactCount} time(s), cumulatively released ~${(compactedReleases / 1000).toFixed(1)}K token`,
-                `  • Context budget: ~60,000 tokens (auto-truncates when exceeded)`,
-              ].join("\n")
-            : [
-                `Tokens used this session: ${totalTokens.toLocaleString()} total (real API usage)`,
-                `  • No usage data yet — send a message to the AI.`,
-                compactCount > 0
-                  ? `  • Compaction: ${compactCount} time(s), cumulatively released ~${(compactedReleases / 1000).toFixed(1)}K token`
-                  : `  • No compaction yet — type /compact to collapse old context into a summary`,
-                `  • Context budget: ~60,000 tokens (auto-truncates when exceeded)`,
-              ].join("\n"),
+      case "tokens": {
+        // 预算读真实配置；当前上下文占用在分词器就绪时做精确计数（未就绪自动回退估算）
+        const lines = lastUsage
+          ? [
+              `Tokens used this session: ${totalTokens.toLocaleString()} total (real API usage)`,
+              `  • Last request: ${lastUsage.prompt_tokens.toLocaleString()} prompt + ${lastUsage.completion_tokens.toLocaleString()} completion = ${lastUsage.total_tokens.toLocaleString()} total`,
+              `  • Compaction: ${compactCount} time(s), cumulatively released ~${(compactedReleases / 1000).toFixed(1)}K token`,
+            ]
+          : [
+              `Tokens used this session: ${totalTokens.toLocaleString()} total (real API usage)`,
+              `  • No usage data yet — send a message to the AI.`,
+              compactCount > 0
+                ? `  • Compaction: ${compactCount} time(s), cumulatively released ~${(compactedReleases / 1000).toFixed(1)}K token`
+                : `  • No compaction yet — type /compact to collapse old context into a summary`,
+            ];
+        lines.push(
+          `  • Context budget: ${config.tokenBudget.toLocaleString()} tokens (auto-truncates when exceeded)`,
         );
+        const emit = () => pushSystem(lines.join("\n"));
+        const payload = useSession.getState().lastSentPayload;
+        if (payload) {
+          void countConversationTokensAccurate(payload)
+            .then((n) => {
+              lines.push(`  • Current context: ~${n.toLocaleString()} tokens (精确计数)`);
+              emit();
+            })
+            .catch(() => emit());
+        } else {
+          emit();
+        }
         break;
+      }
 
       case "run": {
         // /run <command> — execute a bash command directly (no AI needed)
@@ -1255,6 +1289,15 @@ export function Terminal() {
                   </div>
                 )}
               </div>
+              {/* 实时输入计数徽标（Hero 与对话态同框生效） */}
+              {liveTokens > 0 && (
+                <span
+                  className="shrink-0 rounded px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-500"
+                  title="输入 + 附件 token 估算（真分词器就绪时精确计数）"
+                >
+                  ≈{liveTokens.toLocaleString()}
+                </span>
+              )}
               {/* 发送 */}
               <button
                 onClick={submit}

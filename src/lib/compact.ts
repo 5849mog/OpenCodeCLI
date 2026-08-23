@@ -24,7 +24,7 @@ import {
   type AiClientConfig,
   type ChatMessage,
 } from "./ai-client";
-import { estimateConversationTokens } from "./context";
+import { contextCounter } from "./wasm/tokenizer";
 
 /** How long the summary request may take before we fall back (ms). */
 const SUMMARY_TIMEOUT_MS = 60_000;
@@ -185,7 +185,7 @@ export async function compactConversation(
   aiConfig: AiClientConfig,
   signal?: AbortSignal,
 ): Promise<CompactResult> {
-  const tokensBefore = estimateConversationTokens(messages);
+  const tokensBefore = await contextCounter(messages);
   if (messages.length <= 2) {
     // Nothing worth compacting — keep as-is.
     return { messages, removedCount: 0, tokensBefore, tokensAfter: tokensBefore, mode: "llm" };
@@ -211,7 +211,7 @@ export async function compactConversation(
       messages: newMessages,
       removedCount: messages.length - newMessages.length,
       tokensBefore,
-      tokensAfter: estimateConversationTokens(newMessages),
+      tokensAfter: await contextCounter(newMessages),
       mode: "llm",
     };
   } catch {
@@ -231,7 +231,7 @@ export async function compactConversation(
       messages: working,
       removedCount: messages.length - working.length,
       tokensBefore,
-      tokensAfter: estimateConversationTokens(working),
+      tokensAfter: await contextCounter(working),
       mode: "heuristic",
     };
   }
