@@ -41,7 +41,6 @@ import {
   FilePlus,
   FolderSearch,
   Pencil,
-  FolderOpen,
   Zap,
   Settings2,
   MoreHorizontal,
@@ -833,20 +832,6 @@ export function Terminal() {
             title={title || "新会话"}
           >
             {title || "新会话"}
-          </span>
-          <span
-            className="hidden shrink-0 items-center gap-1 rounded-md bg-[#262626] px-2 py-1 text-[12px] text-zinc-300 sm:flex"
-            title="当前项目"
-          >
-            <FolderOpen className="h-3 w-3 text-zinc-500" />
-            OpenCodeCLI-main
-          </span>
-          <span
-            className="hidden shrink-0 items-center gap-1 rounded-md bg-[#262626] px-2 py-1 text-[12px] text-zinc-300 sm:flex"
-            title="当前分支"
-          >
-            <Zap className="h-3 w-3 text-zinc-500" />
-            main
           </span>
           <div className="relative shrink-0" ref={moreMenuRef}>
             <button
