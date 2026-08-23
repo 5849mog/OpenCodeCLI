@@ -17,7 +17,7 @@ import {
   ArrowUp,
   Copy,
   Download,
-  Upload,
+  Plus,
   Loader2,
   Square,
   Trash2,
@@ -747,9 +747,20 @@ export function Terminal() {
     ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
   }, [input]);
 
+  // 空状态：还没有任何 user/assistant 事件 → Hero 布局（隐藏 header，输入框居中）
+  const isEmpty =
+    events.every((ev) => ev.kind !== "user" && ev.kind !== "assistant-message") &&
+    !streamingText &&
+    !streamingReasoning;
+  // 提升到组件体：Hero 条件渲染后 JSX 内的 useMemo 会导致 hook 数量不稳定
+  const turnGroups = useMemo(() => groupAssistantTurns(groupToolEvents(events)), [events]);
+  const hour = new Date().getHours();
+  const greeting = hour < 6 ? "夜深了" : hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好";
+
   return (
-    <div className="flex h-full flex-col bg-background text-foreground font-mono text-[length:var(--font-size-base)] leading-relaxed">
-      {/* Header bar — model name centered, mode toggle right */}
+    <div className="relative flex h-full flex-col bg-background text-foreground font-mono text-[length:var(--font-size-base)] leading-relaxed">
+      {/* Header bar — model name centered, mode toggle right（空状态隐藏，首屏干净如 ZCode） */}
+      {!isEmpty && (
       <div className="flex items-center justify-between border-b border-[#DEDEDE] px-4 py-2.5 text-xs dark:border-[#333333]">
         <div className="flex items-center gap-2 text-[#6B6B6B] dark:text-zinc-500">
           <TerminalIcon className="h-3.5 w-3.5 text-[#E58F67]" />
@@ -808,6 +819,7 @@ export function Terminal() {
           )}
         </div>
       </div>
+      )}
 
       {/* Events stream */}
       <div
@@ -815,18 +827,9 @@ export function Terminal() {
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] [&::-webkit-scrollbar-track]:bg-transparent"
       >
-        {events.every((ev) => ev.kind !== "user" && ev.kind !== "assistant-message") &&
-          !streamingText &&
-          !streamingReasoning && (
-          <EmptyState
-            onUsePrompt={(t) => {
-              setInput(t);
-              textareaRef.current?.focus();
-            }}
-          />
-        )}
-        <div className="space-y-4">
-          {useMemo(() => groupAssistantTurns(groupToolEvents(events)), [events]).map((ev) =>
+        {/* 居中限宽列：对话内容与输入框同宽对齐（ZCode 式） */}
+        <div className="mx-auto w-full max-w-3xl space-y-4">
+          {turnGroups.map((ev) =>
             ev.kind === "turn" ? (
               <TurnBlock key={ev.id} turn={ev} />
             ) : (
@@ -852,50 +855,25 @@ export function Terminal() {
             <AssistantRow text={streamingText.text} streaming={true} />
           )}
         </div>
-
-          {/* Question modal — fixed overlay, appears as soon as AI calls ask_user_input */}
-          {pendingQuestions && (
-            <QuestionModal
-              panel={pendingQuestions}
-              onSubmit={(answers) => {
-                const answersText =
-                  `[用户回答 (${pendingQuestions.request_id})]:\n` +
-                  Object.entries(answers)
-                    .map(([qId, val]) => {
-                      const q = pendingQuestions.questions.find((q) => q.id === qId);
-                      const label = q ? q.question : qId;
-                      // 选项 id → label：让 AI 看到用户选的真实选项内容，而非随机 opt_xxx id。
-                      const resolve = (oid: string): string => {
-                        if (!q) return oid;
-                        return q.options.find((o) => o.id === oid)?.label ?? oid;
-                      };
-                      const value = Array.isArray(val)
-                        ? val.map(resolve).join(", ")
-                        : resolve(val);
-                      return `- ${label}: ${value}`;
-                    })
-                    .join("\n");
-                setPendingQuestions(null);
-                send(answersText);
-              }}
-            />
-          )}
-
-          {/* Zip tool bridges — download (zip_archive) + file picker (unzip_archive) */}
-          <ZipDownloadBridge />
-          <ZipPickerModal />
-
-          {/* Payload inspector — 查看/编辑上次发送给 AI 的完整上下文（/inspect 打开） */}
-          <PayloadInspector open={payloadOpen} onClose={() => setPayloadOpen(false)} />
-
-          {/* Token 用量面板 — 右侧滑出（输入区 token 计数 / /tokens 命令打开） */}
-          <TokenSheet open={tokenSheetOpen} onClose={() => setTokenSheetOpen(false)} />
       </div>
 
-      {/* Input */}
-      {/* Input area — 输入框与暗色背景融为一体（不再是独立渐变条） */}
-      <div className="px-4 py-3">
-        <div className="group relative flex flex-col gap-2 rounded-2xl border border-[#DEDEDE] bg-[#FAFAFA]/80 p-3 shadow-sm backdrop-blur transition-all duration-200 focus-within:border-[#E58F67]/60 focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.08),0_4px_20px_rgba(0,0,0,0.06)] dark:border-[#333333] dark:bg-[#161616]/70 dark:shadow-none dark:focus-within:border-[#E58F67]/50 dark:focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.12),0_8px_30px_rgba(0,0,0,0.4)]">
+      {/* Input — 有对话时是底部限宽列；空状态整体浮到主区正中（Hero，ZCode 式居中命令框） */}
+      <div
+        className={cn(
+          isEmpty
+            ? "pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center px-4"
+            : "mx-auto w-full max-w-3xl px-4 py-3",
+        )}
+      >
+        {isEmpty && (
+          <div className="mb-5 text-lg font-medium text-zinc-300">{greeting}，接下来交给我吧</div>
+        )}
+        <div
+          className={cn(
+            "group relative flex w-full items-center gap-1 rounded-xl border border-[#DEDEDE] bg-[#FAFAFA] px-2 py-1.5 transition-colors hover:border-[#C8C8C8] focus-within:border-[#E58F67]/70 focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.08)] dark:border-[#333333] dark:bg-[#161616] dark:hover:border-[#4D4D4D] dark:focus-within:border-[#E58F67]/70 dark:focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.10)]",
+            isEmpty && "pointer-events-auto max-w-3xl",
+          )}
+        >
           {/* 附件 chips（命令框上方） */}
           {attachments.length > 0 && (
             <div className="absolute bottom-full left-0 mb-2 flex max-w-full flex-wrap gap-1.5">
@@ -929,7 +907,16 @@ export function Terminal() {
               ))}
             </div>
           )}
-          {/* 中区：输入 */}
+          {/* 左侧：附件选择按钮（+，与输入同行） */}
+          <button
+            onClick={() => attachInputRef.current?.click()}
+            disabled={isStreaming || isCompacting || uploading}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#A6A6A6] transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300"
+            title={uploading ? "正在上传图片到 Files API…" : "上传文件（图片 / 文本，≤10MB）"}
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          </button>
+          {/* 中区：输入（flex-1 自适应增高，控件内联两侧） */}
           <textarea
             ref={textareaRef}
             value={input}
@@ -942,20 +929,9 @@ export function Terminal() {
                 : "向 Open Code 提问，使用 @ 引用文件，使用 / 调用命令"
             }
             disabled={isStreaming || isCompacting}
-            className="max-h-[200px] w-full resize-none bg-transparent text-[length:var(--font-size-base)] text-[#171717] placeholder:text-[#A6A6A6] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+            className="max-h-[200px] min-w-0 flex-1 resize-none self-center bg-transparent py-1.5 text-[length:var(--font-size-base)] text-[#171717] placeholder:text-[#A6A6A6] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
           />
-          {/* 底排：左 [+/模式]，右 [模型/思考/发送]（对齐参考图） */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-            <div className="flex items-center gap-0.5">
-              {/* 附件选择按钮 */}
-              <button
-                onClick={() => attachInputRef.current?.click()}
-                disabled={isStreaming || isCompacting || uploading}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#A6A6A6] transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300"
-                title={uploading ? "正在上传图片到 Files API…" : "上传文件（图片 / 文本，≤10MB）"}
-              >
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              </button>
+          {/* 右侧控件：模式 / 模型 / 思考 / 发送（同行内联，ZCode 式命令框） */}
               {/* 运行模式 + 执行模式 下拉：橙色盾牌（向上弹出） */}
               <div className="relative" ref={modeMenuRef}>
                 <button
@@ -1023,8 +999,6 @@ export function Terminal() {
                   </div>
                 )}
               </div>
-            </div>
-            <div className="flex items-center gap-0.5">
               {/* 模型选择器 */}
               {config.hasApiKey && (
                 <div className="relative" ref={modelMenuRef}>
@@ -1148,13 +1122,11 @@ export function Terminal() {
               <button
                 onClick={submit}
                 disabled={(!input.trim() && attachments.length === 0) || isStreaming || isCompacting}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-zinc-300 transition-all hover:bg-[#F0F0F0] hover:text-[#383838] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-100"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-300 transition-all hover:bg-[#F0F0F0] hover:text-[#383838] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-100"
                 title="Send (Enter)"
               >
                 <ArrowUp className="h-3.5 w-3.5" />
               </button>
-            </div>
-          </div>
           <input
             ref={attachInputRef}
             type="file"
@@ -1186,6 +1158,7 @@ export function Terminal() {
             </div>
           )}
         </div>
+        {!isEmpty && (
         <div className="mt-2 flex items-center justify-between px-1 text-[length:var(--font-size-ui-sm)] text-[#A6A6A6] dark:text-zinc-500">
           <span className="flex items-center gap-3">
             {totalTokens > 0 && (
@@ -1223,7 +1196,47 @@ export function Terminal() {
           </span>
           <span className="opacity-80">Enter 发送 · Shift+Tab 切换模式 · /help</span>
         </div>
+        )}
       </div>
+
+      {/* 弹窗/浮层 — 挂在根级，不随布局状态移动 */}
+      {/* Question modal — fixed overlay, appears as soon as AI calls ask_user_input */}
+      {pendingQuestions && (
+        <QuestionModal
+          panel={pendingQuestions}
+          onSubmit={(answers) => {
+            const answersText =
+              `[用户回答 (${pendingQuestions.request_id})]:\n` +
+              Object.entries(answers)
+                .map(([qId, val]) => {
+                  const q = pendingQuestions.questions.find((q) => q.id === qId);
+                  const label = q ? q.question : qId;
+                  // 选项 id → label：让 AI 看到用户选的真实选项内容，而非随机 opt_xxx id。
+                  const resolve = (oid: string): string => {
+                    if (!q) return oid;
+                    return q.options.find((o) => o.id === oid)?.label ?? oid;
+                  };
+                  const value = Array.isArray(val)
+                    ? val.map(resolve).join(", ")
+                    : resolve(val);
+                  return `- ${label}: ${value}`;
+                })
+                .join("\n");
+            setPendingQuestions(null);
+            send(answersText);
+          }}
+        />
+      )}
+
+      {/* Zip tool bridges — download (zip_archive) + file picker (unzip_archive) */}
+      <ZipDownloadBridge />
+      <ZipPickerModal />
+
+      {/* Payload inspector — 查看/编辑上次发送给 AI 的完整上下文（/inspect 打开） */}
+      <PayloadInspector open={payloadOpen} onClose={() => setPayloadOpen(false)} />
+
+      {/* Token 用量面板 — 右侧滑出（输入区 token 计数 / /tokens 命令打开） */}
+      <TokenSheet open={tokenSheetOpen} onClose={() => setTokenSheetOpen(false)} />
     </div>
   );
 }
@@ -1483,40 +1496,6 @@ function QuestionPanel({
         >
           {panel.submit_label}
         </button>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-
-function EmptyState({ onUsePrompt }: { onUsePrompt?: (text: string) => void }) {
-  const hour = new Date().getHours();
-  const greeting = hour < 6 ? "夜深了" : hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好";
-  const prompts = [
-    "分析这个项目的结构并给出改进建议",
-    "为这个仓库写一个 README 概览",
-    "解释这段代码是做什么的",
-  ];
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-6 py-12 text-center">
-      <div className="flex items-center gap-2 text-[length:var(--font-size-base)] font-medium text-[#8C8C8C] dark:text-zinc-400">
-        <TerminalIcon className="h-4 w-4 text-[#E58F67]" />
-        <span>{greeting}，接下来交给我吧</span>
-      </div>
-      <div className="flex max-w-xl flex-wrap items-center justify-center gap-2 text-[length:var(--font-size-ui-sm)]">
-        {prompts.map((p) => (
-          <button
-            key={p}
-            onClick={() => onUsePrompt?.(p)}
-            className="rounded-full border border-[#333333] bg-[#262626] px-3.5 py-1.5 text-[#A6A6A6] transition-colors hover:border-[#E58F67]/40 hover:text-[#E8A87C] dark:border-[#333333] dark:bg-[#262626] dark:hover:border-[#E58F67]/40 dark:hover:text-[#E8A87C]"
-          >
-            {p}
-          </button>
-        ))}
-      </div>
-      <div className="text-[length:var(--font-size-ui-sm)] text-[#6B6B6B] dark:text-zinc-500">
-        使用 @ 提及文件，或输入 / 使用命令
       </div>
     </div>
   );

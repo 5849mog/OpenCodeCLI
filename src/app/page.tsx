@@ -17,6 +17,9 @@ import {
   Trash2,
   MoreHorizontal,
   Sparkles,
+  Search,
+  FolderOpen,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -56,11 +59,13 @@ function formatRelativeTime(ts: number): string {
 
 function SessionRow({
   session,
+  active,
   onSwitch,
   onRename,
   onDelete,
 }: {
   session: SessionMeta;
+  active?: boolean;
   onSwitch: () => void;
   onRename: (title: string) => void;
   onDelete: () => void;
@@ -80,10 +85,11 @@ function SessionRow({
       onClick={onSwitch}
       className={cn(
         "group flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[#262626] dark:text-zinc-200",
-        "cursor-pointer hover:bg-white dark:hover:bg-[#262626]",
+        "cursor-pointer hover:bg-white dark:hover:bg-[#2A2A2A]",
+        active && "bg-[#E58F67]/10 text-[#E58F67] hover:bg-[#E58F67]/10 dark:bg-[#E58F67]/10 dark:text-[#E58F67]",
       )}
     >
-      <MessageSquare className="h-3.5 w-3.5 shrink-0 text-[#A6A6A6] dark:text-zinc-500" />
+      <MessageSquare className={cn("h-3.5 w-3.5 shrink-0 text-[#A6A6A6] dark:text-zinc-500", active && "text-[#E58F67]")} />
       {renaming ? (
         <input
           autoFocus
@@ -171,11 +177,12 @@ export default function Home() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [, setPanelDirection] = useState<"horizontal" | "vertical">("horizontal");
   const init = useSession((s) => s.init);
   const config = useSession((s) => s.config);
   const sessionId = useSession((s) => s.sessionId);
-  const agentPreset = useSession((s) => s.agentPreset);
   const title = useSession((s) => s.title);
   const rightPanelOpen = useVfsView((s) => s.rightPanelOpen);
   const sessions = useSession((s) => s.sessions);
@@ -299,54 +306,108 @@ export default function Home() {
               </button>
             </div>
 
-            {/* New chat button */}
-            <div className="px-3 pb-2">
+            {/* Action rows — 新建任务 / 搜索会话 / 文件袋（ZCode 式朴素动作行，无边框） */}
+            <div className="flex flex-col gap-0.5 px-2 pb-2">
               <button
                 onClick={() => void newSession()}
-                className="flex w-full items-center gap-2 rounded-lg border border-[#DEDEDE] bg-white px-3 py-2 text-sm text-[#6B6B6B] transition-colors hover:border-[#E58F67]/30 hover:text-[#E58F67] dark:border-[#333333] dark:bg-[#161616] dark:text-zinc-400"
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[#6B6B6B] transition-colors hover:bg-white hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
               >
-                <Plus className="h-4 w-4" />
-                新任务
+                <Plus className="h-4 w-4 shrink-0" />
+                新建任务
               </button>
+              <button
+                onClick={() => {
+                  setSearchOpen((v) => !v);
+                  if (searchOpen) setSearchQuery("");
+                }}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white hover:text-[#262626] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200",
+                  searchOpen ? "text-[#E58F67]" : "text-[#6B6B6B] dark:text-zinc-400",
+                )}
+              >
+                <Search className="h-4 w-4 shrink-0" />
+                搜索会话
+              </button>
+              <button
+                onClick={() => useVfsView.getState().setRightPanelOpen(!rightPanelOpen)}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white hover:text-[#262626] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200",
+                  rightPanelOpen ? "text-[#E58F67]" : "text-[#6B6B6B] dark:text-zinc-400",
+                )}
+              >
+                <FolderOpen className="h-4 w-4 shrink-0" />
+                文件袋
+              </button>
+              {searchOpen && (
+                <div className="mt-1 flex items-center gap-2 rounded-lg border border-[#DEDEDE] bg-white px-2.5 py-1.5 dark:border-[#333333] dark:bg-[#161616]">
+                  <Search className="h-3.5 w-3.5 shrink-0 text-[#A6A6A6] dark:text-zinc-500" />
+                  <input
+                    autoFocus
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setSearchOpen(false);
+                        setSearchQuery("");
+                      }
+                    }}
+                    placeholder="按标题过滤会话…"
+                    className="w-full min-w-0 bg-transparent text-xs text-[#262626] placeholder:text-[#A6A6A6] focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-500"
+                  />
+                  <button
+                    onClick={() => {
+                      setSearchOpen(false);
+                      setSearchQuery("");
+                    }}
+                    className="shrink-0 rounded p-0.5 text-[#A6A6A6] hover:text-[#262626] dark:text-zinc-500 dark:hover:text-zinc-200"
+                    title="关闭搜索"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Conversation list */}
+            {/* Session list — 无分区标题，当前会话高亮置顶（ZCode 式），搜索时按标题过滤 */}
             <div className="flex-1 overflow-y-auto px-2 py-2">
-              <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#A6A6A6] dark:text-zinc-500">
-                会话
-              </div>
-              {/* Current session */}
-              <div className="flex items-center gap-2 rounded-lg bg-[#E58F67]/8 px-3 py-2 text-sm text-[#262626] dark:bg-[#E58F67]/10 dark:text-zinc-100">
-                <MessageSquare className="h-3.5 w-3.5 shrink-0 text-[#E58F67]" />
-                <span className="truncate">{title || "新会话"}</span>
-                <span className="ml-auto flex shrink-0 items-center gap-1.5">
-                  <span className="text-[10px] text-[#8C8C8C] dark:text-zinc-500">{presetBadgeLabel(agentPreset)}</span>
-                  {config.hasApiKey && (
-                    <span className="text-[10px] text-[#A6A6A6] dark:text-zinc-500">{config.model}</span>
-                  )}
-                </span>
-              </div>
-              {/* History sessions */}
-              <div className="mb-1 mt-3 px-2 text-[10px] font-semibold uppercase tracking-wider text-[#A6A6A6] dark:text-zinc-500">
-                历史会话
-              </div>
-              {sessions.filter((s) => s.id !== sessionId).length === 0 ? (
-                <div className="px-2 py-3 text-xs text-[#A6A6A6] dark:text-zinc-500">暂无历史会话</div>
-              ) : (
-                <div className="space-y-0.5">
-                  {sessions
-                    .filter((s) => s.id !== sessionId)
-                    .map((s) => (
+              {(() => {
+                const q = searchQuery.trim().toLowerCase();
+                // 当前会话可能还没写入 sessions 列表（首条消息前）——兜底一个伪 meta，保证它始终显示
+                const fromList = sessions.find((s) => s.id === sessionId);
+                const current: SessionMeta =
+                  fromList ?? {
+                    id: sessionId,
+                    title: title || "新会话",
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                    totalTokens: 0,
+                    messageCount: 0,
+                  };
+                const ordered = [
+                  current,
+                  ...sessions.filter((s) => s.id !== sessionId),
+                ];
+                const list = q
+                  ? ordered.filter((s) => (s.title || "新会话").toLowerCase().includes(q))
+                  : ordered;
+                if (list.length === 0) {
+                  return <div className="px-2 py-3 text-xs text-[#A6A6A6] dark:text-zinc-500">没有匹配的会话</div>;
+                }
+                return (
+                  <div className="space-y-0.5">
+                    {list.map((s) => (
                       <SessionRow
                         key={s.id}
                         session={s}
+                        active={s.id === sessionId}
                         onSwitch={() => void switchSession(s.id)}
                         onRename={(t) => void renameSession(s.id, t)}
                         onDelete={() => void deleteSession(s.id)}
                       />
                     ))}
-                </div>
-              )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Bottom controls */}
