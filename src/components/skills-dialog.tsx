@@ -215,16 +215,16 @@ export function SkillsDialog({
           e.target.value = ""; // 允许重复选择同一文件
         }}
       />
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-[#E5E2D9] bg-[#FFFFFF] text-[#2D2B27] shadow-2xl dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-100">
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-[#DEDEDE] bg-[#FFFFFF] text-[#262626] shadow-2xl dark:border-[#333333] dark:bg-[#161616] dark:text-zinc-100">
         {/* Header */}
-        <div className="flex items-center gap-2 border-b border-[#E5E2D9] px-5 py-4 dark:border-[#3a3731]">
+        <div className="flex items-center gap-2 border-b border-[#DEDEDE] px-5 py-4 dark:border-[#333333]">
           <Sparkles className="h-5 w-5 text-[#E58F67]" />
           <h2 className="text-lg font-semibold">Skills · 技能包</h2>
           <span className="ml-1 flex items-center gap-1">
             <button
               onClick={() => void handleExport()}
               title="导出自定义 skill 为 JSON 备份"
-              className="flex items-center gap-1 rounded border border-[#E5E2D9] px-2 py-1 text-[11px] text-[#3D3B37] transition-colors hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:text-zinc-300 dark:hover:bg-[#2a2723]"
+              className="flex items-center gap-1 rounded border border-[#DEDEDE] px-2 py-1 text-[11px] text-[#383838] transition-colors hover:bg-[#F0F0F0] dark:border-[#333333] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]"
             >
               <Download className="h-3 w-3" />
               导出
@@ -232,7 +232,7 @@ export function SkillsDialog({
             <button
               onClick={() => fileInputRef.current?.click()}
               title="从 JSON 备份导入自定义 skill"
-              className="flex items-center gap-1 rounded border border-[#E5E2D9] px-2 py-1 text-[11px] text-[#3D3B37] transition-colors hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:text-zinc-300 dark:hover:bg-[#2a2723]"
+              className="flex items-center gap-1 rounded border border-[#DEDEDE] px-2 py-1 text-[11px] text-[#383838] transition-colors hover:bg-[#F0F0F0] dark:border-[#333333] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]"
             >
               <Upload className="h-3 w-3" />
               导入
@@ -250,40 +250,40 @@ export function SkillsDialog({
           </span>
           <button
             onClick={onClose}
-            className="ml-auto rounded p-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            className="ml-auto rounded p-1.5 text-[#8C8C8C] hover:bg-[#F0F0F0] hover:text-[#383838] dark:text-zinc-500 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Hint */}
-        <div className="border-b border-[#E5E2D9] px-5 py-2 text-[11px] text-[#8B8884] dark:border-[#3a3731] dark:text-zinc-500">
+        <div className="border-b border-[#DEDEDE] px-5 py-2 text-[11px] text-[#8C8C8C] dark:border-[#333333] dark:text-zinc-500">
           技能包可由 AI 通过 <span className="font-mono text-[#E58F67]">create_skill</span> 创建、<span className="font-mono text-[#E58F67]">delete_skill</span> 删除；也可在此新建 / 编辑 / 导入导出。点击卡片查看完整内容。
         </div>
 
         {/* Skill list */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+        <div className="flex-1 overflow-y-auto px-5 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
           {/* 新建表单 */}
           {creating && (
-            <div className="mb-4 rounded-lg border border-[#E58F67]/40 bg-[#FAF9F7] p-4 dark:border-[#E58F67]/30 dark:bg-[#161512]">
-              <div className="mb-2 text-xs font-semibold text-[#6B6862] dark:text-zinc-400">新建 Skill</div>
+            <div className="mb-4 rounded-lg border border-[#E58F67]/40 bg-[#FAFAFA] p-4 dark:border-[#E58F67]/30 dark:bg-[#0A0A0A]">
+              <div className="mb-2 text-xs font-semibold text-[#6B6B6B] dark:text-zinc-400">新建 Skill</div>
               <input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="skill 名称（字母数字点横线下划线，≤64）"
-                className="mb-2 w-full rounded border border-[#E5E2D9] bg-[#FFFFFF] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
+                className="mb-2 w-full rounded border border-[#DEDEDE] bg-[#FFFFFF] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#333333] dark:bg-[#0A0A0A] dark:text-zinc-100"
               />
               <textarea
                 value={newContent}
                 onChange={(e) => setNewContent(e.target.value)}
                 placeholder={"# Skill 标题\n\n填写技能说明与指令（Markdown）。首行 # 标题会成为列表里的描述。"}
                 rows={6}
-                className="mb-2 w-full rounded border border-[#E5E2D9] bg-[#FFFFFF] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
+                className="mb-2 w-full rounded border border-[#DEDEDE] bg-[#FFFFFF] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#333333] dark:bg-[#0A0A0A] dark:text-zinc-100"
               />
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => { setCreating(false); setNewName(""); setNewContent(""); }}
-                  className="rounded border border-[#E5E2D9] px-3 py-1.5 text-xs text-[#8B8884] hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:text-zinc-400 dark:hover:bg-[#2a2723]"
+                  className="rounded border border-[#DEDEDE] px-3 py-1.5 text-xs text-[#8C8C8C] hover:bg-[#F0F0F0] dark:border-[#333333] dark:text-zinc-400 dark:hover:bg-[#2A2A2A]"
                 >
                   取消
                 </button>
@@ -300,7 +300,7 @@ export function SkillsDialog({
           )}
 
           {metas.length === 0 ? (
-            <div className="rounded border border-dashed border-[#E5E2D9] px-4 py-8 text-center text-xs text-[#8B8884] dark:border-[#3a3731] dark:text-zinc-500">
+            <div className="rounded border border-dashed border-[#DEDEDE] px-4 py-8 text-center text-xs text-[#8C8C8C] dark:border-[#333333] dark:text-zinc-500">
               暂无可用 Skill。
             </div>
           ) : (
@@ -315,8 +315,8 @@ export function SkillsDialog({
                     className={cn(
                       "overflow-hidden rounded-lg border transition-colors",
                       isOpen
-                        ? "border-[#E58F67]/40 bg-[#FAF9F7] dark:border-[#E58F67]/30 dark:bg-[#161512]"
-                        : "border-[#E5E2D9] bg-[#FFFFFF] hover:border-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#1c1a17] dark:hover:border-[#52504b]",
+                        ? "border-[#E58F67]/40 bg-[#FAFAFA] dark:border-[#E58F67]/30 dark:bg-[#0A0A0A]"
+                        : "border-[#DEDEDE] bg-[#FFFFFF] hover:border-[#D4D4D4] dark:border-[#333333] dark:bg-[#161616] dark:hover:border-[#4D4D4D]",
                     )}
                   >
                     <button
@@ -326,16 +326,16 @@ export function SkillsDialog({
                       {isOpen ? (
                         <ChevronDown className="h-4 w-4 shrink-0 text-[#E58F67]" />
                       ) : (
-                        <ChevronRight className="h-4 w-4 shrink-0 text-[#8B8884] dark:text-zinc-500" />
+                        <ChevronRight className="h-4 w-4 shrink-0 text-[#8C8C8C] dark:text-zinc-500" />
                       )}
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#E58F67]/10">
                         <Sparkles className="h-4 w-4 text-[#E58F67]" />
                       </span>
                       <span className="flex-1">
-                        <span className="block font-mono text-sm font-semibold text-[#2D2B27] dark:text-zinc-100">
+                        <span className="block font-mono text-sm font-semibold text-[#262626] dark:text-zinc-100">
                           {m.name}
                         </span>
-                        <span className="mt-0.5 block text-xs text-[#6B6862] dark:text-zinc-400">
+                        <span className="mt-0.5 block text-xs text-[#6B6B6B] dark:text-zinc-400">
                           {m.description}
                         </span>
                       </span>
@@ -357,26 +357,26 @@ export function SkillsDialog({
                             void handleDelete(m);
                           }}
                           title="删除自定义 skill"
-                          className="shrink-0 rounded p-1.5 text-[#A8A29E] transition-colors hover:bg-[#E54D2E]/10 hover:text-[#E54D2E]"
+                          className="shrink-0 rounded p-1.5 text-[#A6A6A6] transition-colors hover:bg-[#E54D2E]/10 hover:text-[#E54D2E]"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </span>
                       )}
                     </button>
                     {isOpen && (
-                      <div className="border-t border-[#E5E2D9] px-4 py-3 dark:border-[#3a3731]">
+                      <div className="border-t border-[#DEDEDE] px-4 py-3 dark:border-[#333333]">
                         {isEditing ? (
                           <div>
                             <textarea
                               value={editContent}
                               onChange={(e) => setEditContent(e.target.value)}
                               rows={10}
-                              className="mb-2 w-full rounded border border-[#E5E2D9] bg-[#FFFFFF] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
+                              className="mb-2 w-full rounded border border-[#DEDEDE] bg-[#FFFFFF] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#333333] dark:bg-[#0A0A0A] dark:text-zinc-100"
                             />
                             <div className="flex justify-end gap-2">
                               <button
                                 onClick={() => setEditing(null)}
-                                className="rounded border border-[#E5E2D9] px-3 py-1.5 text-xs text-[#8B8884] hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:text-zinc-400 dark:hover:bg-[#2a2723]"
+                                className="rounded border border-[#DEDEDE] px-3 py-1.5 text-xs text-[#8C8C8C] hover:bg-[#F0F0F0] dark:border-[#333333] dark:text-zinc-400 dark:hover:bg-[#2A2A2A]"
                               >
                                 取消
                               </button>
@@ -397,7 +397,7 @@ export function SkillsDialog({
                               <div className="mt-3 flex justify-end">
                                 <button
                                   onClick={() => startEdit(m.name)}
-                                  className="flex items-center gap-1 rounded border border-[#E5E2D9] px-3 py-1.5 text-xs text-[#3D3B37] hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:text-zinc-300 dark:hover:bg-[#2a2723]"
+                                  className="flex items-center gap-1 rounded border border-[#DEDEDE] px-3 py-1.5 text-xs text-[#383838] hover:bg-[#F0F0F0] dark:border-[#333333] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]"
                                 >
                                   <Pencil className="h-3 w-3" />
                                   编辑
@@ -415,9 +415,9 @@ export function SkillsDialog({
           )}
 
           {/* Storage + 管理说明 */}
-          <div className="mt-4 rounded-md border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-[11px] text-[#8B8884] dark:border-[#3a3731] dark:bg-[#262320] dark:text-zinc-500">
+          <div className="mt-4 rounded-md border border-[#DEDEDE] bg-[#FAFAFA] px-3 py-2 text-[11px] text-[#8C8C8C] dark:border-[#333333] dark:bg-[#262626] dark:text-zinc-500">
             <div className="mb-1">
-              <span className="font-semibold text-[#6B6862] dark:text-zinc-400">存储位置：</span>
+              <span className="font-semibold text-[#6B6B6B] dark:text-zinc-400">存储位置：</span>
               <span className="text-[#E58F67]">内置</span> skill 随程序内置，不在文件袋；自定义 skill 存于独立的浏览器存储，与文件袋内容互不影响——清空文件袋不会丢失。
               {" "}导出会备份全部自定义 skill（内置不导出）。
             </div>

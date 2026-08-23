@@ -66,7 +66,7 @@ export function FileBag() {
 
   if (!hydrated) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#FFFFFF] text-[#8B8884] dark:bg-background dark:text-zinc-500">
+      <div className="flex h-full items-center justify-center bg-[#FFFFFF] text-[#8C8C8C] dark:bg-background dark:text-zinc-500">
         <div className="animate-pulse text-[length:var(--font-size-ui-sm)]">loading 文件袋…</div>
       </div>
     );
@@ -198,9 +198,9 @@ function FileBagInner() {
   };
 
   return (
-    <div className="flex h-full flex-col bg-[#FFFFFF] text-[#2D2B27] dark:bg-background dark:text-zinc-100">
+    <div className="flex h-full flex-col bg-[#FFFFFF] text-[#262626] dark:bg-background dark:text-zinc-100">
       {/* Toolbar + tabs */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-[#E5E2D9] px-2 py-2 text-[length:var(--font-size-ui-sm)] dark:border-[#3a3731]">
+      <div className="flex flex-wrap items-center gap-1 border-b border-[#DEDEDE] px-2 py-2 text-[length:var(--font-size-ui-sm)] dark:border-[#333333]">
         {/* Panel tabs — sliding underline indicator */}
         <div className="mr-3 flex items-center gap-1 border-b border-transparent">
           {(
@@ -220,7 +220,7 @@ function FileBagInner() {
                   "relative flex items-center gap-1.5 rounded px-2.5 py-1.5 font-medium transition-colors",
                   active
                     ? "text-[#E58F67]"
-                    : "text-[#8B8884] hover:bg-[#F5F3EE] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:bg-[#262320] dark:hover:text-zinc-300",
+                    : "text-[#8C8C8C] hover:bg-[#F5F5F5] hover:text-[#383838] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-300",
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -251,17 +251,17 @@ function FileBagInner() {
 
         {/* Files toolbar — only show when on files tab */}
         {rightPanelTab === "files" && (<>
-        <div className="h-5 w-px bg-[#E5E2D9] dark:bg-[#3a3731]" />
+        <div className="h-5 w-px bg-[#DEDEDE] dark:bg-[#333333]" />
         <button
           onClick={() => setTreeCollapsed(!treeCollapsed)}
-          className="flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27] tablet:flex desktop:hidden dark:text-zinc-400 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+          className="flex items-center gap-1 rounded px-3 py-2 text-[#6B6B6B] hover:bg-[#F0F0F0] hover:text-[#262626] tablet:flex desktop:hidden dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
           title={treeCollapsed ? "展开文件树" : "折叠文件树"}
         >
           <PanelLeft className="h-3 w-3" />
         </button>
         <button
           onClick={handleUploadClick}
-          className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-400 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+          className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6B6B] hover:bg-[#F0F0F0] hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
           title="上传文件"
         >
           <Upload className="h-3 w-3" />
@@ -269,7 +269,7 @@ function FileBagInner() {
         </button>
         <button
           onClick={handleFolderUploadClick}
-          className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-400 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+          className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6B6B] hover:bg-[#F0F0F0] hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
           title="Upload folder"
         >
           <FolderUp className="h-3 w-3" />
@@ -277,7 +277,7 @@ function FileBagInner() {
         </button>
         <button
           onClick={() => setNewFileModal(true)}
-          className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-400 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+          className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6B6B] hover:bg-[#F0F0F0] hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
           title="New file"
         >
           <FilePlus className="h-3 w-3" />
@@ -286,7 +286,7 @@ function FileBagInner() {
         <div className="ml-auto flex items-center gap-1">
           <button
             onClick={handleDownloadZip}
-            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-400 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6B6B] hover:bg-[#F0F0F0] hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
             title="Download workspace as zip"
           >
             <Download className="h-3 w-3" />
@@ -294,14 +294,14 @@ function FileBagInner() {
           </button>
           <button
             onClick={handleClear}
-            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#E54D2E]/10 hover:text-[#E54D2E] dark:text-zinc-400"
+            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6B6B] hover:bg-[#E54D2E]/10 hover:text-[#E54D2E] dark:text-zinc-400"
             title="Clear workspace"
           >
             <Trash2 className="h-3 w-3" />
           </button>
           <button
             onClick={() => bump()}
-            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-400 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6B6B] hover:bg-[#F0F0F0] hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
             title="Refresh"
           >
             <RefreshCw className="h-3 w-3" />
@@ -341,7 +341,7 @@ function FileBagInner() {
         activeTab ? (
           <div className="flex min-h-0 flex-1">
             <div className={cn(
-              "shrink-0 border-r border-[#E5E2D9] overflow-y-auto transition-all duration-200 ease-in-out",
+              "shrink-0 border-r border-[#DEDEDE] overflow-y-auto transition-all duration-200 ease-in-out",
               treeCollapsed ? "w-0 overflow-hidden border-r-0" : "w-48"
             )}>
               <FileTree onOpen={(p) => openTab(p)} />
@@ -423,32 +423,32 @@ function FileTree({ onOpen }: { onOpen: (path: string) => void }) {
       .slice(0, 50);
     return (
       <div className="flex h-full flex-col font-mono text-[length:var(--font-size-code)]">
-        <div className="border-b border-[#E5E2D9] p-2 dark:border-[#3a3731]">
-          <div className="flex items-center gap-1.5 rounded border border-[#E5E2D9] bg-[#FAF9F7] px-2 py-1 dark:border-[#3a3731] dark:bg-[#1c1a17]">
-            <Search className="h-3 w-3 text-[#8B8884] dark:text-zinc-500" />
+        <div className="border-b border-[#DEDEDE] p-2 dark:border-[#333333]">
+          <div className="flex items-center gap-1.5 rounded border border-[#DEDEDE] bg-[#FAFAFA] px-2 py-1 dark:border-[#333333] dark:bg-[#161616]">
+            <Search className="h-3 w-3 text-[#8C8C8C] dark:text-zinc-500" />
             <input
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search files…"
-              className="flex-1 bg-transparent text-[#2D2B27] placeholder:text-[#A8A29E] focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-500"
+              className="flex-1 bg-transparent text-[#262626] placeholder:text-[#A6A6A6] focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-500"
             />
             {query && (
               <button
                 onClick={() => setQuery("")}
-                className="text-[#8B8884] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:text-zinc-200"
+                className="text-[#8C8C8C] hover:text-[#383838] dark:text-zinc-500 dark:hover:text-zinc-200"
               >
                 <X className="h-3 w-3" />
               </button>
             )}
           </div>
-          <div className="mt-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
+          <div className="mt-1 text-[length:var(--font-size-ui-sm)] text-[#A6A6A6] dark:text-zinc-500">
             {matched.length} match{matched.length !== 1 ? "es" : ""}
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto py-1 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+        <div className="flex-1 overflow-y-auto py-1 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
           {matched.length === 0 ? (
-            <div className="px-3 py-4 text-center text-[#A8A29E] dark:text-zinc-500">No files match "{query}"</div>
+            <div className="px-3 py-4 text-center text-[#A6A6A6] dark:text-zinc-500">No files match "{query}"</div>
           ) : (
             matched.map((f) => (
               <button
@@ -457,11 +457,11 @@ function FileTree({ onOpen }: { onOpen: (path: string) => void }) {
                   onOpen(f.path);
                   setQuery("");
                 }}
-                className="flex w-full items-center gap-1.5 px-2 py-1 text-left hover:bg-[#F0EDE5] dark:hover:bg-[#2a2723]"
+                className="flex w-full items-center gap-1.5 px-2 py-1 text-left hover:bg-[#F0F0F0] dark:hover:bg-[#2A2A2A]"
                 title={f.path}
               >
-                <FileTypeIcon path={f.path} className="h-3.5 w-3.5 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
-                <span className="truncate text-[#3D3B37] dark:text-zinc-300">{f.path}</span>
+                <FileTypeIcon path={f.path} className="h-3.5 w-3.5 shrink-0 text-[#C08A5F] dark:text-[#E8A87C]" />
+                <span className="truncate text-[#383838] dark:text-zinc-300">{f.path}</span>
               </button>
             ))
           )}
@@ -472,19 +472,19 @@ function FileTree({ onOpen }: { onOpen: (path: string) => void }) {
 
   return (
     <div className="flex h-full flex-col font-mono text-[length:var(--font-size-code)]">
-      <div className="border-b border-[#E5E2D9] p-2 dark:border-[#3a3731]">
-        <div className="flex items-center gap-1.5 rounded border border-[#E5E2D9] bg-[#FAF9F7] px-2 py-1 dark:border-[#3a3731] dark:bg-[#1c1a17]">
-          <Search className="h-3 w-3 text-[#8B8884] dark:text-zinc-500" />
+      <div className="border-b border-[#DEDEDE] p-2 dark:border-[#333333]">
+        <div className="flex items-center gap-1.5 rounded border border-[#DEDEDE] bg-[#FAFAFA] px-2 py-1 dark:border-[#333333] dark:bg-[#161616]">
+          <Search className="h-3 w-3 text-[#8C8C8C] dark:text-zinc-500" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search files…"
-            className="flex-1 bg-transparent text-[#2D2B27] placeholder:text-[#A8A29E] focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-500"
+            className="flex-1 bg-transparent text-[#262626] placeholder:text-[#A6A6A6] focus:outline-none dark:text-zinc-200 dark:placeholder:text-zinc-500"
           />
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto py-1 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
-        <div className="px-2 py-1 text-[length:var(--font-size-ui-sm)] uppercase tracking-wider text-[#A8A29E] dark:text-zinc-500">
+      <div className="flex-1 overflow-y-auto py-1 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
+        <div className="px-2 py-1 text-[length:var(--font-size-ui-sm)] uppercase tracking-wider text-[#A6A6A6] dark:text-zinc-500">
           workspace
         </div>
         <TreeChildren dir={root} depth={0} expanded={expanded} toggleDir={toggleDir} onOpen={onOpen} onDelete={setDeleteTarget} />
@@ -493,15 +493,15 @@ function FileTree({ onOpen }: { onOpen: (path: string) => void }) {
 
       {/* 删除文件夹确认框（样式化） */}
       <AlertDialog open={deleteTarget !== null} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
-        <AlertDialogContent className="border-[#E5E2D9] bg-[#FFFFFF] text-[#2D2B27] dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-100">
+        <AlertDialogContent className="border-[#DEDEDE] bg-[#FFFFFF] text-[#262626] dark:border-[#333333] dark:bg-[#161616] dark:text-zinc-100">
           <AlertDialogHeader>
             <AlertDialogTitle>删除文件夹「{deleteTarget ?? ""}」？</AlertDialogTitle>
-            <AlertDialogDescription className="text-[#6B6862] dark:text-zinc-400">
+            <AlertDialogDescription className="text-[#6B6B6B] dark:text-zinc-400">
               将递归删除该文件夹下所有内容（{deleteCount} 个文件）。此操作不可撤销。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="border-[#E5E2D9] text-[#3D3B37] hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:text-zinc-300 dark:hover:bg-[#2a2723]">
+            <AlertDialogCancel className="border-[#DEDEDE] text-[#383838] hover:bg-[#F0F0F0] dark:border-[#333333] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]">
               取消
             </AlertDialogCancel>
             <AlertDialogAction
@@ -535,7 +535,7 @@ function TreeChildren({
   const children = vfs.listSync(dir);
   if (children.length === 0 && depth === 0) {
     return (
-      <div className="px-4 py-2 text-[#A8A29E] dark:text-zinc-500">
+      <div className="px-4 py-2 text-[#A6A6A6] dark:text-zinc-500">
         No files yet. Upload files or ask the AI to create some.
       </div>
     );
@@ -581,16 +581,16 @@ function TreeRow({
       <button
         onClick={() => (isDir ? toggleDir(node.path) : onOpen(node.path))}
         className={cn(
-          "flex w-full items-center gap-1 py-1 pr-7 text-left hover:bg-[#F0EDE5] dark:hover:bg-[#2a2723]",
+          "flex w-full items-center gap-1 py-1 pr-7 text-left hover:bg-[#F0F0F0] dark:hover:bg-[#2A2A2A]",
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
         {isDir ? (
           <>
             {isOpen ? (
-              <ChevronDown className="h-3 w-3 shrink-0 text-[#8B8884] dark:text-zinc-500" />
+              <ChevronDown className="h-3 w-3 shrink-0 text-[#8C8C8C] dark:text-zinc-500" />
             ) : (
-              <ChevronRight className="h-3 w-3 shrink-0 text-[#8B8884] dark:text-zinc-500" />
+              <ChevronRight className="h-3 w-3 shrink-0 text-[#8C8C8C] dark:text-zinc-500" />
             )}
             {isOpen ? (
               <FolderOpen className="h-3.5 w-3.5 shrink-0 text-[#B87B5A] dark:text-[#E8A87C]" />
@@ -601,10 +601,10 @@ function TreeRow({
         ) : (
           <>
             <span className="w-3 shrink-0" />
-            <FileTypeIcon path={node.path} className="h-3.5 w-3.5 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
+            <FileTypeIcon path={node.path} className="h-3.5 w-3.5 shrink-0 text-[#C08A5F] dark:text-[#E8A87C]" />
           </>
         )}
-        <span className={cn("truncate", isDir ? "text-[#3D3B37] dark:text-zinc-300" : "text-[#6B6862] dark:text-zinc-400")}>
+        <span className={cn("truncate", isDir ? "text-[#383838] dark:text-zinc-300" : "text-[#6B6B6B] dark:text-zinc-400")}>
           {name}
           {isDir && "/"}
         </span>
@@ -614,7 +614,7 @@ function TreeRow({
         <button
           onClick={() => onDelete(node.path)}
           title={`删除文件夹 ${node.path}`}
-          className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 text-[#8B8884] opacity-0 transition-opacity hover:bg-[#E54D2E]/10 hover:text-[#E54D2E] group-hover/row:opacity-100 dark:text-zinc-500 dark:hover:text-[#E54D2E]"
+          className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 text-[#8C8C8C] opacity-0 transition-opacity hover:bg-[#E54D2E]/10 hover:text-[#E54D2E] group-hover/row:opacity-100 dark:text-zinc-500 dark:hover:text-[#E54D2E]"
         >
           <Trash2 className="h-3 w-3" />
         </button>
@@ -637,8 +637,8 @@ function EmptyHint() {
   const all = vfs.allSync();
   if (all.length > 0) return null;
   return (
-    <div className="mt-4 px-4 text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
-      <div className="rounded border border-dashed border-[#E5E2D9] p-4 text-center dark:border-[#3a3731]">
+    <div className="mt-4 px-4 text-[length:var(--font-size-ui-sm)] text-[#A6A6A6] dark:text-zinc-500">
+      <div className="rounded border border-dashed border-[#DEDEDE] p-4 text-center dark:border-[#333333]">
         <Upload className="mx-auto mb-2 h-6 w-6 text-[#BFB8B0] dark:text-zinc-600" />
         <div>Upload files or ask the AI to create them.</div>
         <div className="mt-1 text-[#BFB8B0] dark:text-zinc-600">
@@ -849,7 +849,7 @@ function TabbedEditor() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Tab bar — VSCode style */}
-      <div className="flex items-stretch overflow-x-auto border-b border-[#E5E2D9] bg-[#FAF9F7] text-[length:var(--font-size-ui-sm)] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#1c1a17] dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+      <div className="flex items-stretch overflow-x-auto border-b border-[#DEDEDE] bg-[#FAFAFA] text-[length:var(--font-size-ui-sm)] [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:border-[#333333] dark:bg-[#161616] dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
         {openTabs.map((path) => {
           const isActive = path === activeTab;
           const isDirty = dirtyTabs[path] ?? false;
@@ -858,15 +858,15 @@ function TabbedEditor() {
             <div
               key={path}
               onClick={() => setActiveTab(path)}
-              className={`group flex cursor-pointer items-center gap-1.5 border-r border-[#E5E2D9] px-3 py-2 transition-colors dark:border-[#3a3731] ${
+              className={`group flex cursor-pointer items-center gap-1.5 border-r border-[#DEDEDE] px-3 py-2 transition-colors dark:border-[#333333] ${
                 isActive
-                  ? "bg-[#FFFFFF] text-[#1A1815] dark:bg-[#161512] dark:text-zinc-100"
-                  : "bg-[#FAF9F7] text-[#8B8884] hover:bg-[#FFFFFF]/60 hover:text-[#3D3B37] dark:bg-[#1c1a17] dark:text-zinc-500 dark:hover:bg-[#262320] dark:hover:text-zinc-300"
+                  ? "bg-[#FFFFFF] text-[#171717] dark:bg-[#0A0A0A] dark:text-zinc-100"
+                  : "bg-[#FAFAFA] text-[#8C8C8C] hover:bg-[#FFFFFF]/60 hover:text-[#383838] dark:bg-[#161616] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-300"
               }`}
               style={isActive ? { borderBottom: "2px solid #10b981", marginBottom: "-1px" } : {}}
               title={path}
             >
-              <FileTypeIcon path={path} className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
+              <FileTypeIcon path={path} className="h-3 w-3 shrink-0 text-[#C08A5F] dark:text-[#E8A87C]" />
               <span className="max-w-[120px] truncate font-mono">{name}</span>
               {isDirty ? (
                 <span
@@ -886,7 +886,7 @@ function TabbedEditor() {
                   }
                   closeTab(path);
                 }}
-                className={`ml-1 rounded p-0.5 text-[#8B8884] hover:bg-[#D6D3CE] hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#3a3731] dark:hover:text-zinc-200 ${isDirty ? "hidden group-hover:block" : ""}`}
+                className={`ml-1 rounded p-0.5 text-[#8C8C8C] hover:bg-[#D4D4D4] hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#333333] dark:hover:text-zinc-200 ${isDirty ? "hidden group-hover:block" : ""}`}
                 title="Close tab"
               >
                 <X className="h-3 w-3" />
@@ -897,16 +897,16 @@ function TabbedEditor() {
       </div>
 
       {/* Active tab toolbar */}
-      <div className="flex items-center gap-2 border-b border-[#E5E2D9] bg-[#FFFFFF] px-2 py-1.5 text-[length:var(--font-size-ui-sm)] dark:border-[#3a3731] dark:bg-[#161512]">
-        <span className="truncate font-mono text-[#6B6862] dark:text-zinc-400">{activeTab}</span>
-        <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[length:var(--font-size-ui-sm)] text-[#8B8884]">
+      <div className="flex items-center gap-2 border-b border-[#DEDEDE] bg-[#FFFFFF] px-2 py-1.5 text-[length:var(--font-size-ui-sm)] dark:border-[#333333] dark:bg-[#0A0A0A]">
+        <span className="truncate font-mono text-[#6B6B6B] dark:text-zinc-400">{activeTab}</span>
+        <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[length:var(--font-size-ui-sm)] text-[#8C8C8C]">
           {language}
         </span>
         <div className="ml-auto flex items-center gap-1">
           <button
             onClick={saveActive}
             disabled={!dirty}
-            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27] disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6B6B] hover:bg-[#F0F0F0] hover:text-[#262626] disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
             title="Save (Ctrl+S)"
           >
             <Save className="h-3 w-3" />
@@ -914,14 +914,14 @@ function TabbedEditor() {
           </button>
           <button
             onClick={() => downloadOne(activeTab)}
-            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-400 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6B6B] hover:bg-[#F0F0F0] hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
             title="Download this file"
           >
             <Download className="h-3 w-3" />
           </button>
           <button
             onClick={() => remove(activeTab)}
-            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6862] hover:bg-[#E54D2E]/10 hover:text-[#E54D2E] dark:text-zinc-400"
+            className="touch-target flex items-center gap-1 rounded px-3 py-2 text-[#6B6B6B] hover:bg-[#E54D2E]/10 hover:text-[#E54D2E] dark:text-zinc-400"
             title="Delete this file"
           >
             <Trash2 className="h-3 w-3" />
@@ -930,7 +930,7 @@ function TabbedEditor() {
       </div>
 
       {/* Editor */}
-      <div className="min-h-0 flex-1 overflow-hidden bg-[#FAF9F7] dark:bg-[#161512]">
+      <div className="min-h-0 flex-1 overflow-hidden bg-[#FAFAFA] dark:bg-[#0A0A0A]">
         {isImageTab(activeTab, content) ? (
           <div className="flex h-full items-center justify-center overflow-auto p-4">
             <img
@@ -954,11 +954,11 @@ function TabbedEditor() {
       </div>
 
       {/* Status bar */}
-      <div className="flex items-center justify-between border-t border-[#E5E2D9] bg-[#FAF9F7] px-3 py-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-500">
+      <div className="flex items-center justify-between border-t border-[#DEDEDE] bg-[#FAFAFA] px-3 py-1 text-[length:var(--font-size-ui-sm)] text-[#A6A6A6] dark:border-[#333333] dark:bg-[#161616] dark:text-zinc-500">
         <span>
           {content.length} chars · {content.split("\n").length} lines
         </span>
-        <span className={dirty ? "text-[#B87B5A] dark:text-[#E8A87C]" : "text-[#A8A29E] dark:text-zinc-500"}>
+        <span className={dirty ? "text-[#B87B5A] dark:text-[#E8A87C]" : "text-[#A6A6A6] dark:text-zinc-500"}>
           {dirty ? "● unsaved" : "saved"}
         </span>
       </div>
@@ -1028,19 +1028,19 @@ function NewFileModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-lg border border-[#E5E2D9] bg-[#FFFFFF] p-4 text-[#2D2B27] dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-100">
+      <div className="w-full max-w-md rounded-lg border border-[#DEDEDE] bg-[#FFFFFF] p-4 text-[#262626] dark:border-[#333333] dark:bg-[#161616] dark:text-zinc-100">
         <div className="mb-3 flex items-center gap-2">
           {isDir ? (
             <FolderPlus className="h-4 w-4 text-[#B87B5A] dark:text-[#E8A87C]" />
           ) : (
-            <FilePlus className="h-4 w-4 text-[#8B7355] dark:text-[#E8A87C]" />
+            <FilePlus className="h-4 w-4 text-[#C08A5F] dark:text-[#E8A87C]" />
           )}
           <span className="font-semibold">
             New {isDir ? "directory" : "file"}
           </span>
           <button
             onClick={onClose}
-            className="ml-auto rounded p-1 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            className="ml-auto rounded p-1 text-[#8C8C8C] hover:bg-[#F0F0F0] hover:text-[#383838] dark:text-zinc-500 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
           >
             <X className="h-4 w-4" />
           </button>
@@ -1055,7 +1055,7 @@ function NewFileModal({
             }
           }}
           placeholder="e.g. src/index.ts"
-          className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 font-mono text-sm focus:border-zinc-500 focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
+          className="w-full rounded border border-[#DEDEDE] bg-[#FAFAFA] px-3 py-2 font-mono text-sm focus:border-zinc-500 focus:outline-none dark:border-[#333333] dark:bg-[#0A0A0A] dark:text-zinc-100"
         />
         <div className="mt-3 flex items-center gap-3 text-xs">
           <label className="flex items-center gap-1.5 cursor-pointer">

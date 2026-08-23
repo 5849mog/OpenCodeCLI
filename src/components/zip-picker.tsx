@@ -69,14 +69,14 @@ export function ZipPickerModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-xl border border-[#E5E2D9] bg-[#FFFFFF] p-4 shadow-2xl dark:border-[#3a3731] dark:bg-[#1c1a17]">
+      <div className="w-full max-w-md rounded-xl border border-[#DEDEDE] bg-[#FFFFFF] p-4 shadow-2xl dark:border-[#333333] dark:bg-[#161616]">
         <div className="mb-3 font-semibold dark:text-zinc-100">AI 请求解压 zip 文件</div>
-        <p className="mb-3 text-sm text-[#6B6862] dark:text-zinc-400">
+        <p className="mb-3 text-sm text-[#6B6B6B] dark:text-zinc-400">
           选择一个本地 .zip，解压内容会写入文件袋。（request_id: {pending.requestId}）
         </p>
         <input ref={inputRef} type="file" accept=".zip,application/zip" className="hidden" onChange={handleFile} />
         {isStreaming ? (
-          <p className="text-sm text-[#A8A29E] dark:text-zinc-500">Agent 仍在运行，请稍候…</p>
+          <p className="text-sm text-[#A6A6A6] dark:text-zinc-500">Agent 仍在运行，请稍候…</p>
         ) : (
           <button
             onClick={() => inputRef.current?.click()}
@@ -87,7 +87,7 @@ export function ZipPickerModal() {
         )}
         <button
           onClick={() => setPendingZipRequest(null)}
-          className="mt-2 w-full rounded-lg border px-3 py-2 text-sm text-[#6B6862] hover:bg-gray-50 dark:border-[#3a3731] dark:text-zinc-400 dark:hover:bg-[#2a2723]"
+          className="mt-2 w-full rounded-lg border px-3 py-2 text-sm text-[#6B6B6B] hover:bg-gray-50 dark:border-[#333333] dark:text-zinc-400 dark:hover:bg-[#2A2A2A]"
         >
           取消
         </button>

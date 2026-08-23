@@ -77,7 +77,7 @@ function ToggleArrow({
   return (
     <button
       onClick={onToggle}
-      className="flex items-center gap-1 rounded px-1 py-0.5 text-[length:var(--font-size-ui-sm)] text-[#8B8884] transition-colors hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+      className="flex items-center gap-1 rounded px-1 py-0.5 text-[length:var(--font-size-ui-sm)] text-[#8C8C8C] transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
       title={expanded ? "收起" : "展开完整内容"}
     >
       <ChevronDown

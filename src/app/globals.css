@@ -56,69 +56,69 @@
   --font-size-code: clamp(12px, 1.3vw, 14px);
   --font-size-ui-sm: clamp(11px, 1.1vw, 12px);
   /* Near-black warm grays */
-  --background: #161512;
+  --background: #0A0A0A;
   --foreground: #e7e5e4;
-  --card: #1c1a17;
+  --card: #161616;
   --card-foreground: #e7e5e4;
-  --popover: #1c1a17;
+  --popover: #161616;
   --popover-foreground: #e7e5e4;
   /* Claude orange — brightened on dark so it glows, not drowns */
   --primary: #E58F67;
-  --primary-foreground: #1f1a16;
-  --secondary: #262320;
+  --primary-foreground: #1A1A1A;
+  --secondary: #262626;
   --secondary-foreground: #e7e5e4;
-  --muted: #262320;
-  --muted-foreground: #a8a29e;
-  --accent: #262320;
+  --muted: #262626;
+  --muted-foreground: #A6A6A6;
+  --accent: #262626;
   --accent-foreground: #e7e5e4;
   --destructive: #E54D2E;
-  --border: #3a3731;
-  --input: #3a3731;
+  --border: #333333;
+  --input: #333333;
   --ring: #E58F67;
   /* Charts */
   --chart-1: #E58F67;
   --chart-2: #E8A87C;
   --chart-3: #C4A484;
-  --chart-4: #8B7355;
+  --chart-4: #C08A5F;
   --chart-5: #6B5D54;
-  --sidebar: #1e1c18;
+  --sidebar: #202020;
   --sidebar-foreground: #e7e5e4;
   --sidebar-primary: #E58F67;
-  --sidebar-primary-foreground: #1f1a16;
-  --sidebar-accent: #2a2723;
+  --sidebar-primary-foreground: #1A1A1A;
+  --sidebar-accent: #2A2A2A;
   --sidebar-accent-foreground: #e7e5e4;
-  --sidebar-border: #3a3731;
+  --sidebar-border: #333333;
   --sidebar-ring: #E58F67;
 }
 
 /* Tailwind's dark: variant lives under a plain `.dark` ancestor too, so keep
    the class-based variant resolved even though defaults ARE already dark. */
 :root.dark {
-  --background: #161512;
+  --background: #0A0A0A;
   --foreground: #e7e5e4;
-  --card: #1c1a17;
+  --card: #161616;
   --card-foreground: #e7e5e4;
-  --popover: #1c1a17;
+  --popover: #161616;
   --popover-foreground: #e7e5e4;
   --primary: #E58F67;
-  --primary-foreground: #1f1a16;
-  --secondary: #262320;
+  --primary-foreground: #1A1A1A;
+  --secondary: #262626;
   --secondary-foreground: #e7e5e4;
-  --muted: #262320;
-  --muted-foreground: #a8a29e;
-  --accent: #262320;
+  --muted: #262626;
+  --muted-foreground: #A6A6A6;
+  --accent: #262626;
   --accent-foreground: #e7e5e4;
   --destructive: #E54D2E;
-  --border: #3a3731;
-  --input: #3a3731;
+  --border: #333333;
+  --input: #333333;
   --ring: #E58F67;
-  --sidebar: #1e1c18;
+  --sidebar: #202020;
   --sidebar-foreground: #e7e5e4;
   --sidebar-primary: #E58F67;
-  --sidebar-primary-foreground: #1f1a16;
-  --sidebar-accent: #2a2723;
+  --sidebar-primary-foreground: #1A1A1A;
+  --sidebar-accent: #2A2A2A;
   --sidebar-accent-foreground: #e7e5e4;
-  --sidebar-border: #3a3731;
+  --sidebar-border: #333333;
   --sidebar-ring: #E58F67;
 }
 
@@ -146,7 +146,7 @@ pre[class*="language-"],
 .token.prolog,
 .token.doctype,
 .token.cdata {
-  color: #A8A29E;
+  color: #A6A6A6;
   font-style: italic;
 }
 
@@ -189,7 +189,7 @@ pre[class*="language-"],
 
 .token.function,
 .token.class-name {
-  color: #8B7355;
+  color: #C08A5F;
 }
 
 .token.regex,
@@ -285,11 +285,11 @@ pre[class*="language-"],
   background: transparent;
 }
 .dark ::-webkit-scrollbar-thumb {
-  background: #3a3731;
+  background: #333333;
   border-radius: 3px;
 }
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #52504b;
+  background: #4D4D4D;
 }
 
 /* ----- Scrollbars — Claude style ----- */
@@ -301,11 +301,11 @@ pre[class*="language-"],
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #D6D3CE;
+  background: #D4D4D4;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #A8A29E;
+  background: #A6A6A6;
 }
 
 /* Indeterminate progress bar animation */

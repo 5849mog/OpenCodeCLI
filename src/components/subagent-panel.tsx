@@ -116,30 +116,30 @@ export function SubagentPanel() {
   return (
     <div className="flex h-full flex-col bg-[#FFFFFF] dark:bg-background">
       {/* Sticky header */}
-      <div className="flex items-center gap-2 border-b border-[#E5E2D9] px-5 py-3 dark:border-[#3a3731]">
+      <div className="flex items-center gap-2 border-b border-[#DEDEDE] px-5 py-3 dark:border-[#333333]">
         <span className="relative flex h-2 w-2">
           <span className="relative inline-flex h-2 w-2 rounded-full bg-[#14B8A6]" />
         </span>
-        <h2 className="text-sm font-semibold text-[#2D2B27] dark:text-zinc-100">子智能体</h2>
+        <h2 className="text-sm font-semibold text-[#262626] dark:text-zinc-100">子智能体</h2>
         <span className="ml-auto rounded bg-[#0D9488]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#0F766E] dark:bg-[#14B8A6]/20 dark:text-[#5eead4]">
           Explore
         </span>
       </div>
 
       {/* Scrollable runs */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+      <div className="flex-1 overflow-y-auto px-4 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
         {runs.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-            <div className="rounded-full border border-[#E5E2D9] bg-[#FAF9F7] p-4 dark:border-[#3a3731] dark:bg-[#262320]">
+            <div className="rounded-full border border-[#DEDEDE] bg-[#FAFAFA] p-4 dark:border-[#333333] dark:bg-[#262626]">
               <Search className="h-8 w-8 text-[#0D9488] dark:text-[#5eead4]" />
             </div>
-            <div className="text-sm text-[#3D3B37] dark:text-zinc-200">还没有子智能体活动</div>
-            <div className="max-w-xs text-xs text-[#8B8884] dark:text-zinc-500">
+            <div className="text-sm text-[#383838] dark:text-zinc-200">还没有子智能体活动</div>
+            <div className="max-w-xs text-xs text-[#8C8C8C] dark:text-zinc-500">
               回到主对话，让 AI 委派一个 Explore 子智能体去做多文件研究（工具名{" "}
               <span className="font-mono text-[#E58F67]">dispatch_subagent</span>
               ）——委派提示词和最终回复都会出现在这里。
             </div>
-            <div className="max-w-xs rounded-md border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-[11px] text-[#6B6862] dark:border-[#3a3731] dark:bg-[#262320] dark:text-zinc-400">
+            <div className="max-w-xs rounded-md border border-[#DEDEDE] bg-[#FAFAFA] px-3 py-2 text-[11px] text-[#6B6B6B] dark:border-[#333333] dark:bg-[#262626] dark:text-zinc-400">
               提示：像「梳理这个项目的模块结构」「这段代码在哪里被用到」这类需要读多个文件的问题，AI 会自动委派子智能体去查。
             </div>
           </div>
@@ -171,14 +171,14 @@ function RunCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
       className={cn(
-        "overflow-hidden rounded-lg border bg-[#FFFFFF] dark:bg-[#1c1a17]",
+        "overflow-hidden rounded-lg border bg-[#FFFFFF] dark:bg-[#161616]",
         focused
           ? "border-[#0D9488]/60 shadow-sm ring-1 ring-[#0D9488]/20 dark:border-[#14B8A6]/50"
-          : "border-[#E5E2D9] dark:border-[#3a3731]",
+          : "border-[#DEDEDE] dark:border-[#333333]",
       )}
     >
       {/* Card header */}
-      <div className="flex items-center gap-2 border-b border-[#E5E2D9] bg-[#FAF9F7]/60 px-3 py-2 text-xs dark:border-[#3a3731] dark:bg-[#161512]/60">
+      <div className="flex items-center gap-2 border-b border-[#DEDEDE] bg-[#FAFAFA]/60 px-3 py-2 text-xs dark:border-[#333333] dark:bg-[#0A0A0A]/60">
         {run.running ? (
           <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#E58F67]" />
         ) : run.completed ? (
@@ -188,10 +188,10 @@ function RunCard({
             未完成
           </span>
         )}
-        <span className="shrink-0 font-medium text-[#3D3B37] dark:text-zinc-300">
+        <span className="shrink-0 font-medium text-[#383838] dark:text-zinc-300">
           {run.running ? "运行中" : run.completed ? "已完成" : "撞上限停止"}
         </span>
-        <span className="ml-auto shrink-0 text-[#A8A29E] tabular-nums dark:text-zinc-500">
+        <span className="ml-auto shrink-0 text-[#A6A6A6] tabular-nums dark:text-zinc-500">
           {run.iterations > 0 && `${run.iterations} 迭代 · `}
           {run.toolCalls > 0 && `${run.toolCalls} 工具调用`}
         </span>
@@ -200,13 +200,13 @@ function RunCard({
       {/* Delegation prompt — rendered like a user message */}
       <div className="px-3 pt-2.5">
         <div className="mb-1 flex items-center gap-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#8B8884] dark:text-zinc-500">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#8C8C8C] dark:text-zinc-500">
             委派提示词
           </span>
         </div>
-        <div className="group flex gap-2 rounded-md bg-[#F5F3EE]/70 px-2.5 py-2 dark:bg-[#262320]/80">
+        <div className="group flex gap-2 rounded-md bg-[#F5F5F5]/70 px-2.5 py-2 dark:bg-[#262626]/80">
           <span className="shrink-0 pt-0.5 text-[#E58F67]">&gt;</span>
-          <div className="flex-1 min-w-0 text-[#1A1815] dark:text-zinc-100">
+          <div className="flex-1 min-w-0 text-[#171717] dark:text-zinc-100">
             <CollapsibleText text={run.task} threshold={280} />
           </div>
         </div>
@@ -215,14 +215,14 @@ function RunCard({
       {/* Final reply — rendered like an assistant message */}
       <div className="px-3 pb-3 pt-2.5">
         <div className="mb-1 flex items-center gap-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#8B8884] dark:text-zinc-500">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#8C8C8C] dark:text-zinc-500">
             子代理回复
           </span>
         </div>
         {run.summary ? (
           <div className="group flex gap-2">
-            <span className="shrink-0 pt-0.5 text-[#8B7355] dark:text-[#E8A87C]">⟫</span>
-            <div className="flex-1 min-w-0 break-words text-[#2D2B27] dark:text-zinc-100">
+            <span className="shrink-0 pt-0.5 text-[#C08A5F] dark:text-[#E8A87C]">⟫</span>
+            <div className="flex-1 min-w-0 break-words text-[#262626] dark:text-zinc-100">
               <MarkdownRenderer text={run.summary} />
             </div>
           </div>
@@ -236,12 +236,12 @@ function RunCard({
             子智能体正在工作中…
           </div>
         ) : (
-          <div className="pl-5 text-xs text-[#A8A29E] dark:text-zinc-500">
+          <div className="pl-5 text-xs text-[#A6A6A6] dark:text-zinc-500">
             {run.ok ? "没有返回摘要。" : "子智能体失败，未返回摘要。"}
           </div>
         )}
         {!run.ok && !run.summary && !run.running && (
-          <div className="mt-1 pl-5 text-xs text-[#A8A29E] dark:text-zinc-500">
+          <div className="mt-1 pl-5 text-xs text-[#A6A6A6] dark:text-zinc-500">
             在事件流中找到 <code>tool · dispatch_subagent</code> 结果查看详情。
           </div>
         )}

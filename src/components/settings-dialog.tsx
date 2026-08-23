@@ -359,23 +359,23 @@ export function SettingsDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-[#E5E2D9] bg-[#FFFFFF] text-[#2D2B27] dark:text-zinc-200 shadow-2xl dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-100">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-[#DEDEDE] bg-[#FFFFFF] text-[#262626] dark:text-zinc-200 shadow-2xl dark:border-[#333333] dark:bg-[#161616] dark:text-zinc-100">
         {/* Header */}
-        <div className="flex items-center gap-2 border-b border-[#E5E2D9] px-5 py-4 dark:border-[#3a3731]">
+        <div className="flex items-center gap-2 border-b border-[#DEDEDE] px-5 py-4 dark:border-[#333333]">
           <Settings className="h-5 w-5 text-[#E58F67]" />
           <h2 className="text-lg font-semibold">Settings · AI Provider</h2>
           <button
             onClick={onClose}
-            className="ml-auto rounded p-1.5 text-[#8B8884] dark:text-zinc-500 hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:text-zinc-300 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            className="ml-auto rounded p-1.5 text-[#8C8C8C] dark:text-zinc-500 hover:bg-[#F0F0F0] hover:text-[#383838] dark:text-zinc-300 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+        <div className="flex-1 overflow-y-auto px-5 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
           {/* Presets */}
           <div className="mb-5">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#8B8884] dark:text-zinc-500 dark:text-zinc-500">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#8C8C8C] dark:text-zinc-500 dark:text-zinc-500">
               Quick presets
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -392,11 +392,11 @@ export function SettingsDialog({
                   className={`rounded border px-3 py-2 text-left text-xs transition ${
                     config.baseUrl === p.baseUrl
                       ? "border-[#E58F67] bg-emerald-950/30 dark:bg-emerald-950/40"
-                      : "border-[#E5E2D9] bg-[#FFFFFF] hover:border-zinc-600 dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-zinc-500"
+                      : "border-[#DEDEDE] bg-[#FFFFFF] hover:border-zinc-600 dark:border-[#333333] dark:bg-[#0A0A0A] dark:hover:border-zinc-500"
                   }`}
                 >
-                  <div className="font-semibold text-[#2D2B27] dark:text-zinc-200 dark:text-zinc-200">{p.name}</div>
-                  <div className="mt-0.5 text-[10px] text-[#8B8884] dark:text-zinc-500 dark:text-zinc-500">
+                  <div className="font-semibold text-[#262626] dark:text-zinc-200 dark:text-zinc-200">{p.name}</div>
+                  <div className="mt-0.5 text-[10px] text-[#8C8C8C] dark:text-zinc-500 dark:text-zinc-500">
                     {p.hint}
                   </div>
                 </button>
@@ -410,7 +410,7 @@ export function SettingsDialog({
               value={config.baseUrl}
               onChange={(e) => setConfig({ baseUrl: e.target.value })}
               placeholder="https://api.openai.com/v1"
-              className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none dark:text-zinc-100"
+              className="w-full rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none dark:text-zinc-100"
             />
           </Field>
 
@@ -425,11 +425,11 @@ export function SettingsDialog({
                   setKeyDirty(true);
                 }}
                 placeholder={config.hasApiKey && !keyDirty ? "•••••••• (key is set, type to change)" : "sk-…"}
-                className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
+                className="flex-1 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
               />
               <button
                 onClick={() => setShowKey(!showKey)}
-                className="rounded border border-[#E5E2D9] px-3 text-[#6B6862] dark:text-zinc-400 hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:hover:bg-[#2a2723]"
+                className="rounded border border-[#DEDEDE] px-3 text-[#6B6B6B] dark:text-zinc-400 hover:bg-[#F0F0F0] dark:border-[#333333] dark:hover:bg-[#2A2A2A]"
               >
                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -458,12 +458,12 @@ export function SettingsDialog({
                   );
                 }}
                 placeholder="gpt-4o"
-                className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
+                className="flex-1 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
               />
               <button
                 onClick={testConnection}
                 disabled={testing || !keyInput}
-                className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-3 text-sm text-[#3D3B37] dark:text-zinc-300 hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:hover:bg-[#2a2723] disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded border border-[#DEDEDE] px-3 text-sm text-[#383838] dark:text-zinc-300 hover:bg-[#F0F0F0] dark:border-[#333333] dark:hover:bg-[#2A2A2A] disabled:opacity-40"
                 title="测试连接并拉取可用模型列表"
               >
                 <Zap className="h-3.5 w-3.5" />
@@ -475,7 +475,7 @@ export function SettingsDialog({
                   if (fetchedModels.length === 0 && apiKeyVault.getKey()) void loadModels(true);
                 }}
                 disabled={testing}
-                className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-2.5 text-sm text-[#3D3B37] hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:text-zinc-300 dark:hover:bg-[#2a2723] disabled:opacity-40"
+                className="flex items-center gap-1.5 rounded border border-[#DEDEDE] px-2.5 text-sm text-[#383838] hover:bg-[#F0F0F0] dark:border-[#333333] dark:text-zinc-300 dark:hover:bg-[#2A2A2A] disabled:opacity-40"
                 title="显示可选模型列表"
               >
                 <ChevronDown className="h-3.5 w-3.5" />
@@ -483,9 +483,9 @@ export function SettingsDialog({
               </button>
             </div>
             {showModelList && (
-              <div className="mt-2 max-h-48 overflow-y-auto rounded border border-[#E5E2D9] bg-[#FFFFFF] dark:border-[#3a3731] dark:bg-[#1c1a17]">
+              <div className="mt-2 max-h-48 overflow-y-auto rounded border border-[#DEDEDE] bg-[#FFFFFF] dark:border-[#333333] dark:bg-[#161616]">
                 {modelChoices.length === 0 ? (
-                  <div className="px-3 py-2 text-xs text-[#A8A29E] dark:text-zinc-500">
+                  <div className="px-3 py-2 text-xs text-[#A6A6A6] dark:text-zinc-500">
                     {fetchedModels.length === 0 && !apiKeyVault.getKey()
                       ? "先填入 API key，点 Test 拉取模型列表。"
                       : "暂无模型——点 Test 尝试拉取。"}
@@ -502,7 +502,7 @@ export function SettingsDialog({
                       className={`flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-xs transition-colors ${
                         m === config.model
                           ? "bg-[#E58F67]/10 text-[#E58F67]"
-                          : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]"
+                          : "text-[#383838] hover:bg-[#F5F5F5] dark:text-zinc-300 dark:hover:bg-[#262626]"
                       }`}
                     >
                       <span className="min-w-0 flex-1 truncate">{m}</span>
@@ -513,7 +513,7 @@ export function SettingsDialog({
               </div>
             )}
             {fetchedModels.length > 0 && (
-              <div className="mt-1 text-[11px] text-[#A8A29E] dark:text-zinc-500">
+              <div className="mt-1 text-[11px] text-[#A6A6A6] dark:text-zinc-500">
                 {fetchedModels.length} 个可用模型已拉取
               </div>
             )}
@@ -531,7 +531,7 @@ export function SettingsDialog({
                 onChange={(e) =>
                   setConfig({ temperature: parseFloat(e.target.value) || 0 })
                 }
-                className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
+                className="w-full rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
               />
             </Field>
             <Field label="Max tokens">
@@ -544,7 +544,7 @@ export function SettingsDialog({
                 onChange={(e) =>
                   setConfig({ maxTokens: parseInt(e.target.value, 10) || 1024 })
                 }
-                className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
+                className="w-full rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
               />
             </Field>
           </div>
@@ -564,7 +564,7 @@ export function SettingsDialog({
                 onChange={(e) =>
                   setConfig({ tokenBudget: parseInt(e.target.value, 10) || 60_000 })
                 }
-                className="w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
+                className="w-full rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
               />
             </Field>
           </div>
@@ -579,8 +579,8 @@ export function SettingsDialog({
                 className="mt-0.5 h-4 w-4 accent-[#E58F67]"
               />
               <span>
-                <span className="block text-sm text-[#2D2B27] dark:text-zinc-100">自动压缩对话历史</span>
-                <span className="block text-[10px] text-[#8B8884] dark:text-zinc-500">
+                <span className="block text-sm text-[#262626] dark:text-zinc-100">自动压缩对话历史</span>
+                <span className="block text-[10px] text-[#8C8C8C] dark:text-zinc-500">
                   真分词器估算超预算 85% 时自动用 LLM 摘要压缩（保留信息，需消耗一次摘要调用）；关闭则只丢弃旧消息。距上次压缩 ≥10 条新消息才再次触发。
                 </span>
               </span>
@@ -588,8 +588,8 @@ export function SettingsDialog({
           </div>
 
           {/* DeepSeek V4: thinking + reasoning */}
-          <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+          <div className="mb-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-4 py-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
               DeepSeek V4 · Thinking / Reasoning
             </div>
             <div className="flex flex-wrap gap-4">
@@ -601,15 +601,15 @@ export function SettingsDialog({
                   onChange={(e) => setConfig({ thinkingEnabled: e.target.checked })}
                   className="h-4 w-4 accent-[#E58F67]"
                 />
-                <span className="text-sm text-[#3D3B37] dark:text-zinc-300">Thinking mode</span>
+                <span className="text-sm text-[#383838] dark:text-zinc-300">Thinking mode</span>
               </label>
               {/* Reasoning effort */}
               <label className="flex items-center gap-2">
-                <span className="text-xs text-[#8B8884] dark:text-zinc-500">Effort:</span>
+                <span className="text-xs text-[#8C8C8C] dark:text-zinc-500">Effort:</span>
                 <select
                   value={config.reasoningEffort}
                   onChange={(e) => setConfig({ reasoningEffort: e.target.value })}
-                  className="rounded border border-[#E5E2D9] bg-white dark:bg-[#161512] dark:text-zinc-100 px-2 py-1 text-sm font-mono focus:border-[#E58F67] focus:outline-none"
+                  className="rounded border border-[#DEDEDE] bg-white dark:bg-[#0A0A0A] dark:text-zinc-100 px-2 py-1 text-sm font-mono focus:border-[#E58F67] focus:outline-none"
                 >
                   <option value="low">low</option>
                   <option value="high">high</option>
@@ -618,13 +618,13 @@ export function SettingsDialog({
                 </select>
               </label>
             </div>
-            <div className="mt-1.5 text-[11px] text-[#A8A29E] dark:text-zinc-500">
+            <div className="mt-1.5 text-[11px] text-[#A6A6A6] dark:text-zinc-500">
               For DeepSeek V4 models. On sends <code className="text-[#E58F67]">thinking=enabled</code> + <code className="text-[#E58F67]">reasoning_effort</code>; off sends <code className="text-[#E58F67]">thinking=disabled</code>. Valid efforts: low/high/xhigh/max. Note: thinking &amp; answer share the Max tokens budget.
             </div>
           </div>
 
           {/* Vision / Image input */}
-          <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">
+          <div className="mb-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-4 py-3">
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -633,8 +633,8 @@ export function SettingsDialog({
                 className="h-4 w-4 accent-[#E58F67]"
               />
               <span>
-                <span className="block text-sm text-[#2D2B27] dark:text-zinc-100">支持图片输入（Vision）</span>
-                <span className="block text-[10px] text-[#8B8884] dark:text-zinc-500">
+                <span className="block text-sm text-[#262626] dark:text-zinc-100">支持图片输入（Vision）</span>
+                <span className="block text-[10px] text-[#8C8C8C] dark:text-zinc-500">
                   开启后随消息上传的图片会作为视觉输入传给模型（优先 DeepSeek Files API，失败自动转 base64 内联）。仅视觉模型支持（如 deepseek-v4-flash-vision-exp）；非视觉模型带图会报错。
                 </span>
               </span>
@@ -642,8 +642,8 @@ export function SettingsDialog({
           </div>
 
           {/* 运行模式（新会话默认，会话创建时锁定） */}
-          <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+          <div className="mb-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-4 py-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
               运行模式 · 新会话默认
             </div>
             <div className="flex flex-col gap-2">
@@ -666,7 +666,7 @@ export function SettingsDialog({
                   },
                 ] as const
               ).map((p) => (
-                <label key={p.id} className="flex cursor-pointer items-start gap-2.5 rounded border border-[#E5E2D9] px-3 py-2 dark:border-[#3a3731]">
+                <label key={p.id} className="flex cursor-pointer items-start gap-2.5 rounded border border-[#DEDEDE] px-3 py-2 dark:border-[#333333]">
                   <input
                     type="radio"
                     name="agentPreset"
@@ -675,28 +675,28 @@ export function SettingsDialog({
                     className="mt-0.5 h-3.5 w-3.5 accent-[#E58F67]"
                   />
                   <span>
-                    <span className="block text-sm text-[#2D2B27] dark:text-zinc-100">{p.name}</span>
-                    <span className="block text-[10px] text-[#8B8884] dark:text-zinc-500">{p.desc}</span>
+                    <span className="block text-sm text-[#262626] dark:text-zinc-100">{p.name}</span>
+                    <span className="block text-[10px] text-[#8C8C8C] dark:text-zinc-500">{p.desc}</span>
                   </span>
                 </label>
               ))}
             </div>
-            <div className="mt-1.5 text-[11px] text-[#A8A29E] dark:text-zinc-600">
+            <div className="mt-1.5 text-[11px] text-[#A6A6A6] dark:text-zinc-600">
               该模式在新建会话时锁定，会话内不可切换（保证提示词前缀稳定，持续命中 API 前缀缓存）。切换需新建会话。
             </div>
           </div>
 
           {/* ── DeepSeek account balance (provider-specific /user/balance) ── */}
           {isDeepSeek && (
-            <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">
+            <div className="mb-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-4 py-3">
               <div className="mb-2 flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+                <div className="text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
                   DeepSeek · 账户余额
                 </div>
                 <button
                   onClick={() => void queryBalance()}
                   disabled={balanceLoading}
-                  className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-2 py-1 text-[11px] text-[#3D3B37] dark:text-zinc-300 hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:hover:bg-[#2a2723] disabled:opacity-40"
+                  className="flex items-center gap-1.5 rounded border border-[#DEDEDE] px-2 py-1 text-[11px] text-[#383838] dark:text-zinc-300 hover:bg-[#F0F0F0] dark:border-[#333333] dark:hover:bg-[#2A2A2A] disabled:opacity-40"
                 >
                   <RefreshCw className={`h-3 w-3 ${balanceLoading ? "animate-spin" : ""}`} />
                   {balanceLoading ? "查询中…" : "刷新"}
@@ -707,19 +707,19 @@ export function SettingsDialog({
               ) : balance && balance.balance_infos.length > 0 ? (
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="text-[#8B8884] dark:text-zinc-500">账户可用</span>
+                    <span className="text-[#8C8C8C] dark:text-zinc-500">账户可用</span>
                     <span className={balance.is_available ? "text-emerald-600 dark:text-emerald-400" : "text-[#E54D2E]"}>
                       {balance.is_available ? "✓ 可用" : "✗ 不可用"}
                     </span>
                   </div>
                   {balance.balance_infos.map((b) => (
                     <div key={b.currency} className="flex items-baseline justify-between gap-3 text-sm">
-                      <span className="font-mono text-[#8B8884] dark:text-zinc-500">
+                      <span className="font-mono text-[#8C8C8C] dark:text-zinc-500">
                         {b.currency} 总额
                       </span>
-                      <span className="font-mono text-[#2D2B27] dark:text-zinc-100">
+                      <span className="font-mono text-[#262626] dark:text-zinc-100">
                         {b.total_balance}
-                        <span className="ml-1.5 text-[10px] text-[#A8A29E] dark:text-zinc-600">
+                        <span className="ml-1.5 text-[10px] text-[#A6A6A6] dark:text-zinc-600">
                           赠送 {b.granted_balance} · 充值 {b.topped_up_balance}
                         </span>
                       </span>
@@ -727,16 +727,16 @@ export function SettingsDialog({
                   ))}
                 </div>
               ) : (
-                <div className="text-xs text-[#A8A29E] dark:text-zinc-500">正在查询…</div>
+                <div className="text-xs text-[#A6A6A6] dark:text-zinc-500">正在查询…</div>
               )}
             </div>
           )}
 
           {/* ── DeepSeek Files API 管理（图片上传占用的云端文件） ── */}
           {isDeepSeek && (
-            <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">
+            <div className="mb-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-4 py-3">
               <div className="mb-2 flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+                <div className="text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
                   DeepSeek · Files API 文件
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -744,7 +744,7 @@ export function SettingsDialog({
                     <button
                       onClick={() => void clearAllFiles()}
                       disabled={filesLoading}
-                      className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-2 py-1 text-[11px] text-[#E54D2E] hover:bg-[#E54D2E]/10 disabled:opacity-40 dark:border-[#3a3731]"
+                      className="flex items-center gap-1.5 rounded border border-[#DEDEDE] px-2 py-1 text-[11px] text-[#E54D2E] hover:bg-[#E54D2E]/10 disabled:opacity-40 dark:border-[#333333]"
                     >
                       <Trash2 className="h-3 w-3" />
                       清空
@@ -753,7 +753,7 @@ export function SettingsDialog({
                   <button
                     onClick={() => void loadFiles()}
                     disabled={filesLoading}
-                    className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-2 py-1 text-[11px] text-[#3D3B37] hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:text-zinc-300 dark:hover:bg-[#2a2723] disabled:opacity-40"
+                    className="flex items-center gap-1.5 rounded border border-[#DEDEDE] px-2 py-1 text-[11px] text-[#383838] hover:bg-[#F0F0F0] dark:border-[#333333] dark:text-zinc-300 dark:hover:bg-[#2A2A2A] disabled:opacity-40"
                   >
                     <RefreshCw className={`h-3 w-3 ${filesLoading ? "animate-spin" : ""}`} />
                     {filesLoading ? "读取中…" : "刷新"}
@@ -763,27 +763,27 @@ export function SettingsDialog({
               {filesError ? (
                 <div className="text-xs text-[#E54D2E]">{filesError}</div>
               ) : files === null ? (
-                <div className="text-xs text-[#A8A29E] dark:text-zinc-500">正在读取…</div>
+                <div className="text-xs text-[#A6A6A6] dark:text-zinc-500">正在读取…</div>
               ) : files.length === 0 ? (
-                <div className="text-xs text-[#A8A29E] dark:text-zinc-500">暂无已上传文件</div>
+                <div className="text-xs text-[#A6A6A6] dark:text-zinc-500">暂无已上传文件</div>
               ) : (
                 <div className="max-h-48 space-y-1 overflow-y-auto">
                   {files.map((f) => (
                     <div key={f.id} className="flex items-center gap-2 text-xs">
-                      <FileText className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
+                      <FileText className="h-3 w-3 shrink-0 text-[#C08A5F] dark:text-[#E8A87C]" />
                       <span className="min-w-0 flex-1 truncate font-mono" title={`${f.id} · ${f.filename}`}>
                         {f.filename}
                       </span>
-                      <span className="shrink-0 text-[#A8A29E] dark:text-zinc-500">
+                      <span className="shrink-0 text-[#A6A6A6] dark:text-zinc-500">
                         {(f.bytes / 1024).toFixed(1)} KB
                       </span>
-                      <span className="shrink-0 text-[10px] text-[#A8A29E] dark:text-zinc-600">
+                      <span className="shrink-0 text-[10px] text-[#A6A6A6] dark:text-zinc-600">
                         {new Date(f.created_at * 1000).toLocaleDateString()}
                       </span>
                       <button
                         onClick={() => void deleteFile(f.id)}
                         disabled={deletingId === f.id}
-                        className="shrink-0 rounded p-1 text-[#A8A29E] hover:bg-[#E54D2E]/10 hover:text-[#E54D2E] disabled:opacity-40"
+                        className="shrink-0 rounded p-1 text-[#A6A6A6] hover:bg-[#E54D2E]/10 hover:text-[#E54D2E] disabled:opacity-40"
                         title={`删除 ${f.filename}（${f.id}）`}
                       >
                         {deletingId === f.id ? (
@@ -796,16 +796,16 @@ export function SettingsDialog({
                   ))}
                 </div>
               )}
-              <div className="mt-2 text-[10px] text-[#A8A29E] dark:text-zinc-600">
+              <div className="mt-2 text-[10px] text-[#A6A6A6] dark:text-zinc-600">
                 上传的图片文件永久保存在你的 DeepSeek 账户（25 GiB 配额）。删除可释放空间。
               </div>
             </div>
           )}
 
           {/* ── Web & Search ── */}
-          <div className="mb-4 border-t border-[#E5E2D9] pt-5 dark:border-[#3a3731]">
+          <div className="mb-4 border-t border-[#DEDEDE] pt-5 dark:border-[#333333]">
             <div className="flex items-center gap-1.5 mb-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
                 Web &amp; Search
               </span>
             </div>
@@ -820,13 +820,13 @@ export function SettingsDialog({
                     className={`flex-1 rounded border px-3 py-2 text-xs transition ${
                       config.searchProvider === p
                         ? "border-[#E58F67] bg-emerald-950/30 dark:bg-emerald-950/40"
-                        : "border-[#E5E2D9] bg-[#FFFFFF] hover:border-zinc-600 dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-zinc-500"
+                        : "border-[#DEDEDE] bg-[#FFFFFF] hover:border-zinc-600 dark:border-[#333333] dark:bg-[#0A0A0A] dark:hover:border-zinc-500"
                     }`}
                   >
-                    <div className="font-semibold text-[#2D2B27] dark:text-zinc-200">
+                    <div className="font-semibold text-[#262626] dark:text-zinc-200">
                       {p === "tavily" ? "Tavily" : "Brave Search"}
                     </div>
-                    <div className="mt-0.5 text-[10px] text-[#8B8884] dark:text-zinc-500">
+                    <div className="mt-0.5 text-[10px] text-[#8C8C8C] dark:text-zinc-500">
                       {p === "tavily" ? "Recommended · 1k/mo free" : "2k/mo free"}
                     </div>
                   </button>
@@ -849,11 +849,11 @@ export function SettingsDialog({
                       ? "•••••••• (key is set, type to change)"
                       : `Enter your ${config.searchProvider} API key…`
                   }
-                  className="flex-1 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
+                  className="flex-1 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
                 />
                 <button
                   onClick={() => setShowSearchKey(!showSearchKey)}
-                  className="rounded border border-[#E5E2D9] px-3 text-[#6B6862] dark:text-zinc-400 hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:hover:bg-[#2a2723]"
+                  className="rounded border border-[#DEDEDE] px-3 text-[#6B6B6B] dark:text-zinc-400 hover:bg-[#F0F0F0] dark:border-[#333333] dark:hover:bg-[#2A2A2A]"
                 >
                   {showSearchKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -863,15 +863,15 @@ export function SettingsDialog({
                   ✓ 已配置自定义 Key（加密持久化存储）
                 </div>
               ) : !apiKeyVault.hasSearchKey() && !searchKeyDirty && !searchKeyInput ? (
-                <div className="mt-1 text-[11px] text-[#8B8884] dark:text-zinc-500">
+                <div className="mt-1 text-[11px] text-[#8C8C8C] dark:text-zinc-500">
                   未配置搜索 API Key — web_search 暂不可用。填入上方的 Tavily 或 Brave Key 后即可开启（两者都有免费额度）。
                 </div>
               ) : null}
             </Field>
 
             {/* URL Fetch options */}
-            <div className="mb-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-4 py-3">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+            <div className="mb-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-4 py-3">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
                 URL Fetch options
               </div>
 
@@ -883,27 +883,27 @@ export function SettingsDialog({
                   onChange={(e) => setConfig({ useJinaReader: e.target.checked })}
                   className="h-4 w-4 accent-[#E58F67]"
                 />
-                <span className="text-sm text-[#3D3B37] dark:text-zinc-300">
-                  Use Jina AI Reader <span className="text-[#A8A29E] dark:text-zinc-500">(r.jina.ai)</span>
+                <span className="text-sm text-[#383838] dark:text-zinc-300">
+                  Use Jina AI Reader <span className="text-[#A6A6A6] dark:text-zinc-500">(r.jina.ai)</span>
                 </span>
               </label>
-              <div className="mt-1 text-[11px] text-[#A8A29E] dark:text-zinc-500">
+              <div className="mt-1 text-[11px] text-[#A6A6A6] dark:text-zinc-500">
                 Free CORS proxy that converts web pages to LLM-friendly markdown. No API key needed.
                 Disable if you want to use a custom CORS proxy instead.
               </div>
 
               {/* Custom CORS proxy */}
               <div className="mt-3">
-                <label className="mb-1.5 block text-xs text-[#8B8884] dark:text-zinc-500">
-                  Custom CORS proxy URL <span className="text-[#A8A29E] dark:text-zinc-500">(optional)</span>
+                <label className="mb-1.5 block text-xs text-[#8C8C8C] dark:text-zinc-500">
+                  Custom CORS proxy URL <span className="text-[#A6A6A6] dark:text-zinc-500">(optional)</span>
                 </label>
                 <input
                   value={config.corsProxyUrl}
                   onChange={(e) => setConfig({ corsProxyUrl: e.target.value })}
                   placeholder="http://localhost:81/cors-proxy/"
-                  className="w-full rounded border border-[#E5E2D9] bg-white dark:bg-[#161512] dark:text-zinc-100 px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
+                  className="w-full rounded border border-[#DEDEDE] bg-white dark:bg-[#0A0A0A] dark:text-zinc-100 px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
                 />
-                <div className="mt-0.5 text-[11px] text-[#A8A29E] dark:text-zinc-500">
+                <div className="mt-0.5 text-[11px] text-[#A6A6A6] dark:text-zinc-500">
                   Only needed if Jina Reader is disabled and the target site blocks CORS.
                 </div>
               </div>
@@ -911,8 +911,8 @@ export function SettingsDialog({
           </div>
 
           {/* ── Security ── */}
-          <div className="mb-4 border-t border-[#E5E2D9] pt-5 dark:border-[#3a3731]">
-            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+          <div className="mb-4 border-t border-[#DEDEDE] pt-5 dark:border-[#333333]">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
               <Lock className="h-3.5 w-3.5" />
               Security · 密钥安全
             </div>
@@ -929,8 +929,8 @@ export function SettingsDialog({
               </div>
             )}
 
-            <div className="rounded border border-[#E5E2D9] bg-[#FAF9F7] px-4 py-3 dark:border-[#3a3731] dark:bg-[#161512]">
-              <div className="mb-1.5 text-[11px] text-[#8B8884] dark:text-zinc-500">
+            <div className="rounded border border-[#DEDEDE] bg-[#FAFAFA] px-4 py-3 dark:border-[#333333] dark:bg-[#0A0A0A]">
+              <div className="mb-1.5 text-[11px] text-[#8C8C8C] dark:text-zinc-500">
                 密钥用 AES-GCM 加密后持久化在本地浏览器存储，刷新 / 关闭重开可自动恢复、无需重填。离开设备前可一键清除密钥。
               </div>
               <button
@@ -949,8 +949,8 @@ export function SettingsDialog({
               </button>
             </div>
 
-            <div className="mt-3 rounded border border-[#E5E2D9] bg-[#FAF9F7] px-4 py-3 dark:border-[#3a3731] dark:bg-[#161512]">
-              <label className="mb-1 flex items-center gap-2 text-sm text-[#3D3B37] dark:text-zinc-300">
+            <div className="mt-3 rounded border border-[#DEDEDE] bg-[#FAFAFA] px-4 py-3 dark:border-[#333333] dark:bg-[#0A0A0A]">
+              <label className="mb-1 flex items-center gap-2 text-sm text-[#383838] dark:text-zinc-300">
                 <input
                   type="checkbox"
                   checked={(config.idleLockMinutes ?? 0) > 0}
@@ -961,7 +961,7 @@ export function SettingsDialog({
               </label>
               {(config.idleLockMinutes ?? 0) > 0 && (
                 <div className="mt-2 flex items-center gap-2">
-                  <span className="text-xs text-[#8B8884] dark:text-zinc-500">闲置</span>
+                  <span className="text-xs text-[#8C8C8C] dark:text-zinc-500">闲置</span>
                   <input
                     type="number"
                     min={1}
@@ -970,9 +970,9 @@ export function SettingsDialog({
                     onChange={(e) =>
                       setConfig({ idleLockMinutes: Math.max(1, parseInt(e.target.value, 10) || 1) })
                     }
-                    className="w-20 rounded border border-[#E5E2D9] bg-white dark:bg-[#161512] dark:text-zinc-100 px-2 py-1 text-sm font-mono focus:border-[#E58F67] focus:outline-none"
+                    className="w-20 rounded border border-[#DEDEDE] bg-white dark:bg-[#0A0A0A] dark:text-zinc-100 px-2 py-1 text-sm font-mono focus:border-[#E58F67] focus:outline-none"
                   />
-                  <span className="text-xs text-[#8B8884] dark:text-zinc-500">分钟后自动清除密钥</span>
+                  <span className="text-xs text-[#8C8C8C] dark:text-zinc-500">分钟后自动清除密钥</span>
                 </div>
               )}
             </div>
@@ -985,30 +985,30 @@ export function SettingsDialog({
               onChange={(e) => setConfig({ customInstructions: e.target.value })}
               rows={3}
               placeholder="e.g. Always use TypeScript. Prefer functional components. Use Tailwind for styling."
-              className="w-full resize-none rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 text-sm focus:border-[#E58F67] focus:outline-none"
+              className="w-full resize-none rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-3 py-2 text-sm focus:border-[#E58F67] focus:outline-none"
             />
           </Field>
 
           {/* ── 会话导出 / 导入（全量） ── */}
-          <div className="mb-4 border-t border-[#E5E2D9] pt-5 dark:border-[#3a3731]">
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+          <div className="mb-4 border-t border-[#DEDEDE] pt-5 dark:border-[#333333]">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
               会话 · Session backup
             </div>
-            <div className="mb-2 text-[11px] text-[#A8A29E] dark:text-zinc-500">
+            <div className="mb-2 text-[11px] text-[#A6A6A6] dark:text-zinc-500">
               导出全部历史会话为 JSON 文件（可在换浏览器 / 清缓存后导入恢复）。
               导出文件<b>绝不包含 API 密钥</b>（密钥只存在会话内的加密存储中）。
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={handleExportAll}
-                className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-3 py-2 text-xs text-[#3D3B37] hover:bg-[#F0EDE5] dark:border-[#3a3731] dark:text-zinc-300 dark:hover:bg-[#2a2723]"
+                className="flex items-center gap-1.5 rounded border border-[#DEDEDE] px-3 py-2 text-xs text-[#383838] hover:bg-[#F0F0F0] dark:border-[#333333] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]"
               >
                 <Download className="h-3.5 w-3.5" /> 导出全部会话
               </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={importing}
-                className="flex items-center gap-1.5 rounded border border-[#E5E2D9] px-3 py-2 text-xs text-[#3D3B37] hover:bg-[#F0EDE5] disabled:opacity-50 dark:border-[#3a3731] dark:text-zinc-300 dark:hover:bg-[#2a2723]"
+                className="flex items-center gap-1.5 rounded border border-[#DEDEDE] px-3 py-2 text-xs text-[#383838] hover:bg-[#F0F0F0] disabled:opacity-50 dark:border-[#333333] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]"
               >
                 <Upload className="h-3.5 w-3.5" /> {importing ? "导入中…" : "导入并覆盖全部"}
               </button>
@@ -1027,8 +1027,8 @@ export function SettingsDialog({
           </div>
 
           {/* Privacy note */}
-          <div className="mt-4 rounded border border-[#E5E2D9] bg-[#FAF9F7] dark:border-[#3a3731] dark:bg-[#161512] px-3 py-2 text-[11px] text-[#8B8884] dark:text-zinc-500">
-            <span className="font-semibold text-[#6B6862] dark:text-zinc-400">Security:</span> Your
+          <div className="mt-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-3 py-2 text-[11px] text-[#8C8C8C] dark:text-zinc-500">
+            <span className="font-semibold text-[#6B6B6B] dark:text-zinc-400">Security:</span> Your
             API key is encrypted with AES-GCM (Web Crypto API) under a master key derived via
             PBKDF2; both the ciphertext and the master key live in localStorage so keys survive
             refresh / new tabs without re-entry. The plaintext key is never in React state, never
@@ -1038,8 +1038,8 @@ export function SettingsDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-[#E5E2D9] px-5 py-3">
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#8B8884] dark:text-zinc-500">
+        <div className="flex items-center justify-between border-t border-[#DEDEDE] px-5 py-3">
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#8C8C8C] dark:text-zinc-500">
             {config.hasApiKey ? (
               <span className="text-[#E58F67]">● Key configured</span>
             ) : (
@@ -1048,7 +1048,7 @@ export function SettingsDialog({
             {config.hasSearchKey ? (
               <span className="text-[#E58F67]">● Search configured</span>
             ) : (
-              <span className="text-[#8B8884] dark:text-zinc-500">● No search key</span>
+              <span className="text-[#8C8C8C] dark:text-zinc-500">● No search key</span>
             )}
           </div>
           <button
@@ -1096,11 +1096,11 @@ function Field({
 }) {
   return (
     <div className="mb-4">
-      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
         {label}
       </label>
       {children}
-      {hint && <div className="mt-1 text-[11px] text-[#A8A29E] dark:text-zinc-500">{hint}</div>}
+      {hint && <div className="mt-1 text-[11px] text-[#A6A6A6] dark:text-zinc-500">{hint}</div>}
     </div>
   );
 }

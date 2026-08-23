@@ -6,7 +6,7 @@
  *
  * 用法：
  *   const Icon = getFileIcon(path, "h-3.5 w-3.5 shrink-0");
- *   <Icon className="text-[#8B7355] dark:text-[#E8A87C]" />
+ *   <Icon className="text-[#C08A5F] dark:text-[#E8A87C]" />
  */
 
 import {

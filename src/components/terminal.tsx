@@ -58,7 +58,7 @@ mermaid.initialize({
   securityLevel: "strict",
   themeVariables: {
     // 与整体 #E58F67 主色呼应的强调色；其余用 dark 主题默认值。
-    primaryColor: "#2a2723",
+    primaryColor: "#2A2A2A",
     primaryTextColor: "#e4e4e7",
     lineColor: "#a1a1aa",
   },
@@ -750,8 +750,8 @@ export function Terminal() {
   return (
     <div className="flex h-full flex-col bg-background text-foreground font-mono text-[length:var(--font-size-base)] leading-relaxed">
       {/* Header bar — model name centered, mode toggle right */}
-      <div className="flex items-center justify-between border-b border-[#E5E2D9] px-4 py-2.5 text-xs dark:border-[#3a3731]">
-        <div className="flex items-center gap-2 text-[#6B6862] dark:text-zinc-500">
+      <div className="flex items-center justify-between border-b border-[#DEDEDE] px-4 py-2.5 text-xs dark:border-[#333333]">
+        <div className="flex items-center gap-2 text-[#6B6B6B] dark:text-zinc-500">
           <TerminalIcon className="h-3.5 w-3.5 text-[#E58F67]" />
           <span className="font-medium">Open Code</span>
         </div>
@@ -760,7 +760,7 @@ export function Terminal() {
             onClick={() =>
               useVfsView.getState().setRightPanelOpen(!useVfsView.getState().rightPanelOpen)
             }
-            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            className="touch-target rounded px-2.5 py-1.5 text-[#8C8C8C] hover:bg-[#F0F0F0] hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
             title="打开 / 收起文件袋"
           >
             <PanelRight className="h-3.5 w-3.5" />
@@ -769,7 +769,7 @@ export function Terminal() {
           <PlanHeaderBadge />
           <button
             onClick={() => handleSlashCommand("/export json")}
-            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            className="touch-target rounded px-2.5 py-1.5 text-[#8C8C8C] hover:bg-[#F0F0F0] hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
             title="Export session as JSON"
           >
             <Download className="h-3.5 w-3.5" />
@@ -784,14 +784,14 @@ export function Terminal() {
               }
               setPayloadOpen(true);
             }}
-            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            className="touch-target rounded px-2.5 py-1.5 text-[#8C8C8C] hover:bg-[#F0F0F0] hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
             title="查看/编辑发送给 AI 的上下文"
           >
             <ScrollText className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={reset}
-            className="touch-target rounded px-2.5 py-1.5 text-[#8B8884] hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+            className="touch-target rounded px-2.5 py-1.5 text-[#8C8C8C] hover:bg-[#F0F0F0] hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
             title="Clear session"
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -813,7 +813,7 @@ export function Terminal() {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] [&::-webkit-scrollbar-track]:bg-transparent"
+        className="flex-1 overflow-y-auto px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] [&::-webkit-scrollbar-track]:bg-transparent"
       >
         {events.every((ev) => ev.kind !== "user" && ev.kind !== "assistant-message") &&
           !streamingText &&
@@ -895,24 +895,24 @@ export function Terminal() {
       {/* Input */}
       {/* Input area — 输入框与暗色背景融为一体（不再是独立渐变条） */}
       <div className="px-4 py-3">
-        <div className="group relative flex flex-col gap-2 rounded-2xl border border-[#E5E2D9] bg-[#FAF9F7]/80 p-3 shadow-sm backdrop-blur transition-all duration-200 focus-within:border-[#E58F67]/60 focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.08),0_4px_20px_rgba(0,0,0,0.06)] dark:border-[#3a3731] dark:bg-[#1c1a17]/70 dark:shadow-none dark:focus-within:border-[#E58F67]/50 dark:focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.12),0_8px_30px_rgba(0,0,0,0.4)]">
+        <div className="group relative flex flex-col gap-2 rounded-2xl border border-[#DEDEDE] bg-[#FAFAFA]/80 p-3 shadow-sm backdrop-blur transition-all duration-200 focus-within:border-[#E58F67]/60 focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.08),0_4px_20px_rgba(0,0,0,0.06)] dark:border-[#333333] dark:bg-[#161616]/70 dark:shadow-none dark:focus-within:border-[#E58F67]/50 dark:focus-within:shadow-[0_0_0_4px_rgba(229,143,103,0.12),0_8px_30px_rgba(0,0,0,0.4)]">
           {/* 附件 chips（命令框上方） */}
           {attachments.length > 0 && (
             <div className="absolute bottom-full left-0 mb-2 flex max-w-full flex-wrap gap-1.5">
               {attachments.map((a) => (
                 <span
                   key={a.path}
-                  className="flex max-w-[180px] items-center gap-1.5 rounded-lg border border-[#E5E2D9] bg-white px-2 py-1 text-[length:var(--font-size-ui-sm)] text-[#3D3B37] dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-200"
+                  className="flex max-w-[180px] items-center gap-1.5 rounded-lg border border-[#DEDEDE] bg-white px-2 py-1 text-[length:var(--font-size-ui-sm)] text-[#383838] dark:border-[#333333] dark:bg-[#161616] dark:text-zinc-200"
                   title={a.fileId ? `已上传 Files API: ${a.fileId}` : a.isImage ? "将以内联 base64 发送" : "写入工作区，AI 可读取"}
                 >
                   {a.isImage ? (
                     a.dataUrl ? (
                       <img src={a.dataUrl} alt="" className="h-4 w-4 shrink-0 rounded object-cover" />
                     ) : (
-                      <FileText className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
+                      <FileText className="h-3 w-3 shrink-0 text-[#C08A5F] dark:text-[#E8A87C]" />
                     )
                   ) : (
-                    <FileText className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
+                    <FileText className="h-3 w-3 shrink-0 text-[#C08A5F] dark:text-[#E8A87C]" />
                   )}
                   <span className="truncate">{a.name}</span>
                   {a.isImage && a.fileId ? (
@@ -920,7 +920,7 @@ export function Terminal() {
                   ) : null}
                   <button
                     onClick={() => setAttachments((prev) => prev.filter((x) => x.path !== a.path))}
-                    className="shrink-0 rounded p-0.5 text-[#A8A29E] hover:bg-[#F0EDE5] hover:text-[#E54D2E] dark:hover:bg-[#2a2723]"
+                    className="shrink-0 rounded p-0.5 text-[#A6A6A6] hover:bg-[#F0F0F0] hover:text-[#E54D2E] dark:hover:bg-[#2A2A2A]"
                     title="移除"
                   >
                     <X className="h-3 w-3" />
@@ -942,7 +942,7 @@ export function Terminal() {
                 : "向 Open Code 提问，使用 @ 引用文件，使用 / 调用命令"
             }
             disabled={isStreaming || isCompacting}
-            className="max-h-[200px] w-full resize-none bg-transparent text-[length:var(--font-size-base)] text-[#1A1815] placeholder:text-[#A8A29E] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+            className="max-h-[200px] w-full resize-none bg-transparent text-[length:var(--font-size-base)] text-[#171717] placeholder:text-[#A6A6A6] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
           />
           {/* 底排：左 [+/模式]，右 [模型/思考/发送]（对齐参考图） */}
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
@@ -951,7 +951,7 @@ export function Terminal() {
               <button
                 onClick={() => attachInputRef.current?.click()}
                 disabled={isStreaming || isCompacting || uploading}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#A8A29E] transition-colors hover:bg-[#F0EDE5] hover:text-[#3D3B37] disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-300"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[#A6A6A6] transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300"
                 title={uploading ? "正在上传图片到 Files API…" : "上传文件（图片 / 文本，≤10MB）"}
               >
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -960,16 +960,16 @@ export function Terminal() {
               <div className="relative" ref={modeMenuRef}>
                 <button
                   onClick={() => setModeMenuOpen((v) => !v)}
-                  className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[length:var(--font-size-ui-sm)] font-medium text-zinc-300 transition-colors hover:bg-[#F0EDE5] dark:text-zinc-300 dark:hover:bg-[#2a2723]"
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[length:var(--font-size-ui-sm)] font-medium text-zinc-300 transition-colors hover:bg-[#F0F0F0] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]"
                   title="运行模式（完整/精简/极简）+ 执行模式"
                 >
                   <Shield className="h-3.5 w-3.5 text-[#E58F67]" />
                   <span>{mode === "plan" ? "计划模式" : "完全访问"}</span>
-                  <ChevronDown className="h-3 w-3 text-[#8B8884]" />
+                  <ChevronDown className="h-3 w-3 text-[#8C8C8C]" />
                 </button>
                 {modeMenuOpen && (
-                  <div className="absolute bottom-full left-0 z-50 mb-1.5 w-56 overflow-hidden rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
-                    <div className="px-3 py-2 text-[length:var(--font-size-ui-sm)] font-medium text-[#6B6862] dark:text-zinc-400">
+                  <div className="absolute bottom-full left-0 z-50 mb-1.5 w-56 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] dark:bg-[#161616] dark:shadow-black/40">
+                    <div className="px-3 py-2 text-[length:var(--font-size-ui-sm)] font-medium text-[#6B6B6B] dark:text-zinc-400">
                       运行模式
                     </div>
                     {([
@@ -987,15 +987,15 @@ export function Terminal() {
                           "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors",
                           agentPreset === p.id
                             ? "bg-[#E58F67]/10 text-[#E58F67]"
-                            : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
+                            : "text-[#383838] hover:bg-[#F5F5F5] dark:text-zinc-300 dark:hover:bg-[#262626]",
                         )}
                       >
                         <span className="text-[length:var(--font-size-ui-sm)]">{p.label}</span>
-                        <span className="text-[10px] text-[#A8A29E] dark:text-zinc-500">{p.desc}</span>
+                        <span className="text-[10px] text-[#A6A6A6] dark:text-zinc-500">{p.desc}</span>
                         {agentPreset === p.id && <Check className="ml-auto h-3 w-3 shrink-0" />}
                       </button>
                     ))}
-                    <div className="border-t border-[#E5E2D9] px-3 py-2 text-[length:var(--font-size-ui-sm)] font-medium text-[#6B6862] dark:border-[#3a3731] dark:text-zinc-400">
+                    <div className="border-t border-[#DEDEDE] px-3 py-2 text-[length:var(--font-size-ui-sm)] font-medium text-[#6B6B6B] dark:border-[#333333] dark:text-zinc-400">
                       执行模式
                     </div>
                     {([
@@ -1012,11 +1012,11 @@ export function Terminal() {
                           "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors",
                           mode === m.id
                             ? "bg-[#E58F67]/10 text-[#E58F67]"
-                            : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
+                            : "text-[#383838] hover:bg-[#F5F5F5] dark:text-zinc-300 dark:hover:bg-[#262626]",
                         )}
                       >
                         <span className="text-[length:var(--font-size-ui-sm)]">{m.label}</span>
-                        <span className="text-[10px] text-[#A8A29E] dark:text-zinc-500">{m.desc}</span>
+                        <span className="text-[10px] text-[#A6A6A6] dark:text-zinc-500">{m.desc}</span>
                         {mode === m.id && <Check className="ml-auto h-3 w-3 shrink-0" />}
                       </button>
                     ))}
@@ -1030,26 +1030,26 @@ export function Terminal() {
                 <div className="relative" ref={modelMenuRef}>
                   <button
                     onClick={() => setModelMenuOpen((v) => !v)}
-                    className="flex max-w-[200px] items-center gap-1.5 rounded-lg px-2 py-1 text-[length:var(--font-size-ui-sm)] text-zinc-300 transition-colors hover:bg-[#F0EDE5] dark:text-zinc-300 dark:hover:bg-[#2a2723]"
+                    className="flex max-w-[200px] items-center gap-1.5 rounded-lg px-2 py-1 text-[length:var(--font-size-ui-sm)] text-zinc-300 transition-colors hover:bg-[#F0F0F0] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]"
                     title="切换模型"
                   >
                     <span className="truncate">{config.model}</span>
-                    <ChevronDown className="h-3 w-3 shrink-0 text-[#8B8884]" />
+                    <ChevronDown className="h-3 w-3 shrink-0 text-[#8C8C8C]" />
                   </button>
                   {modelMenuOpen && (
-                    <div className="absolute bottom-full left-0 z-50 mb-1.5 max-h-72 w-72 overflow-y-auto rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
+                    <div className="absolute bottom-full left-0 z-50 mb-1.5 max-h-72 w-72 overflow-y-auto rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] dark:bg-[#161616] dark:shadow-black/40">
                       {headerModelChoices.length === 0 ? (
-                        <div className="px-3 py-2 text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
+                        <div className="px-3 py-2 text-[length:var(--font-size-ui-sm)] text-[#A6A6A6] dark:text-zinc-500">
                           暂无模型列表——在设置里点 Test 拉取
                         </div>
                       ) : (
                         <>
-                          <div className="border-b border-[#E5E2D9] px-3 py-2 text-[length:var(--font-size-ui-sm)] font-medium text-[#6B6862] dark:border-[#3a3731] dark:text-zinc-400">
+                          <div className="border-b border-[#DEDEDE] px-3 py-2 text-[length:var(--font-size-ui-sm)] font-medium text-[#6B6B6B] dark:border-[#333333] dark:text-zinc-400">
                             模型
                           </div>
                           {groupModels(headerModelChoices).map((g) => (
                             <div key={g.provider}>
-                              <div className="px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[#A8A29E] dark:text-zinc-500">
+                              <div className="px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[#A6A6A6] dark:text-zinc-500">
                                 {g.provider}
                               </div>
                               {g.models.map((m) => (
@@ -1064,7 +1064,7 @@ export function Terminal() {
                                   className={`flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-[length:var(--font-size-ui-sm)] transition-colors ${
                                     m === config.model
                                       ? "bg-[#E58F67]/10 text-[#E58F67]"
-                                      : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]"
+                                      : "text-[#383838] hover:bg-[#F5F5F5] dark:text-zinc-300 dark:hover:bg-[#262626]"
                                   }`}
                                 >
                                   <span className="min-w-0 flex-1 truncate">{m}</span>
@@ -1078,7 +1078,7 @@ export function Terminal() {
                               setModelMenuOpen(false);
                               toast.info("请到设置面板管理模型与 API Key");
                             }}
-                            className="flex w-full items-center gap-2 border-t border-[#E5E2D9] px-3 py-2 text-left text-[length:var(--font-size-ui-sm)] text-[#8B7355] transition-colors hover:bg-[#F5F3EE] dark:border-[#3a3731] dark:text-[#E8A87C] dark:hover:bg-[#262320]"
+                            className="flex w-full items-center gap-2 border-t border-[#DEDEDE] px-3 py-2 text-left text-[length:var(--font-size-ui-sm)] text-[#C08A5F] transition-colors hover:bg-[#F5F5F5] dark:border-[#333333] dark:text-[#E8A87C] dark:hover:bg-[#262626]"
                           >
                             <Wrench className="h-3.5 w-3.5" />
                             <span>管理模型</span>
@@ -1093,10 +1093,10 @@ export function Terminal() {
               <div className="relative" ref={effortMenuRef}>
                 <button
                   onClick={() => setEffortMenuOpen((v) => !v)}
-                  className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[length:var(--font-size-ui-sm)] text-zinc-300 transition-colors hover:bg-[#F0EDE5] dark:text-zinc-300 dark:hover:bg-[#2a2723]"
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[length:var(--font-size-ui-sm)] text-zinc-300 transition-colors hover:bg-[#F0F0F0] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]"
                   title="思考强度"
                 >
-                  <Sparkles className="h-3.5 w-3.5 text-[#8B8884]" />
+                  <Sparkles className="h-3.5 w-3.5 text-[#8C8C8C]" />
                   <span>
                     {!config.thinkingEnabled
                       ? "关闭"
@@ -1106,10 +1106,10 @@ export function Terminal() {
                           ? "超高"
                           : "高"}
                   </span>
-                  <ChevronDown className="h-3 w-3 text-[#8B8884]" />
+                  <ChevronDown className="h-3 w-3 text-[#8C8C8C]" />
                 </button>
                 {effortMenuOpen && (
-                  <div className="absolute bottom-full left-0 z-50 mb-1.5 w-44 overflow-hidden rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
+                  <div className="absolute bottom-full left-0 z-50 mb-1.5 w-44 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] dark:bg-[#161616] dark:shadow-black/40">
                     {([
                       { id: "off" as const, label: "关闭", desc: "不启用思考" },
                       { id: "low" as const, label: "低", desc: "更快，更省 token" },
@@ -1132,11 +1132,11 @@ export function Terminal() {
                             "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors",
                             selected
                               ? "bg-[#E58F67]/10 text-[#E58F67]"
-                              : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
+                              : "text-[#383838] hover:bg-[#F5F5F5] dark:text-zinc-300 dark:hover:bg-[#262626]",
                           )}
                         >
                           <span className="text-[length:var(--font-size-ui-sm)]">{e.label}</span>
-                          <span className="text-[10px] text-[#A8A29E] dark:text-zinc-500">{e.desc}</span>
+                          <span className="text-[10px] text-[#A6A6A6] dark:text-zinc-500">{e.desc}</span>
                           {selected && <Check className="ml-auto h-3 w-3 shrink-0" />}
                         </button>
                       );
@@ -1148,7 +1148,7 @@ export function Terminal() {
               <button
                 onClick={submit}
                 disabled={(!input.trim() && attachments.length === 0) || isStreaming || isCompacting}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-zinc-300 transition-all hover:bg-[#F0EDE5] hover:text-[#3D3B37] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-[#2a2723] dark:hover:text-zinc-100"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-zinc-300 transition-all hover:bg-[#F0F0F0] hover:text-[#383838] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-100"
                 title="Send (Enter)"
               >
                 <ArrowUp className="h-3.5 w-3.5" />
@@ -1168,7 +1168,7 @@ export function Terminal() {
           />
           {/* @mention autocomplete dropdown */}
           {mentionQuery !== null && mentionFiles.length > 0 && (
-            <div className="absolute bottom-full left-0 mb-2 w-72 overflow-hidden rounded-xl border border-[#E5E2D9] bg-white shadow-xl shadow-black/10 dark:border-[#3a3731] dark:bg-[#1c1a17] dark:shadow-black/40">
+            <div className="absolute bottom-full left-0 mb-2 w-72 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] dark:bg-[#161616] dark:shadow-black/40">
               {mentionFiles.map((f, i) => (
                 <button
                   key={f.path}
@@ -1176,23 +1176,23 @@ export function Terminal() {
                   onMouseEnter={() => setMentionIndex(i)}
                   className={cn(
                     "flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors",
-                    i === mentionIndex ? "bg-[#E58F67]/10 text-[#E58F67]" : "text-[#3D3B37] hover:bg-[#F5F3EE] dark:text-zinc-300 dark:hover:bg-[#262320]",
+                    i === mentionIndex ? "bg-[#E58F67]/10 text-[#E58F67]" : "text-[#383838] hover:bg-[#F5F5F5] dark:text-zinc-300 dark:hover:bg-[#262626]",
                   )}
                 >
-                  <FileTypeIcon path={f.path} className="h-3 w-3 shrink-0 text-[#8B7355] dark:text-[#E8A87C]" />
+                  <FileTypeIcon path={f.path} className="h-3 w-3 shrink-0 text-[#C08A5F] dark:text-[#E8A87C]" />
                   <span className="truncate">{f.path}</span>
                 </button>
               ))}
             </div>
           )}
         </div>
-        <div className="mt-2 flex items-center justify-between px-1 text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
+        <div className="mt-2 flex items-center justify-between px-1 text-[length:var(--font-size-ui-sm)] text-[#A6A6A6] dark:text-zinc-500">
           <span className="flex items-center gap-3">
             {totalTokens > 0 && (
               <button
                 onClick={() => setTokenSheetOpen(true)}
                 title={`本会话累计 ${totalTokens.toLocaleString()} tokens · 点击查看 Token 面板`}
-                className="cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+                className="cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[#F0F0F0] hover:text-[#262626] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
               >
                 累计 {totalTokens.toLocaleString()}
               </button>
@@ -1201,7 +1201,7 @@ export function Terminal() {
               <button
                 onClick={() => setTokenSheetOpen(true)}
                 title={`上次请求 ${lastUsage.prompt_tokens.toLocaleString()} prompt + ${lastUsage.completion_tokens.toLocaleString()} completion（账单口径）· 点击查看 Token 面板`}
-                className="cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[#F0EDE5] hover:text-[#2D2B27] dark:hover:bg-[#2a2723] dark:hover:text-zinc-200"
+                className="cursor-pointer rounded px-1 py-0.5 transition-colors hover:bg-[#F0F0F0] hover:text-[#262626] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
               >
                 本轮 {lastUsage.total_tokens.toLocaleString()}
               </button>
@@ -1209,7 +1209,7 @@ export function Terminal() {
             {isStreaming && (
               <span className="flex items-center gap-1.5">
                 <span>step</span>
-                <span className="font-mono text-[#6B6862] dark:text-zinc-500">{agentIteration}</span>
+                <span className="font-mono text-[#6B6B6B] dark:text-zinc-500">{agentIteration}</span>
                 <span className="inline-block h-1 w-16 overflow-hidden rounded-full bg-zinc-800">
                   <span
                     className="block h-full w-1/3 animate-pulse rounded-full bg-[#E58F67]"
@@ -1246,7 +1246,7 @@ function QuestionModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-[#E5E2D9] bg-[#FFFFFF] shadow-2xl dark:border-[#3a3731] dark:bg-[#1c1a17]">
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-[#DEDEDE] bg-[#FFFFFF] shadow-2xl dark:border-[#333333] dark:bg-[#161616]">
         <QuestionPanel panel={panel} onSubmit={onSubmit} />
       </div>
     </div>
@@ -1319,13 +1319,13 @@ function QuestionPanel({
   };
 
   return (
-    <div className="rounded-lg border border-[#E58F67]/30 bg-[#FFFFFF] shadow-sm dark:bg-[#1c1a17]">
+    <div className="rounded-lg border border-[#E58F67]/30 bg-[#FFFFFF] shadow-sm dark:bg-[#161616]">
       {/* Header */}
       {panel.title && (
-        <div className="border-b border-[#E5E2D9] px-5 py-3 dark:border-[#3a3731]">
-          <h3 className="text-sm font-semibold text-[#2D2B27] dark:text-zinc-100">{panel.title}</h3>
+        <div className="border-b border-[#DEDEDE] px-5 py-3 dark:border-[#333333]">
+          <h3 className="text-sm font-semibold text-[#262626] dark:text-zinc-100">{panel.title}</h3>
           {panel.description && (
-            <p className="mt-0.5 text-xs text-[#8B8884] dark:text-zinc-400">{panel.description}</p>
+            <p className="mt-0.5 text-xs text-[#8C8C8C] dark:text-zinc-400">{panel.description}</p>
           )}
         </div>
       )}
@@ -1334,7 +1334,7 @@ function QuestionPanel({
       <div className="space-y-4 px-5 py-4">
         {panel.questions.map((q, qi) => (
           <div key={q.id}>
-            <div className="mb-2 text-sm font-medium text-[#2D2B27] dark:text-zinc-200">
+            <div className="mb-2 text-sm font-medium text-[#262626] dark:text-zinc-200">
               <span>{qi + 1}. {q.question}</span>
               {q.required && <span className="ml-1 text-[#E54D2E]">*</span>}
             </div>
@@ -1349,7 +1349,7 @@ function QuestionPanel({
                       className={`flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors ${
                         selected
                           ? "border-[#E58F67] bg-[#E58F67]/8"
-                          : "border-[#E5E2D9] bg-[#FAF9F7] hover:border-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-[#52504b]"
+                          : "border-[#DEDEDE] bg-[#FAFAFA] hover:border-[#D4D4D4] dark:border-[#333333] dark:bg-[#0A0A0A] dark:hover:border-[#4D4D4D]"
                       }`}
                     >
                       <input
@@ -1361,9 +1361,9 @@ function QuestionPanel({
                         className="mt-0.5 h-3.5 w-3.5 accent-[#E58F67]"
                       />
                       <div>
-                        <div className="text-[#2D2B27] dark:text-zinc-200">{opt.label}</div>
+                        <div className="text-[#262626] dark:text-zinc-200">{opt.label}</div>
                         {opt.description && (
-                          <div className="mt-0.5 text-[length:var(--font-size-ui-sm)] text-[#8B8884] dark:text-zinc-400">{opt.description}</div>
+                          <div className="mt-0.5 text-[length:var(--font-size-ui-sm)] text-[#8C8C8C] dark:text-zinc-400">{opt.description}</div>
                         )}
                       </div>
                     </label>
@@ -1375,7 +1375,7 @@ function QuestionPanel({
                       className={`flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors ${
                         answers[q.id] === "__other__"
                           ? "border-[#E58F67] bg-[#E58F67]/8"
-                          : "border-[#E5E2D9] bg-[#FAF9F7] hover:border-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-[#52504b]"
+                          : "border-[#DEDEDE] bg-[#FAFAFA] hover:border-[#D4D4D4] dark:border-[#333333] dark:bg-[#0A0A0A] dark:hover:border-[#4D4D4D]"
                       }`}
                     >
                       <input
@@ -1386,7 +1386,7 @@ function QuestionPanel({
                         onChange={() => setAnswer(q.id, "__other__")}
                         className="mt-0.5 h-3.5 w-3.5 accent-[#E58F67]"
                       />
-                      <span className="text-[#2D2B27] dark:text-zinc-200">其他</span>
+                      <span className="text-[#262626] dark:text-zinc-200">其他</span>
                     </label>
                     {answers[q.id] === "__other__" && (
                       <input
@@ -1394,7 +1394,7 @@ function QuestionPanel({
                         value={otherInputs[q.id] ?? ""}
                         onChange={(e) => setOther(q.id, e.target.value)}
                         placeholder="请输入…"
-                        className="mt-1.5 ml-7 w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-1.5 text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
+                        className="mt-1.5 ml-7 w-full rounded border border-[#DEDEDE] bg-[#FAFAFA] px-3 py-1.5 text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#333333] dark:bg-[#0A0A0A] dark:text-zinc-100"
                         autoFocus
                       />
                     )}
@@ -1412,7 +1412,7 @@ function QuestionPanel({
                       className={`flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors ${
                         selected
                           ? "border-[#E58F67] bg-[#E58F67]/8"
-                          : "border-[#E5E2D9] bg-[#FAF9F7] hover:border-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-[#52504b]"
+                          : "border-[#DEDEDE] bg-[#FAFAFA] hover:border-[#D4D4D4] dark:border-[#333333] dark:bg-[#0A0A0A] dark:hover:border-[#4D4D4D]"
                       }`}
                     >
                       <input
@@ -1422,9 +1422,9 @@ function QuestionPanel({
                         className="mt-0.5 h-3.5 w-3.5 accent-[#E58F67]"
                       />
                       <div>
-                        <div className="text-[#2D2B27] dark:text-zinc-200">{opt.label}</div>
+                        <div className="text-[#262626] dark:text-zinc-200">{opt.label}</div>
                         {opt.description && (
-                          <div className="mt-0.5 text-[length:var(--font-size-ui-sm)] text-[#8B8884] dark:text-zinc-400">{opt.description}</div>
+                          <div className="mt-0.5 text-[length:var(--font-size-ui-sm)] text-[#8C8C8C] dark:text-zinc-400">{opt.description}</div>
                         )}
                       </div>
                     </label>
@@ -1432,14 +1432,14 @@ function QuestionPanel({
                 })}
                 {q.allow_other && (
                   <div>
-                    <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-sm hover:border-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#161512] dark:hover:border-[#52504b]">
+                    <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-[#DEDEDE] bg-[#FAFAFA] px-3 py-2 text-sm hover:border-[#D4D4D4] dark:border-[#333333] dark:bg-[#0A0A0A] dark:hover:border-[#4D4D4D]">
                       <input
                         type="checkbox"
                         checked={((answers[q.id] as string[]) ?? []).includes("__other__")}
                         onChange={() => toggleOption(q.id, "__other__")}
                         className="mt-0.5 h-3.5 w-3.5 accent-[#E58F67]"
                       />
-                      <span className="text-[#2D2B27] dark:text-zinc-200">其他</span>
+                      <span className="text-[#262626] dark:text-zinc-200">其他</span>
                     </label>
                     {((answers[q.id] as string[]) ?? []).includes("__other__") && (
                       <input
@@ -1447,7 +1447,7 @@ function QuestionPanel({
                         value={otherInputs[q.id] ?? ""}
                         onChange={(e) => setOther(q.id, e.target.value)}
                         placeholder="请输入…"
-                        className="mt-1.5 ml-7 w-full rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-1.5 text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
+                        className="mt-1.5 ml-7 w-full rounded border border-[#DEDEDE] bg-[#FAFAFA] px-3 py-1.5 text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#333333] dark:bg-[#0A0A0A] dark:text-zinc-100"
                         autoFocus
                       />
                     )}
@@ -1462,7 +1462,7 @@ function QuestionPanel({
                   onChange={(e) => setAnswer(q.id, e.target.value)}
                   placeholder="请输入…"
                   rows={3}
-                  className="w-full resize-none rounded border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#3a3731] dark:bg-[#161512] dark:text-zinc-100"
+                  className="w-full resize-none rounded border border-[#DEDEDE] bg-[#FAFAFA] px-3 py-2 text-sm focus:border-[#E58F67] focus:outline-none dark:border-[#333333] dark:bg-[#0A0A0A] dark:text-zinc-100"
                 />
               </div>
             )}
@@ -1476,7 +1476,7 @@ function QuestionPanel({
       </div>
 
       {/* Submit */}
-      <div className="border-t border-[#E5E2D9] px-5 py-3 dark:border-[#3a3731]">
+      <div className="border-t border-[#DEDEDE] px-5 py-3 dark:border-[#333333]">
         <button
           onClick={handleSubmit}
           className="rounded-lg bg-[#E58F67] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#C66B4A]"
@@ -1500,7 +1500,7 @@ function EmptyState({ onUsePrompt }: { onUsePrompt?: (text: string) => void }) {
   ];
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 px-6 py-12 text-center">
-      <div className="flex items-center gap-2 text-[length:var(--font-size-base)] font-medium text-[#8B8884] dark:text-zinc-400">
+      <div className="flex items-center gap-2 text-[length:var(--font-size-base)] font-medium text-[#8C8C8C] dark:text-zinc-400">
         <TerminalIcon className="h-4 w-4 text-[#E58F67]" />
         <span>{greeting}，接下来交给我吧</span>
       </div>
@@ -1509,13 +1509,13 @@ function EmptyState({ onUsePrompt }: { onUsePrompt?: (text: string) => void }) {
           <button
             key={p}
             onClick={() => onUsePrompt?.(p)}
-            className="rounded-full border border-[#3a3731] bg-[#262320] px-3.5 py-1.5 text-[#A8A29E] transition-colors hover:border-[#E58F67]/40 hover:text-[#E8A87C] dark:border-[#3a3731] dark:bg-[#262320] dark:hover:border-[#E58F67]/40 dark:hover:text-[#E8A87C]"
+            className="rounded-full border border-[#333333] bg-[#262626] px-3.5 py-1.5 text-[#A6A6A6] transition-colors hover:border-[#E58F67]/40 hover:text-[#E8A87C] dark:border-[#333333] dark:bg-[#262626] dark:hover:border-[#E58F67]/40 dark:hover:text-[#E8A87C]"
           >
             {p}
           </button>
         ))}
       </div>
-      <div className="text-[length:var(--font-size-ui-sm)] text-[#6B6862] dark:text-zinc-500">
+      <div className="text-[length:var(--font-size-ui-sm)] text-[#6B6B6B] dark:text-zinc-500">
         使用 @ 提及文件，或输入 / 使用命令
       </div>
     </div>
@@ -1539,7 +1539,7 @@ function AgentStatusRow({ status }: { status: string }) {
       </span>
       <Sparkles className="h-3 w-3 text-[#E58F67]/70" />
       <Loader2 className="h-3 w-3 animate-spin text-[#E58F67]/70" />
-      <span className="text-[#2D2B27] dark:text-zinc-200">{status || "agent is working…"}</span>
+      <span className="text-[#262626] dark:text-zinc-200">{status || "agent is working…"}</span>
     </motion.div>
   );
 }
@@ -1730,7 +1730,7 @@ function StreamingBubble({ text, reasoning }: { text: string; reasoning: string 
       transition={{ duration: 0.15 }}
       className="overflow-hidden rounded-md border border-[#E58F67]/20 bg-[#E58F67]/5 px-2.5 py-1.5 text-xs dark:border-[#E58F67]/25"
     >
-      <div className="flex items-center gap-1.5 text-[#8B7355] dark:text-[#E8A87C]">
+      <div className="flex items-center gap-1.5 text-[#C08A5F] dark:text-[#E8A87C]">
         <Sparkles className="h-3 w-3 text-[#E58F67]/70" />
         <span className="font-medium">正在分析…</span>
         <span className="flex gap-0.5 pl-1">
@@ -1739,7 +1739,7 @@ function StreamingBubble({ text, reasoning }: { text: string; reasoning: string 
           <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "240ms" }} />
         </span>
       </div>
-      {preview && <div className="mt-1 truncate text-[#A8A29E] dark:text-zinc-500">{preview}</div>}
+      {preview && <div className="mt-1 truncate text-[#A6A6A6] dark:text-zinc-500">{preview}</div>}
     </motion.div>
   );
 }
@@ -1760,7 +1760,7 @@ function TurnBlock({ turn }: { turn: TurnGroup }) {
     >
       {/* 叙述文字：AI 的输出内容，在其应有的位置展示（不并入思考） */}
       {turn.analysis && (
-        <div className="px-1 text-[#2D2B27] dark:text-zinc-100">
+        <div className="px-1 text-[#262626] dark:text-zinc-100">
           <MarkdownRenderer text={turn.analysis} />
         </div>
       )}
@@ -1831,7 +1831,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={copy}
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded transition-colors text-[#A8A29E] hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:bg-[#2a2723] dark:hover:text-zinc-300"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded transition-colors text-[#A6A6A6] hover:bg-[#F0F0F0] hover:text-[#383838] dark:text-zinc-500 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300"
       title={copied ? "Copied" : "Copy message"}
     >
       {copied ? <Check size={14} className="text-emerald-500 dark:text-[#34d399]" /> : <Copy size={14} />}
@@ -1898,9 +1898,9 @@ function ThinkingStep({ text, streaming, durationMs }: { text: string; streaming
         disabled={streaming}
         className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-white/5 disabled:cursor-default dark:hover:bg-white/5"
       >
-        <ChevronRight className={cn("h-3 w-3 shrink-0 text-[#8B8884] transition-transform", !collapsed && "rotate-90")} />
-        <Brain className={cn("h-3.5 w-3.5 shrink-0", streaming ? "text-[#E58F67]" : "text-[#A8A29E]")} />
-        <span className={cn("shrink-0 font-medium", streaming ? "text-shimmer" : "text-[#8B8884]")}>
+        <ChevronRight className={cn("h-3 w-3 shrink-0 text-[#8C8C8C] transition-transform", !collapsed && "rotate-90")} />
+        <Brain className={cn("h-3.5 w-3.5 shrink-0", streaming ? "text-[#E58F67]" : "text-[#A6A6A6]")} />
+        <span className={cn("shrink-0 font-medium", streaming ? "text-shimmer" : "text-[#8C8C8C]")}>
           {streaming ? "思考中" : `思考过程${durationMs != null ? ` 持续了 ${formatDuration(durationMs)}` : ""}`}
         </span>
         {streaming && (
@@ -1910,12 +1910,12 @@ function ThinkingStep({ text, streaming, durationMs }: { text: string; streaming
             <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "240ms" }} />
           </span>
         )}
-        {!streaming && collapsed && <span className="min-w-0 truncate pl-1 text-[#A8A29E]">{preview}</span>}
-        {!streaming && <span className="ml-auto text-[#8B8884]">{collapsed ? "展开" : "收起"}</span>}
+        {!streaming && collapsed && <span className="min-w-0 truncate pl-1 text-[#A6A6A6]">{preview}</span>}
+        {!streaming && <span className="ml-auto text-[#8C8C8C]">{collapsed ? "展开" : "收起"}</span>}
       </button>
       {(!collapsed || streaming) && (
         <pre
-          className="ml-6 mb-1 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-[#3a3731] bg-[#161512] px-3 py-2.5 font-mono text-xs leading-relaxed text-[#A8A29E] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#3a3731]"
+          className="ml-6 mb-1 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-[#333333] bg-[#0A0A0A] px-3 py-2.5 font-mono text-xs leading-relaxed text-[#A6A6A6] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333333]"
           style={{ opacity: isStale ? 0.9 : 1 }}
         >
           {shown}
@@ -1987,12 +1987,12 @@ function StepCard({
         disabled={running}
         className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-white/5 disabled:cursor-default dark:hover:bg-white/5"
       >
-        <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 text-[#8B8884] transition-transform", expanded && "rotate-90")} />
-        <Icon className={cn("h-3.5 w-3.5 shrink-0", running ? "text-[#E58F67]" : "text-[#A8A29E]")} />
-        <span className={cn("shrink-0 font-medium", running ? "text-shimmer" : "text-[#8B8884]")}>
+        <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 text-[#8C8C8C] transition-transform", expanded && "rotate-90")} />
+        <Icon className={cn("h-3.5 w-3.5 shrink-0", running ? "text-[#E58F67]" : "text-[#A6A6A6]")} />
+        <span className={cn("shrink-0 font-medium", running ? "text-shimmer" : "text-[#8C8C8C]")}>
           {running ? meta.running : meta.done}
         </span>
-        {metaText && <span className="min-w-0 truncate font-mono text-[#A8A29E]">{metaText}</span>}
+        {metaText && <span className="min-w-0 truncate font-mono text-[#A6A6A6]">{metaText}</span>}
         {(statAdd > 0 || statRem > 0) && (
           <span className="shrink-0 font-mono text-[10px]">
             <span className="text-emerald-400">+{statAdd}</span>{" "}
@@ -2006,34 +2006,34 @@ function StepCard({
             <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "240ms" }} />
           </span>
         )}
-        {!running && <span className="ml-auto text-[#8B8884]">{expanded ? "收起" : "展开"}</span>}
+        {!running && <span className="ml-auto text-[#8C8C8C]">{expanded ? "收起" : "展开"}</span>}
       </button>
       {expanded && (
-        <div className="ml-6 mb-1 overflow-hidden rounded-lg border border-[#3a3731] bg-[#161512]">
+        <div className="ml-6 mb-1 overflow-hidden rounded-lg border border-[#333333] bg-[#0A0A0A]">
           {running ? (
             <div className="space-y-0.5 px-3 py-2 text-xs">
               {Object.entries(args).slice(0, 6).map(([k, v]) => (
                 <div key={k} className="flex gap-2">
-                  <span className="shrink-0 text-[#8B8884]">{k}:</span>
-                  <span className="break-all text-[#A8A29E]">{formatArgValue(v)}</span>
+                  <span className="shrink-0 text-[#8C8C8C]">{k}:</span>
+                  <span className="break-all text-[#A6A6A6]">{formatArgValue(v)}</span>
                 </div>
               ))}
             </div>
           ) : result?.plan ? (
-            <div className="px-3 py-2 text-xs text-[#A8A29E]">计划已更新 · 可在右侧 Plan 面板查看</div>
+            <div className="px-3 py-2 text-xs text-[#A6A6A6]">计划已更新 · 可在右侧 Plan 面板查看</div>
           ) : diff ? (
             <DiffView before={diff.before} after={diff.after} />
           ) : output ? (
             <div className="px-3 py-2">
               {meta.kind === "terminal" && command && (
-                <div className="mb-1.5 font-mono text-xs text-[#8B8884]">$ {command}</div>
+                <div className="mb-1.5 font-mono text-xs text-[#8C8C8C]">$ {command}</div>
               )}
-              <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-[#A8A29E] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+              <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-[#A6A6A6] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333333]">
                 {output}
               </pre>
             </div>
           ) : (
-            <div className="px-3 py-2 text-xs text-[#A8A29E]">{ok ? "完成" : "失败"}</div>
+            <div className="px-3 py-2 text-xs text-[#A6A6A6]">{ok ? "完成" : "失败"}</div>
           )}
         </div>
       )}
@@ -2068,13 +2068,13 @@ function UserRow({
               key={a.path}
               src={a.dataUrl}
               alt={a.name}
-              className="max-h-40 max-w-[240px] rounded-lg border border-[#E5E2D9] object-contain shadow dark:border-[#3a3731]"
+              className="max-h-40 max-w-[240px] rounded-lg border border-[#DEDEDE] object-contain shadow dark:border-[#333333]"
             />
           ))}
         </div>
       )}
       {editing ? (
-        <div className="w-full max-w-[80%] rounded-2xl rounded-br-md border border-[#E58F67]/40 bg-[#262320] px-4 py-2.5">
+        <div className="w-full max-w-[80%] rounded-2xl rounded-br-md border border-[#E58F67]/40 bg-[#262626] px-4 py-2.5">
           <textarea
             autoFocus
             value={draft}
@@ -2090,7 +2090,7 @@ function UserRow({
           <div className="mt-1.5 flex items-center justify-end gap-1.5">
             <button
               onClick={() => setEditing(false)}
-              className="flex h-7 w-7 items-center justify-center rounded text-[#A8A29E] transition-colors hover:bg-white/10"
+              className="flex h-7 w-7 items-center justify-center rounded text-[#A6A6A6] transition-colors hover:bg-white/10"
               title="取消"
             >
               <X className="h-3.5 w-3.5" />
@@ -2098,7 +2098,7 @@ function UserRow({
             <button
               onClick={submitEdit}
               disabled={!draft.trim()}
-              className="flex h-7 w-7 items-center justify-center rounded bg-[#3a3731] text-zinc-200 transition-colors hover:bg-[#4a4740] disabled:opacity-40"
+              className="flex h-7 w-7 items-center justify-center rounded bg-[#333333] text-zinc-200 transition-colors hover:bg-[#4a4740] disabled:opacity-40"
               title="发送并重新开始"
             >
               <ArrowUp className="h-3.5 w-3.5" />
@@ -2107,17 +2107,17 @@ function UserRow({
         </div>
       ) : (
         <>
-          <div className="max-w-[75%] rounded-2xl rounded-br-md bg-[#F5F3EE] px-4 py-2.5 text-[#2D2B27] dark:bg-[#262320] dark:text-zinc-100">
+          <div className="max-w-[75%] rounded-2xl rounded-br-md bg-[#F5F5F5] px-4 py-2.5 text-[#262626] dark:bg-[#262626] dark:text-zinc-100">
             <CollapsibleText text={text} render={(t) => <MarkdownRenderer text={t} />} />
           </div>
-          <div className="flex items-center gap-0.5 pr-1 text-[#A8A29E] dark:text-zinc-500">
+          <div className="flex items-center gap-0.5 pr-1 text-[#A6A6A6] dark:text-zinc-500">
             <CopyButton text={text} />
             <button
               onClick={() => {
                 setDraft(text);
                 setEditing(true);
               }}
-              className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:hover:bg-[#2a2723] dark:hover:text-zinc-300"
+              className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300"
               title="修改"
             >
               <Pencil className="h-3.5 w-3.5" />
@@ -2153,7 +2153,7 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
       <button
         onClick={() => setCollapsed((c) => !c)}
         disabled={streaming}
-        className="flex w-full items-center gap-1.5 px-2.5 py-1 text-left text-xs text-[#8B7355] disabled:cursor-default dark:text-[#E8A87C]"
+        className="flex w-full items-center gap-1.5 px-2.5 py-1 text-left text-xs text-[#C08A5F] disabled:cursor-default dark:text-[#E8A87C]"
       >
         <ChevronRight className={cn("h-3 w-3 transition-transform", !collapsed && "rotate-90")} />
         <Sparkles className="h-3 w-3 text-[#E58F67]/70" />
@@ -2165,12 +2165,12 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
             <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "240ms" }} />
           </span>
         )}
-        {!streaming && collapsed && <span className="ml-2 truncate text-[#A8A29E]">{preview}</span>}
-        {!streaming && <span className="ml-auto text-[#A8A29E]">{collapsed ? "show" : "hide"}</span>}
+        {!streaming && collapsed && <span className="ml-2 truncate text-[#A6A6A6]">{preview}</span>}
+        {!streaming && <span className="ml-auto text-[#A6A6A6]">{collapsed ? "show" : "hide"}</span>}
       </button>
       {!collapsed && (
         <pre
-          className="max-h-64 overflow-auto whitespace-pre-wrap break-words px-3 pb-2.5 pt-0.5 font-mono text-xs leading-relaxed text-[#6B6862] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE]"
+          className="max-h-64 overflow-auto whitespace-pre-wrap break-words px-3 pb-2.5 pt-0.5 font-mono text-xs leading-relaxed text-[#6B6B6B] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4]"
           style={{ opacity: isStale ? 0.9 : 1 }}
         >
           {shown}
@@ -2205,7 +2205,7 @@ function AssistantRow({
   return (
     <div className="flex flex-col gap-1">
       <div
-        className="min-w-0 break-words text-[#2D2B27] dark:text-zinc-100"
+        className="min-w-0 break-words text-[#262626] dark:text-zinc-100"
         style={{ opacity: isStale ? 0.95 : 1 }}
       >
         {showReasoning && <ThinkingStep text={reasoning!} streaming={streaming} durationMs={durationMs} />}
@@ -2215,12 +2215,12 @@ function AssistantRow({
         )}
       </div>
       {!streaming && (
-        <div className="flex items-center gap-0.5 pl-1 text-[#A8A29E] dark:text-zinc-500">
+        <div className="flex items-center gap-0.5 pl-1 text-[#A6A6A6] dark:text-zinc-500">
           <CopyButton text={fullText || text || reasoning || ""} />
           {canRegenerate && (
             <button
               onClick={() => void regenerate()}
-              className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0EDE5] hover:text-[#3D3B37] dark:hover:bg-[#2a2723] dark:hover:text-zinc-300"
+              className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300"
               title="重新生成"
             >
               <RefreshCw className="h-3.5 w-3.5" />
@@ -2282,12 +2282,12 @@ function SubagentCard({
       ) : (
         <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#34d399]" />
       )}
-      <span className="shrink-0 font-semibold text-[#3D3B37]">子智能体</span>
+      <span className="shrink-0 font-semibold text-[#383838]">子智能体</span>
       <span className="shrink-0 rounded bg-[#0D9488]/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0F766E]">
         Explore
       </span>
-      <span className="shrink-0 text-[#A8A29E] dark:text-zinc-600">·</span>
-      <span className="min-w-0 flex-1 truncate text-[#6B6862] dark:text-zinc-400">
+      <span className="shrink-0 text-[#A6A6A6] dark:text-zinc-600">·</span>
+      <span className="min-w-0 flex-1 truncate text-[#6B6B6B] dark:text-zinc-400">
         {title || "探索任务"}
       </span>
       {running ? (
@@ -2300,7 +2300,7 @@ function SubagentCard({
           <span className="hidden sm:inline">运行中…</span>
         </span>
       ) : (
-        <span className="shrink-0 text-[#A8A29E]">查看详情 →</span>
+        <span className="shrink-0 text-[#A6A6A6]">查看详情 →</span>
       )}
     </motion.button>
   );
@@ -2318,24 +2318,24 @@ function ToolCallRow({
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="rounded-md border border-[#E5E2D9] bg-gradient-to-r from-amber-950/15 to-zinc-900/30 px-3 py-2 text-xs dark:border-[#3a3731] dark:from-amber-950/25 dark:to-zinc-900/50"
+      className="rounded-md border border-[#DEDEDE] bg-gradient-to-r from-amber-950/15 to-zinc-900/30 px-3 py-2 text-xs dark:border-[#333333] dark:from-amber-950/25 dark:to-zinc-900/50"
       style={{ borderLeft: "3px solid rgba(217, 119, 6, 0.5)" }}
     >
       <div className="flex items-center gap-2 text-[#B87B5A] dark:text-[#E8A87C]">
         <Wrench className="h-3.5 w-3.5" />
         <span className="font-semibold tracking-wide">tool · {name}</span>
       </div>
-      <div className="mt-1.5 space-y-0.5 pl-5 text-[#6B6862] dark:text-zinc-400">
+      <div className="mt-1.5 space-y-0.5 pl-5 text-[#6B6B6B] dark:text-zinc-400">
         {Object.entries(args).slice(0, 6).map(([k, v]) => (
           <div key={k} className="flex gap-2">
-            <span className="text-[#8B8884] dark:text-zinc-500">{k}:</span>
-            <span className="flex-1 break-all text-[#3D3B37] dark:text-zinc-300">
+            <span className="text-[#8C8C8C] dark:text-zinc-500">{k}:</span>
+            <span className="flex-1 break-all text-[#383838] dark:text-zinc-300">
               {formatArgValue(v)}
             </span>
           </div>
         ))}
         {Object.keys(args).length > 6 && (
-          <div className="text-[#A8A29E] dark:text-zinc-500">… {Object.keys(args).length - 6} more</div>
+          <div className="text-[#A6A6A6] dark:text-zinc-500">… {Object.keys(args).length - 6} more</div>
         )}
       </div>
     </motion.div>
@@ -2377,7 +2377,7 @@ function ToolGroupRow({
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
-      className="overflow-hidden rounded-md border border-[#E5E2D9] bg-[#FFFFFF] text-xs shadow-sm dark:border-[#3a3731] dark:bg-[#1c1a17]"
+      className="overflow-hidden rounded-md border border-[#DEDEDE] bg-[#FFFFFF] text-xs shadow-sm dark:border-[#333333] dark:bg-[#161616]"
     >
       {/* Header — tool name + status */}
       <div className="flex items-center gap-2 bg-gradient-to-r from-amber-950/15 to-zinc-900/30 px-3 py-2 dark:from-amber-950/25 dark:to-zinc-900/50">
@@ -2396,17 +2396,17 @@ function ToolGroupRow({
 
       {/* Args — compact key-value pairs */}
       {Object.keys(args).length > 0 && (
-        <div className="border-b border-[#E5E2D9] px-3 py-1.5 text-[#6B6862] dark:border-[#3a3731] dark:text-zinc-400">
+        <div className="border-b border-[#DEDEDE] px-3 py-1.5 text-[#6B6B6B] dark:border-[#333333] dark:text-zinc-400">
           {Object.entries(args).slice(0, 6).map(([k, v]) => (
             <div key={k} className="flex gap-2">
-              <span className="shrink-0 text-[#8B8884] dark:text-zinc-500">{k}:</span>
-              <span className="break-all text-[#3D3B37] dark:text-zinc-300">
+              <span className="shrink-0 text-[#8C8C8C] dark:text-zinc-500">{k}:</span>
+              <span className="break-all text-[#383838] dark:text-zinc-300">
                 {formatArgValue(v)}
               </span>
             </div>
           ))}
           {Object.keys(args).length > 6 && (
-            <div className="text-[#A8A29E] dark:text-zinc-500">
+            <div className="text-[#A6A6A6] dark:text-zinc-500">
               … {Object.keys(args).length - 6} more
             </div>
           )}
@@ -2419,7 +2419,7 @@ function ToolGroupRow({
           {showPath && !isPlan && (
             <button
               onClick={() => select(showPath)}
-              className="flex items-center gap-1 truncate rounded px-1 text-[#8B7355] hover:bg-[#F0EDE5] dark:text-[#E8A87C] dark:hover:bg-[#2a2723]"
+              className="flex items-center gap-1 truncate rounded px-1 text-[#C08A5F] hover:bg-[#F0F0F0] dark:text-[#E8A87C] dark:hover:bg-[#2A2A2A]"
               title="Open in editor"
             >
               <FileText className="h-3 w-3" />
@@ -2427,14 +2427,14 @@ function ToolGroupRow({
             </button>
           )}
           {!result.diff && !isPlan && output && (
-            <span className="text-[length:var(--font-size-ui-sm)] text-[#A8A29E] dark:text-zinc-500">
+            <span className="text-[length:var(--font-size-ui-sm)] text-[#A6A6A6] dark:text-zinc-500">
               {outputLineCount} line{outputLineCount !== 1 ? "s" : ""}
             </span>
           )}
           {!isPlan && (
             <button
               onClick={() => setCollapsed((c) => !c)}
-              className="ml-auto text-[#8B8884] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:text-zinc-200"
+              className="ml-auto text-[#8C8C8C] hover:text-[#383838] dark:text-zinc-500 dark:hover:text-zinc-200"
             >
               {collapsed ? "show" : "hide"}
             </button>
@@ -2444,7 +2444,7 @@ function ToolGroupRow({
         {isPlan ? (
           <div className="mt-2 flex items-center gap-2 text-xs">
             <span className="text-[#E58F67]">📋</span>
-            <span className="text-[#6B6862] dark:text-zinc-400">Plan updated. </span>
+            <span className="text-[#6B6B6B] dark:text-zinc-400">Plan updated. </span>
             <button
               onClick={() => useVfsView.getState().setRightPanelTab("plan")}
               className="text-[#E58F67] underline hover:no-underline"
@@ -2461,7 +2461,7 @@ function ToolGroupRow({
           </div>
         ) : (
           !collapsed && output && (
-            <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-[#6B6862] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:text-zinc-400 dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+            <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-[#6B6B6B] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:text-zinc-400 dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
               {output}
             </pre>
           )
@@ -2511,7 +2511,7 @@ function ToolResultRow({
       className={cn(
         "rounded-md border px-3 py-2 text-xs",
         ok
-          ? "border-[#E5E2D9] bg-[#F5F3EE] dark:border-[#3a3731] dark:bg-[#1c1a17]"
+          ? "border-[#DEDEDE] bg-[#F5F5F5] dark:border-[#333333] dark:bg-[#161616]"
           : "border-[#E54D2E]/20 bg-[#E54D2E]/5",
       )}
     >
@@ -2521,13 +2521,13 @@ function ToolResultRow({
         ) : (
           <XCircle className="h-3.5 w-3.5 shrink-0 text-[#E54D2E]" />
         )}
-        <span className="font-semibold text-[#3D3B37] dark:text-zinc-200">
+        <span className="font-semibold text-[#383838] dark:text-zinc-200">
           {ok ? "result" : "failed"} · {name}
         </span>
         {showPath && !isPlan && (
           <button
             onClick={() => select(showPath)}
-            className="ml-1 flex items-center gap-1 truncate rounded px-1 text-[#8B7355] hover:bg-[#F0EDE5] dark:text-[#E8A87C] dark:hover:bg-[#2a2723]"
+            className="ml-1 flex items-center gap-1 truncate rounded px-1 text-[#C08A5F] hover:bg-[#F0F0F0] dark:text-[#E8A87C] dark:hover:bg-[#2A2A2A]"
             title="Open in editor"
           >
             <FileText className="h-3 w-3" />
@@ -2535,14 +2535,14 @@ function ToolResultRow({
           </button>
         )}
         {!diff && !isPlan && output && (
-          <span className="text-[10px] text-[#A8A29E] dark:text-zinc-500">
+          <span className="text-[10px] text-[#A6A6A6] dark:text-zinc-500">
             {outputLineCount} line{outputLineCount !== 1 ? "s" : ""}
           </span>
         )}
         {!isPlan && (
           <button
             onClick={() => setCollapsed((c) => !c)}
-            className="ml-auto text-[#8B8884] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:text-zinc-200"
+            className="ml-auto text-[#8C8C8C] hover:text-[#383838] dark:text-zinc-500 dark:hover:text-zinc-200"
           >
             {collapsed ? "show" : "hide"}
           </button>
@@ -2552,7 +2552,7 @@ function ToolResultRow({
       {isPlan ? (
         <div className="mt-2 flex items-center gap-2 pl-5 text-xs">
           <span className="text-[#E58F67]">📋</span>
-          <span className="text-[#6B6862] dark:text-zinc-400">Plan updated. </span>
+          <span className="text-[#6B6B6B] dark:text-zinc-400">Plan updated. </span>
           <button
             onClick={() => useVfsView.getState().setRightPanelTab("plan")}
             className="text-[#E58F67] underline hover:no-underline"
@@ -2566,7 +2566,7 @@ function ToolResultRow({
         </div>
       ) : (
         !collapsed && output && (
-          <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words pl-5 text-[#6B6862] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:text-zinc-400 dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+          <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words pl-5 text-[#6B6B6B] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:text-zinc-400 dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
             {output}
           </pre>
         )
@@ -2626,8 +2626,8 @@ function ErrorRow({ text }: { text: string }) {
 
 function SystemRow({ text }: { text: string }) {
   return (
-    <div className="rounded-md border border-[#E5E2D9] bg-[#F5F3EE] px-3 py-2 text-xs text-[#6B6862] dark:border-[#3a3731] dark:bg-[#1c1a17] dark:text-zinc-400">
-      <span className="text-[#8B8884] dark:text-zinc-500">[system]</span> {text}
+    <div className="rounded-md border border-[#DEDEDE] bg-[#F5F5F5] px-3 py-2 text-xs text-[#6B6B6B] dark:border-[#333333] dark:bg-[#161616] dark:text-zinc-400">
+      <span className="text-[#8C8C8C] dark:text-zinc-500">[system]</span> {text}
     </div>
   );
 }
@@ -2643,7 +2643,7 @@ function DiffView({ before, after }: { before: string; after: string }) {
   const diff = lineDiff(beforeLines, afterLines);
 
   return (
-    <div className="overflow-x-auto rounded border border-[#E5E2D9] bg-[#FFFFFF] text-[length:var(--font-size-code)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:border-[#3a3731] dark:bg-[#0d0d0b] dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+    <div className="overflow-x-auto rounded border border-[#DEDEDE] bg-[#FFFFFF] text-[length:var(--font-size-code)] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:border-[#333333] dark:bg-[#0d0d0b] dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
       <table className="min-w-full border-collapse font-mono">
         <tbody>
           {diff.map((row, i) => (
@@ -2654,10 +2654,10 @@ function DiffView({ before, after }: { before: string; after: string }) {
                 row.type === "del" && "bg-red-950/30",
               )}
             >
-              <td className="w-8 select-none border-r border-[#E5E2D9] px-1 text-right text-[#A8A29E] dark:border-[#3a3731] dark:text-zinc-500">
+              <td className="w-8 select-none border-r border-[#DEDEDE] px-1 text-right text-[#A6A6A6] dark:border-[#333333] dark:text-zinc-500">
                 {row.leftNum ?? ""}
               </td>
-              <td className="w-8 select-none border-r border-[#E5E2D9] px-1 text-right text-[#A8A29E] dark:border-[#3a3731] dark:text-zinc-500">
+              <td className="w-8 select-none border-r border-[#DEDEDE] px-1 text-right text-[#A6A6A6] dark:border-[#333333] dark:text-zinc-500">
                 {row.rightNum ?? ""}
               </td>
               <td
@@ -2665,7 +2665,7 @@ function DiffView({ before, after }: { before: string; after: string }) {
                   "whitespace-pre-wrap break-all px-2",
                   row.type === "add" && "text-emerald-300 dark:text-[#6ee7b7]",
                   row.type === "del" && "text-[#E54D2E]",
-                  row.type === "ctx" && "text-[#6B6862] dark:text-zinc-400",
+                  row.type === "ctx" && "text-[#6B6B6B] dark:text-zinc-400",
                 )}
               >
                 <span className="select-none mr-1">
@@ -2823,7 +2823,7 @@ function MermaidBlock({ code }: { code: string }) {
     return <pre className="my-2 rounded border border-red-300/40 bg-red-50/50 px-3 py-2 text-xs text-red-600 dark:border-red-500/30 dark:bg-red-950/20 dark:text-red-400">[mermaid 渲染失败] {error}</pre>;
   }
   if (!isComplete) {
-    return <pre className="text-xs text-[#8B8884] italic">[diagram]</pre>;
+    return <pre className="text-xs text-[#8C8C8C] italic">[diagram]</pre>;
   }
   return <div ref={ref} className="my-2 flex justify-center" />;
 }
@@ -2879,7 +2879,7 @@ function GraphvizBlock({ code }: { code: string }) {
     return <pre className="my-2 rounded border border-red-300/40 bg-red-50/50 px-3 py-2 text-xs text-red-600 dark:border-red-500/30 dark:bg-red-950/20 dark:text-red-400">[dot 渲染失败] {error}</pre>;
   }
   if (!isComplete) {
-    return <pre className="text-xs text-[#8B8884] italic">[graph]</pre>;
+    return <pre className="text-xs text-[#8C8C8C] italic">[graph]</pre>;
   }
   return <div ref={ref} className="my-2 flex justify-center" />;
 }
@@ -2929,10 +2929,10 @@ function ChartBlock({ code }: { code: string }) {
     return <pre className="my-2 rounded border border-red-300/40 bg-red-50/50 px-3 py-2 text-xs text-red-600 dark:border-red-500/30 dark:bg-red-950/20 dark:text-red-400">[chart 渲染失败] {error}</pre>;
   }
   if (!isComplete) {
-    return <pre className="text-xs text-[#8B8884] italic">[chart]</pre>;
+    return <pre className="text-xs text-[#8C8C8C] italic">[chart]</pre>;
   }
   return (
-    <div className="my-2 flex h-64 items-center justify-center rounded border border-[#E5E2D9] bg-[#FFFFFF] p-3 dark:border-[#3a3731] dark:bg-[#0f0e0b]">
+    <div className="my-2 flex h-64 items-center justify-center rounded border border-[#DEDEDE] bg-[#FFFFFF] p-3 dark:border-[#333333] dark:bg-[#0f0e0b]">
       <canvas ref={canvasRef} className="max-h-full max-w-full" />
     </div>
   );
@@ -2940,31 +2940,31 @@ function ChartBlock({ code }: { code: string }) {
 
 const markdownComponents: Components = {
   h1: ({ children }) => (
-    <h1 className="mt-3 mb-2 text-xl font-extrabold tracking-tight text-[#1A1815] dark:text-white">{children}</h1>
+    <h1 className="mt-3 mb-2 text-xl font-extrabold tracking-tight text-[#171717] dark:text-white">{children}</h1>
   ),
   h2: ({ children }) => (
-    <h2 className="mt-3 mb-2 text-lg font-bold tracking-tight text-[#1A1815] dark:text-white">{children}</h2>
+    <h2 className="mt-3 mb-2 text-lg font-bold tracking-tight text-[#171717] dark:text-white">{children}</h2>
   ),
   h3: ({ children }) => (
-    <h3 className="mt-2 mb-1 text-base font-semibold text-[#2D2B27] dark:text-zinc-100">{children}</h3>
+    <h3 className="mt-2 mb-1 text-base font-semibold text-[#262626] dark:text-zinc-100">{children}</h3>
   ),
   h4: ({ children }) => (
-    <h4 className="mt-2 mb-1 text-sm font-semibold text-[#3D3B37] dark:text-zinc-200">{children}</h4>
+    <h4 className="mt-2 mb-1 text-sm font-semibold text-[#383838] dark:text-zinc-200">{children}</h4>
   ),
   p: ({ children }) => (
-    <p className="my-1.5 leading-relaxed text-[#2D2B27] dark:text-zinc-300">{children}</p>
+    <p className="my-1.5 leading-relaxed text-[#262626] dark:text-zinc-300">{children}</p>
   ),
   ul: ({ children, ...props }) => {
     // task list?
     const items = Array.isArray(children) ? children : [children];
     return (
-      <ul className="my-1.5 ml-4 list-disc space-y-0.5 text-[#2D2B27] dark:text-zinc-300" {...props}>
+      <ul className="my-1.5 ml-4 list-disc space-y-0.5 text-[#262626] dark:text-zinc-300" {...props}>
         {children}
       </ul>
     );
   },
   ol: ({ children, ...props }) => (
-    <ol className="my-1.5 ml-4 list-decimal space-y-0.5 text-[#2D2B27] dark:text-zinc-300" {...props}>
+    <ol className="my-1.5 ml-4 list-decimal space-y-0.5 text-[#262626] dark:text-zinc-300" {...props}>
       {children}
     </ol>
   ),
@@ -2977,24 +2977,24 @@ const markdownComponents: Components = {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-[#8B7355] underline decoration-sky-700 hover:decoration-sky-400 dark:text-[#7dd3fc] dark:decoration-[#0369a1] dark:hover:decoration-[#38bdf8]"
+      className="text-[#C08A5F] underline decoration-sky-700 hover:decoration-sky-400 dark:text-[#7dd3fc] dark:decoration-[#0369a1] dark:hover:decoration-[#38bdf8]"
     >
       {children}
     </a>
   ),
   strong: ({ children }) => (
-    <strong className="font-bold text-[#1A1815] dark:text-white">{children}</strong>
+    <strong className="font-bold text-[#171717] dark:text-white">{children}</strong>
   ),
-  em: ({ children }) => <em className="italic text-[#3D3B37] dark:text-zinc-200">{children}</em>,
+  em: ({ children }) => <em className="italic text-[#383838] dark:text-zinc-200">{children}</em>,
   del: ({ children }) => (
-    <del className="text-[#8B8884] line-through dark:text-zinc-500">{children}</del>
+    <del className="text-[#8C8C8C] line-through dark:text-zinc-500">{children}</del>
   ),
   blockquote: ({ children }) => (
-    <blockquote className="my-2 border-l-2 border-[#E5E2D9] pl-3 text-[#6B6862] italic dark:border-[#52504b] dark:text-zinc-400">
+    <blockquote className="my-2 border-l-2 border-[#DEDEDE] pl-3 text-[#6B6B6B] italic dark:border-[#4D4D4D] dark:text-zinc-400">
       {children}
     </blockquote>
   ),
-  hr: () => <hr className="my-3 border-[#E5E2D9] dark:border-[#3a3731]" />,
+  hr: () => <hr className="my-3 border-[#DEDEDE] dark:border-[#333333]" />,
   table: ({ children }) => (
     <div className="my-2 overflow-x-auto">
       <table className="min-w-full border-collapse text-xs">
@@ -3003,13 +3003,13 @@ const markdownComponents: Components = {
     </div>
   ),
   thead: ({ children }) => (
-    <thead className="border-b border-[#E5E2D9] dark:border-[#3a3731]">{children}</thead>
+    <thead className="border-b border-[#DEDEDE] dark:border-[#333333]">{children}</thead>
   ),
   th: ({ children }) => (
-    <th className="px-2 py-1 text-left font-semibold text-[#2D2B27] dark:text-zinc-100">{children}</th>
+    <th className="px-2 py-1 text-left font-semibold text-[#262626] dark:text-zinc-100">{children}</th>
   ),
   td: ({ children }) => (
-    <td className="px-2 py-1 border-t border-[#E5E2D9] text-[#3D3B37] dark:border-[#3a3731] dark:text-zinc-300">{children}</td>
+    <td className="px-2 py-1 border-t border-[#DEDEDE] text-[#383838] dark:border-[#333333] dark:text-zinc-300">{children}</td>
   ),
   // Inline code — the "微白框" look: soft light box with readable text,
   // never the harsh emerald. In dark mode: brighter box, near-white text.
@@ -3019,7 +3019,7 @@ const markdownComponents: Components = {
     if (isInline) {
       return (
         <code
-          className="rounded-md border border-[#E5E2D9] bg-[#F5F3EE] px-1.5 py-0.5 text-[length:var(--font-size-code)] font-medium text-[#3D3B37] dark:border-[#52504b] dark:bg-[#262320] dark:text-zinc-100"
+          className="rounded-md border border-[#DEDEDE] bg-[#F5F5F5] px-1.5 py-0.5 text-[length:var(--font-size-code)] font-medium text-[#383838] dark:border-[#4D4D4D] dark:bg-[#262626] dark:text-zinc-100"
           {...props}
         >
           {children}
@@ -3063,20 +3063,20 @@ const markdownComponents: Components = {
       return <ChartBlock code={codeText} />;
     }
     return (
-      <div className="my-2 overflow-hidden rounded-md border border-[#E5E2D9] bg-[#FFFFFF] dark:border-[#3a3731] dark:bg-[#0f0e0b]">
-        <div className="flex items-center justify-between border-b border-[#E5E2D9] px-3 py-1 text-[length:var(--font-size-ui-sm)] uppercase tracking-wider text-[#8B8884] dark:border-[#3a3731] dark:text-zinc-500">
+      <div className="my-2 overflow-hidden rounded-md border border-[#DEDEDE] bg-[#FFFFFF] dark:border-[#333333] dark:bg-[#0f0e0b]">
+        <div className="flex items-center justify-between border-b border-[#DEDEDE] px-3 py-1 text-[length:var(--font-size-ui-sm)] uppercase tracking-wider text-[#8C8C8C] dark:border-[#333333] dark:text-zinc-500">
           <span>{lang}</span>
           <button
             onClick={() => {
               if (codeText) navigator.clipboard?.writeText(codeText);
             }}
-            className="text-[#A8A29E] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:text-zinc-200"
+            className="text-[#A6A6A6] hover:text-[#383838] dark:text-zinc-500 dark:hover:text-zinc-200"
             title="Copy"
           >
             copy
           </button>
         </div>
-        <pre className="overflow-x-auto px-4 py-3 text-[length:var(--font-size-code)] leading-relaxed [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+        <pre className="overflow-x-auto px-4 py-3 text-[length:var(--font-size-code)] leading-relaxed [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
           {children}
         </pre>
       </div>

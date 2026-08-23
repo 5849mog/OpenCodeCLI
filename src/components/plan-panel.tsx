@@ -65,7 +65,7 @@ function StatusIcon({ status }: { status: PlanNode["status"] }) {
   }
   // todo
   return (
-    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[#E5E2D9] bg-transparent" />
+    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[#DEDEDE] bg-transparent" />
   );
 }
 
@@ -83,8 +83,8 @@ function PlanNodeRow({ node, depth, currentPath }: { node: PlanNode; depth: numb
     <>
       <li
         className={cn(
-          "flex items-start gap-2.5 rounded-md border-l-2 border-transparent px-2 py-1.5 transition-colors hover:bg-[#F5F3EE] dark:hover:bg-[#262320]",
-          node.status === "done" ? "text-[#8B8884] dark:text-zinc-500" : "text-[#2D2B27] dark:text-zinc-200",
+          "flex items-start gap-2.5 rounded-md border-l-2 border-transparent px-2 py-1.5 transition-colors hover:bg-[#F5F5F5] dark:hover:bg-[#262626]",
+          node.status === "done" ? "text-[#8C8C8C] dark:text-zinc-500" : "text-[#262626] dark:text-zinc-200",
           isCurrent && "border-l-[#E58F67] bg-[#E58F67]/5 dark:bg-[#E58F67]/10",
         )}
         style={{ paddingLeft: `${12 + padLeft}px` }}
@@ -120,7 +120,7 @@ function PlanNodeRow({ node, depth, currentPath }: { node: PlanNode; depth: numb
           </span>
         )}
         {hasChildren && (
-          <span className="shrink-0 text-[11px] text-[#A8A29E] tabular-nums dark:text-zinc-500">
+          <span className="shrink-0 text-[11px] text-[#A6A6A6] tabular-nums dark:text-zinc-500">
             {done}/{total}
           </span>
         )}
@@ -150,15 +150,15 @@ export function PlanPanel() {
   if (!parsed) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-        <div className="rounded-full border border-[#E5E2D9] bg-[#FAF9F7] p-4 dark:border-[#3a3731] dark:bg-[#262320]">
+        <div className="rounded-full border border-[#DEDEDE] bg-[#FAFAFA] p-4 dark:border-[#333333] dark:bg-[#262626]">
           <ClipboardList className="h-8 w-8 text-[#E58F67]" />
         </div>
-        <div className="text-sm text-[#3D3B37] dark:text-zinc-200">No plan yet</div>
-        <div className="max-w-xs text-xs text-[#8B8884] dark:text-zinc-500">
+        <div className="text-sm text-[#383838] dark:text-zinc-200">No plan yet</div>
+        <div className="max-w-xs text-xs text-[#8C8C8C] dark:text-zinc-500">
           Ask the AI to create a plan. It will use <code className="text-[#E58F67]">update_plan</code> to build a structured checklist here.
         </div>
         {mode === "bypass" && (
-          <div className="max-w-xs text-xs text-[#8B8884] dark:text-zinc-500">
+          <div className="max-w-xs text-xs text-[#8C8C8C] dark:text-zinc-500">
             当前为 Bypass 模式，可直接让 AI 先用 <code className="text-[#E58F67]">update_plan</code> 规划再执行。
           </div>
         )}
@@ -175,11 +175,11 @@ export function PlanPanel() {
   if (total === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-        <div className="rounded-full border border-[#E5E2D9] bg-[#FAF9F7] p-4 dark:border-[#3a3731] dark:bg-[#262320]">
+        <div className="rounded-full border border-[#DEDEDE] bg-[#FAFAFA] p-4 dark:border-[#333333] dark:bg-[#262626]">
           <ClipboardList className="h-8 w-8 text-[#E58F67]" />
         </div>
-        <div className="text-sm text-[#3D3B37] dark:text-zinc-200">Plan is empty</div>
-        <div className="max-w-xs text-xs text-[#8B8884] dark:text-zinc-500">
+        <div className="text-sm text-[#383838] dark:text-zinc-200">Plan is empty</div>
+        <div className="max-w-xs text-xs text-[#8C8C8C] dark:text-zinc-500">
           Plan exists but has no checklist items. Use <code className="text-[#E58F67]">- [ ]</code> syntax in Markdown.
         </div>
       </div>
@@ -189,17 +189,17 @@ export function PlanPanel() {
   return (
     <div className="flex h-full flex-col">
       {/* Sticky header */}
-      <div className="border-b border-[#E5E2D9] bg-[#FFFFFF] px-5 py-4 dark:border-[#3a3731] dark:bg-[#161512]">
+      <div className="border-b border-[#DEDEDE] bg-[#FFFFFF] px-5 py-4 dark:border-[#333333] dark:bg-[#0A0A0A]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ClipboardList className="h-5 w-5 text-[#E58F67]" />
-            <h2 className="text-sm font-semibold text-[#2D2B27] dark:text-zinc-100">{title}</h2>
+            <h2 className="text-sm font-semibold text-[#262626] dark:text-zinc-100">{title}</h2>
           </div>
-          <span className="font-mono text-xs text-[#8B8884] tabular-nums dark:text-zinc-500">
+          <span className="font-mono text-xs text-[#8C8C8C] tabular-nums dark:text-zinc-500">
             {done}/{total} · {pct}%
           </span>
         </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#F0EDE5] dark:bg-[#2a2723]">
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#F0F0F0] dark:bg-[#2A2A2A]">
           {/* key flips when plan completes → replays the emerald fade-in once */}
           <motion.div
             key={pct === 100 ? "done" : "running"}
@@ -217,7 +217,7 @@ export function PlanPanel() {
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D6D3CE] dark:[&::-webkit-scrollbar-thumb]:bg-[#3a3731]">
+      <div className="flex-1 overflow-y-auto px-4 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
         {sections.map((section, si) => {
           const st = computeTotals(section.nodes);
           const sectionPct = st.total > 0 ? Math.round((st.done / st.total) * 100) : 0;
@@ -226,18 +226,18 @@ export function PlanPanel() {
               {section.title && (
                 <div className="mb-2">
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-[#6B6862] dark:text-zinc-400">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
                       {section.title}
                     </span>
-                    <span className="h-px flex-1 bg-[#E5E2D9] dark:bg-[#3a3731]" />
+                    <span className="h-px flex-1 bg-[#DEDEDE] dark:bg-[#333333]" />
                     {st.total > 0 && (
-                      <span className="text-[11px] text-[#A8A29E] tabular-nums dark:text-zinc-500">
+                      <span className="text-[11px] text-[#A6A6A6] tabular-nums dark:text-zinc-500">
                         {st.done}/{st.total}
                       </span>
                     )}
                   </div>
                   {st.total > 0 && (
-                    <div className="mt-1 h-[3px] overflow-hidden rounded-full bg-[#F0EDE5] dark:bg-[#2a2723]">
+                    <div className="mt-1 h-[3px] overflow-hidden rounded-full bg-[#F0F0F0] dark:bg-[#2A2A2A]">
                       <div
                         className="h-full rounded-full bg-[#E58F67]/60 transition-all duration-500"
                         style={{ width: `${sectionPct}%` }}

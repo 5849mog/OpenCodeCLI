@@ -52,10 +52,10 @@ export function AuditPanel() {
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#FCFBF8] dark:bg-[#1a1815]">
+    <div className="flex h-full min-h-0 flex-col bg-[#FCFBF8] dark:bg-[#171717]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#E5E2D9] px-4 py-2.5 dark:border-[#3a3731]">
-        <div className="text-sm font-semibold text-[#2D2B27] dark:text-zinc-100">会话审计</div>
+      <div className="flex items-center justify-between border-b border-[#DEDEDE] px-4 py-2.5 dark:border-[#333333]">
+        <div className="text-sm font-semibold text-[#262626] dark:text-zinc-100">会话审计</div>
         <div className="flex items-center gap-0.5">
           {tabs.map(({ key, label, Icon }) => (
             <button
@@ -65,7 +65,7 @@ export function AuditPanel() {
                 "flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-colors",
                 tab === key
                   ? "bg-[#E58F67]/10 text-[#E58F67]"
-                  : "text-[#8B8884] hover:bg-[#F5F3EE] hover:text-[#3D3B37] dark:text-zinc-500 dark:hover:bg-[#262320]",
+                  : "text-[#8C8C8C] hover:bg-[#F5F5F5] hover:text-[#383838] dark:text-zinc-500 dark:hover:bg-[#262626]",
               )}
             >
               <Icon className="h-3 w-3" />
@@ -91,7 +91,7 @@ function ToolsView({ report }: { report: ReturnType<typeof buildAuditReport> }) 
   return (
     <table className="w-full text-left text-xs">
       <thead>
-        <tr className="border-b border-[#E5E2D9] text-[10px] uppercase tracking-wider text-[#8B8884] dark:border-[#3a3731] dark:text-zinc-500">
+        <tr className="border-b border-[#DEDEDE] text-[10px] uppercase tracking-wider text-[#8C8C8C] dark:border-[#333333] dark:text-zinc-500">
           <th className="py-1.5 pr-2 font-medium">工具</th>
           <th className="px-2 py-1.5 text-right font-medium">次数</th>
           <th className="px-2 py-1.5 text-right font-medium">成功</th>
@@ -103,12 +103,12 @@ function ToolsView({ report }: { report: ReturnType<typeof buildAuditReport> }) 
       <tbody>
         {report.toolStats.map((s) => (
           <tr key={s.name} className="border-b border-[#F0EEE8] dark:border-[#2a2724]">
-            <td className="py-1.5 pr-2 font-mono text-[11px] text-[#2D2B27] dark:text-zinc-200">{s.name}</td>
-            <td className="px-2 py-1.5 text-right text-[#2D2B27] dark:text-zinc-200">{s.count}</td>
+            <td className="py-1.5 pr-2 font-mono text-[11px] text-[#262626] dark:text-zinc-200">{s.name}</td>
+            <td className="px-2 py-1.5 text-right text-[#262626] dark:text-zinc-200">{s.count}</td>
             <td className="px-2 py-1.5 text-right text-[#4A7C3A] dark:text-green-400">{s.ok}</td>
-            <td className={cn("px-2 py-1.5 text-right", s.fail > 0 ? "text-[#E54D2E]" : "text-[#A8A29E]")}>{s.fail}</td>
-            <td className="px-2 py-1.5 text-right text-[#8B8884] dark:text-zinc-500">{fmtMs(s.totalMs)}</td>
-            <td className="pl-2 py-1.5 text-right text-[#8B8884] dark:text-zinc-500">{fmtMs(s.avgMs)}</td>
+            <td className={cn("px-2 py-1.5 text-right", s.fail > 0 ? "text-[#E54D2E]" : "text-[#A6A6A6]")}>{s.fail}</td>
+            <td className="px-2 py-1.5 text-right text-[#8C8C8C] dark:text-zinc-500">{fmtMs(s.totalMs)}</td>
+            <td className="pl-2 py-1.5 text-right text-[#8C8C8C] dark:text-zinc-500">{fmtMs(s.avgMs)}</td>
           </tr>
         ))}
       </tbody>
@@ -124,7 +124,7 @@ function FilesView({ report }: { report: ReturnType<typeof buildAuditReport> }) 
     <ul className="space-y-1">
       {report.fileChanges.slice(-200).map((f, i) => (
         <li key={i} className="flex items-baseline gap-2 text-xs">
-          <span className="shrink-0 font-mono text-[10px] text-[#A8A29E] dark:text-zinc-600">
+          <span className="shrink-0 font-mono text-[10px] text-[#A6A6A6] dark:text-zinc-600">
             {new Date(f.ts).toLocaleTimeString()}
           </span>
           <span
@@ -138,12 +138,12 @@ function FilesView({ report }: { report: ReturnType<typeof buildAuditReport> }) 
           >
             {KIND_LABEL[f.kind] ?? f.kind}
           </span>
-          <span className="truncate font-mono text-[11px] text-[#2D2B27] dark:text-zinc-200">
+          <span className="truncate font-mono text-[11px] text-[#262626] dark:text-zinc-200">
             {f.path}
             {f.toPath ? ` → ${f.toPath}` : ""}
           </span>
           {f.summary && (
-            <span className="shrink-0 text-[10px] text-[#A8A29E] dark:text-zinc-600">{f.summary}</span>
+            <span className="shrink-0 text-[10px] text-[#A6A6A6] dark:text-zinc-600">{f.summary}</span>
           )}
         </li>
       ))}
@@ -155,45 +155,45 @@ function TokensView({ report }: { report: ReturnType<typeof buildAuditReport> })
   const srcLabel: Record<string, string> = { main: "主循环", subagent: "子代理", orchestrator: "编排" };
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border border-[#E5E2D9] bg-[#FAF9F7] px-3 py-2 dark:border-[#3a3731] dark:bg-[#161512]">
+      <div className="rounded-lg border border-[#DEDEDE] bg-[#FAFAFA] px-3 py-2 dark:border-[#333333] dark:bg-[#0A0A0A]">
         <div className="flex items-baseline justify-between">
-          <span className="text-[11px] text-[#8B8884] dark:text-zinc-500">累计真实用量</span>
-          <span className="font-mono text-lg font-semibold text-[#2D2B27] dark:text-zinc-100">
+          <span className="text-[11px] text-[#8C8C8C] dark:text-zinc-500">累计真实用量</span>
+          <span className="font-mono text-lg font-semibold text-[#262626] dark:text-zinc-100">
             {report.totalTokens.toLocaleString()}
-            <span className="ml-1 text-[10px] font-normal text-[#8B8884]">tokens</span>
+            <span className="ml-1 text-[10px] font-normal text-[#8C8C8C]">tokens</span>
           </span>
         </div>
         {report.cost ? (
           <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-[11px] text-[#8B8884] dark:text-zinc-500">
+            <span className="text-[11px] text-[#8C8C8C] dark:text-zinc-500">
               成本估算（{report.cost.rate.key}）
             </span>
-            <span className="font-mono text-sm text-[#2D2B27] dark:text-zinc-100">
+            <span className="font-mono text-sm text-[#262626] dark:text-zinc-100">
               ${report.cost.usd.toFixed(4)}
             </span>
           </div>
         ) : (
-          <div className="mt-1 text-[10px] text-[#A8A29E] dark:text-zinc-600">
+          <div className="mt-1 text-[10px] text-[#A6A6A6] dark:text-zinc-600">
             未匹配到价格表（{report.model}）——在 src/lib/cost.ts 补充定价后可见成本。
           </div>
         )}
         {report.cost && (
-          <div className="mt-0.5 text-[10px] text-[#A8A29E] dark:text-zinc-600">
+          <div className="mt-0.5 text-[10px] text-[#A6A6A6] dark:text-zinc-600">
             {report.cost.promptTokens.toLocaleString()} prompt + {report.cost.completionTokens.toLocaleString()} completion（真实拆分）
           </div>
         )}
       </div>
 
       <div>
-        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#8B8884] dark:text-zinc-500">
+        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#8C8C8C] dark:text-zinc-500">
           逐请求明细（{report.usageRows.length}）
         </div>
         {report.usageRows.length === 0 ? (
-          <div className="text-[11px] text-[#A8A29E] dark:text-zinc-600">还没有 API 请求。</div>
+          <div className="text-[11px] text-[#A6A6A6] dark:text-zinc-600">还没有 API 请求。</div>
         ) : (
           <table className="w-full text-left text-[11px]">
             <thead>
-              <tr className="border-b border-[#E5E2D9] text-[10px] uppercase tracking-wider text-[#8B8884] dark:border-[#3a3731] dark:text-zinc-500">
+              <tr className="border-b border-[#DEDEDE] text-[10px] uppercase tracking-wider text-[#8C8C8C] dark:border-[#333333] dark:text-zinc-500">
                 <th className="py-1 pr-2 font-medium">时间</th>
                 <th className="px-1 py-1 font-medium">来源</th>
                 <th className="px-1 py-1 text-right font-medium">prompt</th>
@@ -204,13 +204,13 @@ function TokensView({ report }: { report: ReturnType<typeof buildAuditReport> })
             <tbody>
               {report.usageRows.slice(-50).map((u, i) => (
                 <tr key={i} className="border-b border-[#F0EEE8] dark:border-[#2a2724]">
-                  <td className="py-1 pr-2 font-mono text-[10px] text-[#A8A29E] dark:text-zinc-600">
+                  <td className="py-1 pr-2 font-mono text-[10px] text-[#A6A6A6] dark:text-zinc-600">
                     {new Date(u.ts).toLocaleTimeString()}
                   </td>
-                  <td className="px-1 py-1 text-[#8B8884] dark:text-zinc-500">{srcLabel[u.source] ?? u.source}</td>
-                  <td className="px-1 py-1 text-right text-[#2D2B27] dark:text-zinc-200">{u.promptTokens.toLocaleString()}</td>
-                  <td className="px-1 py-1 text-right text-[#2D2B27] dark:text-zinc-200">{u.completionTokens.toLocaleString()}</td>
-                  <td className="pl-1 py-1 text-right font-medium text-[#2D2B27] dark:text-zinc-100">{u.totalTokens.toLocaleString()}</td>
+                  <td className="px-1 py-1 text-[#8C8C8C] dark:text-zinc-500">{srcLabel[u.source] ?? u.source}</td>
+                  <td className="px-1 py-1 text-right text-[#262626] dark:text-zinc-200">{u.promptTokens.toLocaleString()}</td>
+                  <td className="px-1 py-1 text-right text-[#262626] dark:text-zinc-200">{u.completionTokens.toLocaleString()}</td>
+                  <td className="pl-1 py-1 text-right font-medium text-[#262626] dark:text-zinc-100">{u.totalTokens.toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
@@ -223,6 +223,6 @@ function TokensView({ report }: { report: ReturnType<typeof buildAuditReport> })
 
 function Empty({ text }: { text: string }) {
   return (
-    <div className="py-8 text-center text-xs text-[#A8A29E] dark:text-zinc-600">{text}</div>
+    <div className="py-8 text-center text-xs text-[#A6A6A6] dark:text-zinc-600">{text}</div>
   );
 }
