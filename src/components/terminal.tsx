@@ -959,6 +959,7 @@ export function Terminal() {
               <RoundBlock
                 key={ev.id}
                 round={ev}
+                streaming={isStreaming}
                 canRegenerate={ev.summary?.id === lastAssistantEventId}
                 fullText={ev.summary ? assistantTurnTexts.get(ev.summary.id) : undefined}
               />
@@ -2038,19 +2039,23 @@ function RoundBlock({
   round,
   canRegenerate,
   fullText,
+  streaming,
 }: {
   round: RoundGroup;
   canRegenerate?: boolean;
   fullText?: string;
+  streaming: boolean;
 }) {
   const running = round.turns.some((t) => t.tools.some((ev) => !ev.pairedResult));
-  const [expanded, setExpanded] = useState(() => running);
-  // 任务结束后自动收起（正在跑时保持展开实时可见）
-  const wasRunning = useRef(running);
+  // 整轮完成的判据：流已结束 && 所有工具都有结果 && 总结已落地。
+  // 未完成（流式输出中 / 步与步之间）一律保持展开正常显示，结束才收起。
+  const done = !streaming && !running && !!round.summary;
+  const [expanded, setExpanded] = useState(() => !done);
+  const wasDone = useRef(done);
   useEffect(() => {
-    if (wasRunning.current && !running) setExpanded(false);
-    wasRunning.current = running;
-  }, [running]);
+    if (!wasDone.current && done) setExpanded(false);
+    wasDone.current = done;
+  }, [done]);
   const stats = useMemo(() => {
     let calls = 0;
     const fileSet = new Set<string>();
