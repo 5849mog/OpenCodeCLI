@@ -1005,26 +1005,6 @@ export function Terminal() {
             isEmpty && "pointer-events-auto max-w-3xl",
           )}
         >
-          {/* 三明治 ① 顶栏：项目/上下文选择器 + 能力图标（仅空状态，ZCode 式） */}
-          {isEmpty && (
-            <div className="flex items-center justify-between gap-2 border-b border-[#DEDEDE] px-3.5 py-2 dark:border-[#2E2E2E]">
-              <span
-                className="flex min-w-0 items-center gap-1.5 text-[13px] text-zinc-300"
-                title="当前工作区：OpenCodeCLI-main"
-              >
-                <FolderOpen className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-                <span className="truncate">OpenCodeCLI-main</span>
-                <ChevronDown className="h-3 w-3 shrink-0 text-zinc-500" />
-              </span>
-              <button
-                onClick={() => toast.info("能力与技能包：在输入框输入 /skills 查看列表，/help 查看帮助")}
-                className="shrink-0 rounded p-1 text-zinc-500 transition-colors hover:bg-[#F0F0F0] hover:text-zinc-300 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-100"
-                title="能力"
-              >
-                <Zap className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
           {/* 附件 chips（命令框上方） */}
           {attachments.length > 0 && (
             <div className="absolute bottom-full left-0 mb-2 flex max-w-full flex-wrap gap-1.5">
@@ -1058,8 +1038,8 @@ export function Terminal() {
               ))}
             </div>
           )}
-          {/* 三明治 ② 输入区（占位区，随内容增高，垂直居中） */}
-          <div className="flex min-h-[64px] items-center px-4 py-2">
+          {/* 输入区（两层命令框：输入区 + 底栏，占位随内容增高，垂直居中） */}
+          <div className="flex min-h-[56px] items-center px-4 py-2">
             <textarea
               ref={textareaRef}
               value={input}
