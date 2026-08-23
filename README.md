@@ -156,13 +156,13 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    I[输入 / 附件] --> F[文本内容]
-    I --> IMG[图片 → 384 tokens/张]
-    F --> W[tokenizer worker<br/>@huggingface/tokenizers · WASM]
-    W --> C[输入框 ≈N 实时计数]
-    W --> Q[/tokens 精确占用]
-    W --> M[/compact 前后对比]
-    W --> T[发送前预算截断 & auto-compact 85% 判定]
+    I["输入 / 附件"] --> F["文本内容"]
+    I --> IMG["图片 → 384 tokens/张"]
+    F --> W["tokenizer worker · @huggingface/tokenizers · WASM"]
+    W --> C["输入框 ≈N 实时计数"]
+    W --> Q["/tokens 精确占用"]
+    W --> M["/compact 前后对比"]
+    W --> T["发送前预算截断 · auto-compact 85% 判定"]
 ```
 
 - **逐字节一致**：与 Python `transformers` 同引擎，DeepSeek 模型计数分毫不差
