@@ -761,11 +761,7 @@ export function Terminal() {
     <div className="relative flex h-full flex-col bg-background text-foreground font-mono text-[length:var(--font-size-base)] leading-relaxed">
       {/* Header bar — model name centered, mode toggle right（空状态隐藏，首屏干净如 ZCode） */}
       {!isEmpty && (
-      <div className="flex items-center justify-between border-b border-[#DEDEDE] px-4 py-2.5 text-xs dark:border-[#333333]">
-        <div className="flex items-center gap-2 text-[#6B6B6B] dark:text-zinc-500">
-          <TerminalIcon className="h-3.5 w-3.5 text-[#E58F67]" />
-          <span className="font-medium">Open Code</span>
-        </div>
+      <div className="flex items-center justify-end border-b border-[#DEDEDE] px-4 py-2.5 text-xs dark:border-[#333333]">
         <div className="flex items-center gap-2">
           <button
             onClick={() =>
@@ -870,7 +866,7 @@ export function Terminal() {
         )}
         <div
           className={cn(
-            "group relative flex w-full items-center gap-1 rounded-xl border border-[#DEDEDE] bg-[#FAFAFA] px-2 py-1.5 transition-colors hover:border-[#C8C8C8] focus-within:border-[#E58F67]/70 focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.08)] dark:border-[#333333] dark:bg-[#161616] dark:hover:border-[#4D4D4D] dark:focus-within:border-[#E58F67]/70 dark:focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.10)]",
+            "group relative flex w-full items-center gap-1 rounded-[10px] border border-[#DEDEDE] bg-[#FAFAFA] px-2 py-1.5 transition-colors hover:border-[#C8C8C8] focus-within:border-[#E58F67]/70 focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.08)] dark:border-[#3D3D3D] dark:bg-[#1A1A1A] dark:hover:border-[#4A4A4A] dark:focus-within:border-[#E58F67]/70 dark:focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.10)]",
             isEmpty && "pointer-events-auto max-w-3xl",
           )}
         >
@@ -907,11 +903,11 @@ export function Terminal() {
               ))}
             </div>
           )}
-          {/* 左侧：附件选择按钮（+，与输入同行） */}
+          {/* 左侧：附件选择按钮（ZCode 式圆形细线描边 +） */}
           <button
             onClick={() => attachInputRef.current?.click()}
             disabled={isStreaming || isCompacting || uploading}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#A6A6A6] transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] disabled:opacity-40 dark:text-zinc-500 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300"
+            className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-[#C8C8C8] text-[#6B6B6B] transition-colors hover:border-[#383838] hover:text-[#262626] disabled:opacity-40 dark:border-[#4D4D4D] dark:text-[#C9C9C9] dark:hover:border-[#666666] dark:hover:text-zinc-100"
             title={uploading ? "正在上传图片到 Files API…" : "上传文件（图片 / 文本，≤10MB）"}
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
