@@ -6,7 +6,28 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Settings, Eye, EyeOff, Zap, Download, Upload, Lock, RefreshCw, Trash2, FileText, Loader2, ChevronDown, Check } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Zap,
+  Download,
+  Upload,
+  RefreshCw,
+  Trash2,
+  FileText,
+  Loader2,
+  ChevronDown,
+  Check,
+  ArrowLeft,
+  Cpu,
+  Layers,
+  Globe,
+  BookText,
+  LockKeyhole,
+  DatabaseBackup,
+  Gauge,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useSession } from "@/store/session";
 import { fetchModels, fetchBalance, type BalanceResult } from "@/lib/ai-client";
 import { apiKeyVault } from "@/lib/api-key-vault";
@@ -69,6 +90,44 @@ const PRESETS: Array<{
   },
 ];
 
+// ── 设置页左侧导航：分组 + 页面（对标 ZCode 设置页结构，条目映射到本项目真实设置） ──
+type PageId = "model" | "preset" | "search" | "instruct" | "security" | "backup" | "usage";
+
+const PAGE_TITLES: Record<PageId, string> = {
+  model: "模型设置",
+  preset: "运行模式",
+  search: "搜索与抓取",
+  instruct: "自定义指令",
+  security: "安全",
+  backup: "会话与备份",
+  usage: "账户与用量",
+};
+
+const NAV_GROUPS: { label: string; items: { id: PageId; name: string; icon: typeof Cpu }[] }[] = [
+  {
+    label: "基础设置",
+    items: [
+      { id: "model", name: "模型设置", icon: Cpu },
+      { id: "preset", name: "运行模式", icon: Layers },
+    ],
+  },
+  {
+    label: "Agent 能力",
+    items: [
+      { id: "search", name: "搜索与抓取", icon: Globe },
+      { id: "instruct", name: "自定义指令", icon: BookText },
+      { id: "security", name: "安全", icon: LockKeyhole },
+    ],
+  },
+  {
+    label: "数据与统计",
+    items: [
+      { id: "backup", name: "会话与备份", icon: DatabaseBackup },
+      { id: "usage", name: "账户与用量", icon: Gauge },
+    ],
+  },
+];
+
 export function SettingsDialog({
   open,
   onClose,
@@ -121,6 +180,67 @@ export function SettingsDialog({
       ),
     [config.baseUrl, config.model, fetchedModels],
   );
+
+  // ── 页面导航（ZCode 式设置页）──
+  const [page, setPage] = useState<PageId>("model");
+  const providerName = PRESETS.find((p) => p.baseUrl === config.baseUrl)?.name ?? "自定义端点";
+  const pageChip =
+    page === "model"
+      ? providerName
+      : page === "preset"
+        ? ({ full: "完整模式", light: "精简模式", minimal: "极简模式" } as Record<string, string>)[config.defaultPreset] ?? "完整模式"
+        : page === "search"
+          ? config.searchProvider === "brave"
+            ? "Brave Search"
+            : "Tavily"
+          : null;
+
+  // 立即把输入的 Key 写入加密 vault（ZCode 式「保存」按钮）
+  const saveLlmKey = async () => {
+    if (!keyInput) {
+      apiKeyVault.clear();
+      setConfig({ hasApiKey: false });
+    } else {
+      await apiKeyVault.setKey(keyInput);
+      setConfig({ hasApiKey: true });
+    }
+    setKeyDirty(false);
+    toast.success(keyInput ? "API Key 已加密保存" : "API Key 已清除");
+  };
+  const saveSearchKey = async () => {
+    if (!searchKeyInput) {
+      apiKeyVault.clearSearchKey();
+      setConfig({ hasSearchKey: false });
+    } else {
+      await apiKeyVault.setSearchKey(searchKeyInput);
+      setConfig({ hasSearchKey: true });
+    }
+    setSearchKeyDirty(false);
+    toast.success(searchKeyInput ? "Search API Key 已加密保存" : "Search API Key 已清除");
+  };
+
+  // 关闭=先落盘密钥再退出（原「Done」按钮语义移到「返回工作区」）
+  const handleClose = async () => {
+    if (keyDirty) {
+      if (keyInput) {
+        await apiKeyVault.setKey(keyInput);
+        setConfig({ hasApiKey: true });
+      } else {
+        apiKeyVault.clear();
+        setConfig({ hasApiKey: false });
+      }
+    }
+    if (searchKeyDirty) {
+      if (searchKeyInput) {
+        await apiKeyVault.setSearchKey(searchKeyInput);
+        setConfig({ hasSearchKey: true });
+      } else {
+        apiKeyVault.clearSearchKey();
+        setConfig({ hasSearchKey: false });
+      }
+    }
+    onClose();
+  };
 
   // The /user/balance endpoint is DeepSeek-specific — only surface the card
   // when the configured base URL points at deepseek.com.
@@ -358,26 +478,74 @@ export function SettingsDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-[#DEDEDE] bg-[#FFFFFF] text-[#262626] dark:text-zinc-200 shadow-2xl dark:border-[#333333] dark:bg-[#161616] dark:text-zinc-100">
-        {/* Header */}
-        <div className="flex items-center gap-2 border-b border-[#DEDEDE] px-5 py-4 dark:border-[#333333]">
-          <Settings className="h-5 w-5 text-[#E58F67]" />
-          <h2 className="text-lg font-semibold">Settings · AI Provider</h2>
-          <button
-            onClick={onClose}
-            className="ml-auto rounded p-1.5 text-[#8C8C8C] dark:text-zinc-500 hover:bg-[#F0F0F0] hover:text-[#383838] dark:text-zinc-300 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
-          {/* Presets */}
-          <div className="mb-5">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#8C8C8C] dark:text-zinc-500 dark:text-zinc-500">
-              Quick presets
+    <div className="fixed inset-0 z-[100] flex bg-background text-zinc-100">
+      {/* 左侧分类导航（ZCode 式设置页） */}
+      <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-[#DEDEDE] bg-[#F5F5F5] text-[#262626] dark:border-[#333333] dark:bg-[#161616] dark:text-zinc-100">
+        <button
+          onClick={() => void handleClose()}
+          className="flex shrink-0 items-center gap-2.5 px-4 py-4 text-sm text-[#6B6B6B] transition-colors hover:bg-white hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          返回工作区
+        </button>
+        {NAV_GROUPS.map((g) => (
+          <div key={g.label} className="px-2 pb-3">
+            <div className="px-3 pb-1.5 pt-1 text-[11px] font-medium text-[#8C8C8C] dark:text-zinc-500">
+              {g.label}
             </div>
+            <div className="space-y-0.5">
+              {g.items.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setPage(item.id)}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                    page === item.id
+                      ? "bg-white text-[#262626] dark:bg-[#2A2A2A] dark:text-zinc-100"
+                      : "text-[#6B6B6B] hover:bg-white hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#262626] dark:hover:text-zinc-200",
+                  )}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  {item.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div className="mt-auto shrink-0 border-t border-[#DEDEDE] px-5 py-4 text-xs dark:border-[#333333]">
+          <div className="space-y-1 text-[#8C8C8C] dark:text-zinc-500">
+            {config.hasApiKey ? (
+              <span className="text-[#E58F67]">◉ Key configured</span>
+            ) : (
+              <span>◉ No API key</span>
+            )}
+            {config.hasSearchKey ? (
+              <span className="block text-[#E58F67]">◉ Search configured</span>
+            ) : (
+              <span className="block">◉ No search key</span>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* 右侧内容页 */}
+      <main className="min-w-0 flex-1 overflow-y-auto bg-background px-8 py-10 md:px-12 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333333] [&::-webkit-scrollbar-track]:bg-transparent">
+        <div className="mx-auto w-full max-w-3xl pb-16">
+          <div className="mb-7">
+            <h1 className="text-2xl font-semibold text-zinc-100">{PAGE_TITLES[page]}</h1>
+            {pageChip && (
+              <div className="mt-2">
+                <span className="rounded-md bg-[#F0F0F0] px-2.5 py-1 text-xs text-[#8C8C8C] dark:bg-[#1F1F1F] dark:text-zinc-400">
+                  {pageChip}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {page === "model" && (
+            <>
+          {/* 快速预设 */}
+          <Section title="快速预设">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {PRESETS.map((p) => (
                 <button
@@ -402,8 +570,9 @@ export function SettingsDialog({
                 </button>
               ))}
             </div>
-          </div>
+            </Section>
 
+            <Section title="连接">
           {/* Base URL */}
           <Field label="Base URL" hint="OpenAI-compatible endpoint (without /chat/completions)">
             <input
@@ -415,7 +584,19 @@ export function SettingsDialog({
           </Field>
 
           {/* API Key */}
-          <Field label="API Key" hint="Encrypted with AES-GCM and persisted locally (survives refresh / new tabs). Not stored in React state, not included in session exports.">
+          <Field
+            label="API Key"
+            hint="Encrypted with AES-GCM and persisted locally (survives refresh / new tabs). Not stored in React state, not included in session exports."
+            action={
+              <button
+                onClick={() => void saveLlmKey()}
+                disabled={!keyDirty}
+                className="rounded border border-[#DEDEDE] px-3 py-1 text-xs text-[#383838] transition-colors hover:bg-[#F0F0F0] disabled:opacity-40 dark:border-[#333333] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]"
+              >
+                保存
+              </button>
+            }
+          >
             <div className="flex gap-2">
               <input
                 type={showKey ? "text" : "password"}
@@ -440,7 +621,9 @@ export function SettingsDialog({
               </div>
             )}
           </Field>
+            </Section>
 
+            <Section title="模型">
           {/* Model */}
           <Field label="Model" hint="点下方模型名直接选择；也可手动输入任意模型名">
             <div className="flex gap-2">
@@ -518,7 +701,9 @@ export function SettingsDialog({
               </div>
             )}
           </Field>
+            </Section>
 
+            <Section title="参数">
           {/* Temperature + max tokens */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Temperature">
@@ -570,82 +755,63 @@ export function SettingsDialog({
           </div>
 
           {/* 自动压缩 */}
-          <div className="mt-3">
-            <label className="flex cursor-pointer select-none items-start gap-2">
-              <input
-                type="checkbox"
-                checked={config.autoCompact}
-                onChange={(e) => setConfig({ autoCompact: e.target.checked })}
-                className="mt-0.5 h-4 w-4 accent-[#E58F67]"
-              />
-              <span>
-                <span className="block text-sm text-[#262626] dark:text-zinc-100">自动压缩对话历史</span>
-                <span className="block text-[10px] text-[#8C8C8C] dark:text-zinc-500">
-                  真分词器估算超预算 85% 时自动用 LLM 摘要压缩（保留信息，需消耗一次摘要调用）；关闭则只丢弃旧消息。距上次压缩 ≥10 条新消息才再次触发。
-                </span>
-              </span>
-            </label>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm text-zinc-100">自动压缩对话历史</div>
+              <div className="mt-1 text-[11px] leading-relaxed text-[#8C8C8C] dark:text-zinc-500">
+                真分词器估算超预算 85% 时自动用 LLM 摘要压缩（保留信息，需消耗一次摘要调用）；关闭则只丢弃旧消息。距上次压缩 ≥10 条新消息才再次触发。
+              </div>
+            </div>
+            <Switch checked={config.autoCompact} onChange={(v) => setConfig({ autoCompact: v })} />
           </div>
+            </Section>
 
-          {/* DeepSeek V4: thinking + reasoning */}
-          <div className="mb-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-4 py-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
-              DeepSeek V4 · Thinking / Reasoning
+            <Section title="推理与视觉">
+          {/* Thinking toggle */}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm text-zinc-100">Thinking mode</div>
+              <div className="mt-1 text-[11px] leading-relaxed text-[#8C8C8C] dark:text-zinc-500">
+                For DeepSeek V4 models. On sends <code className="text-[#E58F67]">thinking=enabled</code>{" "}
+                与 <code className="text-[#E58F67]">reasoning_effort</code>；关闭发送{" "}
+                <code className="text-[#E58F67]">thinking=disabled</code>。思考与回答共用 Max tokens 预算。
+              </div>
             </div>
-            <div className="flex flex-wrap gap-4">
-              {/* Thinking toggle */}
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={config.thinkingEnabled}
-                  onChange={(e) => setConfig({ thinkingEnabled: e.target.checked })}
-                  className="h-4 w-4 accent-[#E58F67]"
-                />
-                <span className="text-sm text-[#383838] dark:text-zinc-300">Thinking mode</span>
-              </label>
-              {/* Reasoning effort */}
-              <label className="flex items-center gap-2">
-                <span className="text-xs text-[#8C8C8C] dark:text-zinc-500">Effort:</span>
-                <select
-                  value={config.reasoningEffort}
-                  onChange={(e) => setConfig({ reasoningEffort: e.target.value })}
-                  className="rounded border border-[#DEDEDE] bg-white dark:bg-[#0A0A0A] dark:text-zinc-100 px-2 py-1 text-sm font-mono focus:border-[#E58F67] focus:outline-none"
-                >
-                  <option value="low">low</option>
-                  <option value="high">high</option>
-                  <option value="xhigh">xhigh</option>
-                  <option value="max">max</option>
-                </select>
-              </label>
-            </div>
-            <div className="mt-1.5 text-[11px] text-[#A6A6A6] dark:text-zinc-500">
-              For DeepSeek V4 models. On sends <code className="text-[#E58F67]">thinking=enabled</code> + <code className="text-[#E58F67]">reasoning_effort</code>; off sends <code className="text-[#E58F67]">thinking=disabled</code>. Valid efforts: low/high/xhigh/max. Note: thinking &amp; answer share the Max tokens budget.
-            </div>
+            <Switch checked={config.thinkingEnabled} onChange={(v) => setConfig({ thinkingEnabled: v })} />
           </div>
-
+          {/* Reasoning effort */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="text-sm text-zinc-100">Reasoning effort</div>
+            <select
+              value={config.reasoningEffort}
+              onChange={(e) => setConfig({ reasoningEffort: e.target.value })}
+              className="rounded border border-[#DEDEDE] bg-white px-2 py-1 font-mono text-sm focus:border-[#E58F67] focus:outline-none dark:bg-[#0A0A0A] dark:text-zinc-100"
+            >
+              <option value="low">low</option>
+              <option value="high">high</option>
+              <option value="xhigh">xhigh</option>
+              <option value="max">max</option>
+            </select>
+          </div>
           {/* Vision / Image input */}
-          <div className="mb-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-4 py-3">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={config.supportVision}
-                onChange={(e) => setConfig({ supportVision: e.target.checked })}
-                className="h-4 w-4 accent-[#E58F67]"
-              />
-              <span>
-                <span className="block text-sm text-[#262626] dark:text-zinc-100">支持图片输入（Vision）</span>
-                <span className="block text-[10px] text-[#8C8C8C] dark:text-zinc-500">
-                  开启后随消息上传的图片会作为视觉输入传给模型（优先 DeepSeek Files API，失败自动转 base64 内联）。仅视觉模型支持（如 deepseek-v4-flash-vision-exp）；非视觉模型带图会报错。
-                </span>
-              </span>
-            </label>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm text-zinc-100">支持图片输入（Vision）</div>
+              <div className="mt-1 text-[11px] leading-relaxed text-[#8C8C8C] dark:text-zinc-500">
+                开启后随消息上传的图片会作为视觉输入传给模型（优先 DeepSeek Files API，失败自动转 base64
+                内联）。仅视觉模型支持；非视觉模型带图会报错。
+              </div>
+            </div>
+            <Switch checked={config.supportVision} onChange={(v) => setConfig({ supportVision: v })} />
           </div>
+            </Section>
+            </>
+          )}
 
           {/* 运行模式（新会话默认，会话创建时锁定） */}
-          <div className="mb-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-4 py-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
-              运行模式 · 新会话默认
-            </div>
+          {page === "preset" && (
+            <>
+          <Section title="运行模式 · 新会话默认">
             <div className="flex flex-col gap-2">
               {(
                 [
@@ -684,19 +850,24 @@ export function SettingsDialog({
             <div className="mt-1.5 text-[11px] text-[#A6A6A6] dark:text-zinc-600">
               该模式在新建会话时锁定，会话内不可切换（保证提示词前缀稳定，持续命中 API 前缀缓存）。切换需新建会话。
             </div>
-          </div>
+            </Section>
+            </>
+          )}
 
           {/* ── DeepSeek account balance (provider-specific /user/balance) ── */}
-          {isDeepSeek && (
-            <div className="mb-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-4 py-3">
+          {page === "usage" && (
+            <>
+          <Section title="账户余额">
+          {isDeepSeek ? (
+            <div className="space-y-1">
               <div className="mb-2 flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
+                <div className="text-sm font-semibold text-zinc-100">
                   DeepSeek · 账户余额
                 </div>
                 <button
                   onClick={() => void queryBalance()}
                   disabled={balanceLoading}
-                  className="flex items-center gap-1.5 rounded border border-[#DEDEDE] px-2 py-1 text-[11px] text-[#383838] dark:text-zinc-300 hover:bg-[#F0F0F0] dark:border-[#333333] dark:hover:bg-[#2A2A2A] disabled:opacity-40"
+                  className="flex items-center gap-1.5 rounded border border-[#DEDEDE] px-2 py-1 text-[11px] text-[#383838] hover:bg-[#F0F0F0] dark:border-[#333333] dark:text-zinc-300 dark:hover:bg-[#2A2A2A] disabled:opacity-40"
                 >
                   <RefreshCw className={`h-3 w-3 ${balanceLoading ? "animate-spin" : ""}`} />
                   {balanceLoading ? "查询中…" : "刷新"}
@@ -730,13 +901,18 @@ export function SettingsDialog({
                 <div className="text-xs text-[#A6A6A6] dark:text-zinc-500">正在查询…</div>
               )}
             </div>
+          ) : (
+            <div className="text-xs text-[#A6A6A6] dark:text-zinc-500">
+              账户余额与云端文件仅适用于 DeepSeek 官方 API（/user/balance、Files API）。
+            </div>
           )}
+            </Section>
 
-          {/* ── DeepSeek Files API 管理（图片上传占用的云端文件） ── */}
-          {isDeepSeek && (
-            <div className="mb-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-4 py-3">
+            <Section title="云端文件">
+          {isDeepSeek ? (
+            <div className="space-y-1">
               <div className="mb-2 flex items-center justify-between">
-                <div className="text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
+                <div className="text-sm font-semibold text-zinc-100">
                   DeepSeek · Files API 文件
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -800,16 +976,17 @@ export function SettingsDialog({
                 上传的图片文件永久保存在你的 DeepSeek 账户（25 GiB 配额）。删除可释放空间。
               </div>
             </div>
+          ) : (
+            <div className="text-xs text-[#A6A6A6] dark:text-zinc-500">仅 DeepSeek 官方 API 支持 Files API。</div>
+          )}
+            </Section>
+            </>
           )}
 
           {/* ── Web & Search ── */}
-          <div className="mb-4 border-t border-[#DEDEDE] pt-5 dark:border-[#333333]">
-            <div className="flex items-center gap-1.5 mb-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
-                Web &amp; Search
-              </span>
-            </div>
-
+          {page === "search" && (
+            <>
+          <Section title="搜索服务">
             {/* Search provider selector */}
             <Field label="Search provider" hint="Tavily returns full page content; Brave returns snippets. Both have free tiers.">
               <div className="flex gap-2">
@@ -835,7 +1012,19 @@ export function SettingsDialog({
             </Field>
 
             {/* Search API Key */}
-            <Field label="Search API Key" hint={`Your ${config.searchProvider === "brave" ? "Brave" : "Tavily"} API key — encrypted the same way as your LLM key.`}>
+            <Field
+              label="Search API Key"
+              hint={`Your ${config.searchProvider === "brave" ? "Brave" : "Tavily"} API key — encrypted the same way as your LLM key.`}
+              action={
+                <button
+                  onClick={() => void saveSearchKey()}
+                  disabled={!searchKeyDirty}
+                  className="rounded border border-[#DEDEDE] px-3 py-1 text-xs text-[#383838] transition-colors hover:bg-[#F0F0F0] disabled:opacity-40 dark:border-[#333333] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]"
+                >
+                  保存
+                </button>
+              }
+            >
               <div className="flex gap-2">
                 <input
                   type={showSearchKey ? "text" : "password"}
@@ -868,32 +1057,24 @@ export function SettingsDialog({
                 </div>
               ) : null}
             </Field>
+            </Section>
 
-            {/* URL Fetch options */}
-            <div className="mb-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-4 py-3">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
-                URL Fetch options
-              </div>
-
+            <Section title="网页抓取">
               {/* Jina AI Reader toggle */}
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={config.useJinaReader}
-                  onChange={(e) => setConfig({ useJinaReader: e.target.checked })}
-                  className="h-4 w-4 accent-[#E58F67]"
-                />
-                <span className="text-sm text-[#383838] dark:text-zinc-300">
-                  Use Jina AI Reader <span className="text-[#A6A6A6] dark:text-zinc-500">(r.jina.ai)</span>
-                </span>
-              </label>
-              <div className="mt-1 text-[11px] text-[#A6A6A6] dark:text-zinc-500">
-                Free CORS proxy that converts web pages to LLM-friendly markdown. No API key needed.
-                Disable if you want to use a custom CORS proxy instead.
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-sm text-zinc-100">
+                    Use Jina AI Reader <span className="text-[#A6A6A6] dark:text-zinc-500">(r.jina.ai)</span>
+                  </div>
+                  <div className="mt-1 text-[11px] leading-relaxed text-[#8C8C8C] dark:text-zinc-500">
+                    Free CORS proxy that converts web pages to LLM-friendly markdown. No API key needed. Disable if you want to use a custom CORS proxy instead.
+                  </div>
+                </div>
+                <Switch checked={config.useJinaReader} onChange={(v) => setConfig({ useJinaReader: v })} />
               </div>
 
               {/* Custom CORS proxy */}
-              <div className="mt-3">
+              <div>
                 <label className="mb-1.5 block text-xs text-[#8C8C8C] dark:text-zinc-500">
                   Custom CORS proxy URL <span className="text-[#A6A6A6] dark:text-zinc-500">(optional)</span>
                 </label>
@@ -901,37 +1082,38 @@ export function SettingsDialog({
                   value={config.corsProxyUrl}
                   onChange={(e) => setConfig({ corsProxyUrl: e.target.value })}
                   placeholder="http://localhost:81/cors-proxy/"
-                  className="w-full rounded border border-[#DEDEDE] bg-white dark:bg-[#0A0A0A] dark:text-zinc-100 px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none"
+                  className="w-full rounded border border-[#DEDEDE] bg-white px-3 py-2 font-mono text-sm focus:border-[#E58F67] focus:outline-none dark:bg-[#0A0A0A] dark:text-zinc-100"
                 />
                 <div className="mt-0.5 text-[11px] text-[#A6A6A6] dark:text-zinc-500">
                   Only needed if Jina Reader is disabled and the target site blocks CORS.
                 </div>
               </div>
-            </div>
-          </div>
+            </Section>
+            </>
+          )}
 
           {/* ── Security ── */}
-          <div className="mb-4 border-t border-[#DEDEDE] pt-5 dark:border-[#333333]">
-            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
-              <Lock className="h-3.5 w-3.5" />
-              Security · 密钥安全
-            </div>
-
+          {page === "security" && (
+            <>
+          <Section title="密钥安全">
             {/* Auto-restore note — key persists locally, normally no re-entry needed */}
             {apiKeyVault.llmNeedsReentry() && (
-              <div className="mb-3 rounded border border-amber-300/60 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-300">
+              <div className="rounded border border-amber-300/60 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-300">
                 检测到 LLM API Key 的加密数据，但未能自动解密（主密钥可能已损坏）——请在上方重新输入 Key。
               </div>
             )}
             {apiKeyVault.searchNeedsReentry() && (
-              <div className="mb-3 rounded border border-amber-300/60 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-300">
+              <div className="rounded border border-amber-300/60 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-300">
                 检测到 Search API Key 的加密数据，但未能自动解密——请在上方重新输入。
               </div>
             )}
 
-            <div className="rounded border border-[#DEDEDE] bg-[#FAFAFA] px-4 py-3 dark:border-[#333333] dark:bg-[#0A0A0A]">
-              <div className="mb-1.5 text-[11px] text-[#8C8C8C] dark:text-zinc-500">
-                密钥用 AES-GCM 加密后持久化在本地浏览器存储，刷新 / 关闭重开可自动恢复、无需重填。离开设备前可一键清除密钥。
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm text-zinc-100">密钥加密存储</div>
+                <div className="mt-1 text-[11px] leading-relaxed text-[#8C8C8C] dark:text-zinc-500">
+                  密钥用 AES-GCM 加密后持久化在本地浏览器存储，刷新 / 关闭重开可自动恢复、无需重填。离开设备前可一键清除密钥。
+                </div>
               </div>
               <button
                 onClick={() => {
@@ -943,25 +1125,21 @@ export function SettingsDialog({
                   setSearchKeyDirty(false);
                   toast.success("已清除全部 API 密钥（内存 + 本地加密存储）");
                 }}
-                className="rounded border border-[#E54D2E]/40 px-3 py-1.5 text-xs font-medium text-[#E54D2E] hover:bg-[#E54D2E]/10"
+                className="shrink-0 rounded border border-[#E54D2E]/40 px-3 py-1.5 text-xs font-medium text-[#E54D2E] hover:bg-[#E54D2E]/10"
               >
                 立即锁定并清除密钥
               </button>
             </div>
 
-            <div className="mt-3 rounded border border-[#DEDEDE] bg-[#FAFAFA] px-4 py-3 dark:border-[#333333] dark:bg-[#0A0A0A]">
-              <label className="mb-1 flex items-center gap-2 text-sm text-[#383838] dark:text-zinc-300">
-                <input
-                  type="checkbox"
-                  checked={(config.idleLockMinutes ?? 0) > 0}
-                  onChange={(e) => setConfig({ idleLockMinutes: e.target.checked ? 30 : 0 })}
-                  className="h-4 w-4 accent-[#E58F67]"
-                />
-                空闲自动锁定
-              </label>
-              {(config.idleLockMinutes ?? 0) > 0 && (
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-xs text-[#8C8C8C] dark:text-zinc-500">闲置</span>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm text-zinc-100">空闲自动锁定</div>
+                <div className="mt-1 text-[11px] leading-relaxed text-[#8C8C8C] dark:text-zinc-500">
+                  闲置指定分钟后自动清除密钥（防窥屏）。刷新 / 关闭重开需重新输入。
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {(config.idleLockMinutes ?? 0) > 0 && (
                   <input
                     type="number"
                     min={1}
@@ -970,15 +1148,23 @@ export function SettingsDialog({
                     onChange={(e) =>
                       setConfig({ idleLockMinutes: Math.max(1, parseInt(e.target.value, 10) || 1) })
                     }
-                    className="w-20 rounded border border-[#DEDEDE] bg-white dark:bg-[#0A0A0A] dark:text-zinc-100 px-2 py-1 text-sm font-mono focus:border-[#E58F67] focus:outline-none"
+                    className="w-20 rounded border border-[#DEDEDE] bg-white px-2 py-1 font-mono text-sm focus:border-[#E58F67] focus:outline-none dark:bg-[#0A0A0A] dark:text-zinc-100"
                   />
-                  <span className="text-xs text-[#8C8C8C] dark:text-zinc-500">分钟后自动清除密钥</span>
-                </div>
-              )}
+                )}
+                <Switch
+                  checked={(config.idleLockMinutes ?? 0) > 0}
+                  onChange={(v) => setConfig({ idleLockMinutes: v ? 30 : 0 })}
+                />
+              </div>
             </div>
-          </div>
+          </Section>
+            </>
+          )}
 
           {/* Custom instructions */}
+          {page === "instruct" && (
+            <>
+          <Section title="自定义指令">
           <Field label="Custom instructions" hint="Extra instructions appended to the system prompt (optional)">
             <textarea
               value={config.customInstructions}
@@ -988,9 +1174,14 @@ export function SettingsDialog({
               className="w-full resize-none rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-3 py-2 text-sm focus:border-[#E58F67] focus:outline-none"
             />
           </Field>
+            </Section>
+            </>
+          )}
 
           {/* ── 会话导出 / 导入（全量） ── */}
-          <div className="mb-4 border-t border-[#DEDEDE] pt-5 dark:border-[#333333]">
+          {page === "backup" && (
+            <>
+          <Section title="会话与备份">
             <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
               会话 · Session backup
             </div>
@@ -1024,10 +1215,12 @@ export function SettingsDialog({
                 }}
               />
             </div>
-          </div>
+            </Section>
+            </>
+          )}
 
           {/* Privacy note */}
-          <div className="mt-4 rounded border border-[#DEDEDE] bg-[#FAFAFA] dark:border-[#333333] dark:bg-[#0A0A0A] px-3 py-2 text-[11px] text-[#8C8C8C] dark:text-zinc-500">
+          <div className="rounded-[12px] border border-[#DEDEDE] bg-[#FFFFFF] px-5 py-4 text-[11px] leading-relaxed text-[#8C8C8C] dark:border-[#2A2A2A] dark:bg-[#151515] dark:text-zinc-500">
             <span className="font-semibold text-[#6B6B6B] dark:text-zinc-400">Security:</span> Your
             API key is encrypted with AES-GCM (Web Crypto API) under a master key derived via
             PBKDF2; both the ciphertext and the master key live in localStorage so keys survive
@@ -1036,51 +1229,7 @@ export function SettingsDialog({
             your browser to the provider. The 文件袋 is stored locally in IndexedDB.
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-[#DEDEDE] px-5 py-3">
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#8C8C8C] dark:text-zinc-500">
-            {config.hasApiKey ? (
-              <span className="text-[#E58F67]">● Key configured</span>
-            ) : (
-              <span className="text-[#B87B5A]">● No API key</span>
-            )}
-            {config.hasSearchKey ? (
-              <span className="text-[#E58F67]">● Search configured</span>
-            ) : (
-              <span className="text-[#8C8C8C] dark:text-zinc-500">● No search key</span>
-            )}
-          </div>
-          <button
-            onClick={async () => {
-              // Save LLM key to vault before closing
-              if (keyDirty) {
-                if (keyInput) {
-                  await apiKeyVault.setKey(keyInput);
-                  setConfig({ hasApiKey: true });
-                } else {
-                  apiKeyVault.clear();
-                  setConfig({ hasApiKey: false });
-                }
-              }
-              // Save search key to vault before closing
-              if (searchKeyDirty) {
-                if (searchKeyInput) {
-                  await apiKeyVault.setSearchKey(searchKeyInput);
-                  setConfig({ hasSearchKey: true });
-                } else {
-                  apiKeyVault.clearSearchKey();
-                  setConfig({ hasSearchKey: false });
-                }
-              }
-              onClose();
-            }}
-            className="rounded bg-[#E58F67] px-4 py-2 text-sm font-medium text-white hover:bg-[#C66B4A]"
-          >
-            Done
-          </button>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }
@@ -1088,19 +1237,67 @@ export function SettingsDialog({
 function Field({
   label,
   hint,
+  action,
   children,
 }: {
   label: string;
   hint?: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className="mb-4">
-      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#6B6B6B] dark:text-zinc-400">
-        {label}
-      </label>
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <label className="text-sm font-medium text-zinc-100">{label}</label>
+        {action}
+      </div>
       {children}
-      {hint && <div className="mt-1 text-[11px] text-[#A6A6A6] dark:text-zinc-500">{hint}</div>}
+      {hint && (
+        <div className="mt-1.5 text-[11px] leading-relaxed text-[#8C8C8C] dark:text-zinc-500">
+          {hint}
+        </div>
+      )}
     </div>
+  );
+}
+
+/** ZCode 式开关：圆角轨道 + 白色圆钮 */
+function Switch({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "relative h-[22px] w-[40px] shrink-0 rounded-full border border-[#DEDEDE] transition-colors dark:border-[#3A3A3A]",
+        checked ? "bg-[#E58F67] dark:bg-[#E58F67]" : "bg-[#E5E5E5] dark:bg-[#2A2A2A]",
+      )}
+    >
+      <span
+        className={cn(
+          "absolute top-[2px] h-4 w-4 rounded-full bg-white shadow-sm transition-all dark:bg-zinc-100",
+          checked ? "left-[19px]" : "left-[2px]",
+        )}
+      />
+    </button>
+  );
+}
+
+/** ZCode 式区块卡片：标题在卡片外，卡片内承载表单 */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="mb-2 text-base font-semibold text-zinc-100">{title}</h2>
+      <div className="space-y-5 rounded-[12px] border border-[#DEDEDE] bg-[#FFFFFF] px-5 py-4 dark:border-[#2A2A2A] dark:bg-[#151515]">
+        {children}
+      </div>
+    </section>
   );
 }
