@@ -814,7 +814,10 @@ export function Terminal() {
     !streamingText &&
     !streamingReasoning;
   // 提升到组件体：Hero 条件渲染后 JSX 内的 useMemo 会导致 hook 数量不稳定
-  const turnGroups = useMemo(() => groupAssistantTurns(groupToolEvents(events)), [events]);
+  const turnGroups = useMemo(
+    () => groupRounds(groupAssistantTurns(groupToolEvents(events))),
+    [events],
+  );
   const hour = new Date().getHours();
   const greeting = hour < 6 ? "夜深了" : hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好";
 
@@ -952,8 +955,13 @@ export function Terminal() {
         {/* 居中限宽列：对话内容与输入框同宽对齐（ZCode 式） */}
         <div className="mx-auto w-full max-w-3xl space-y-4">
           {turnGroups.map((ev) =>
-            ev.kind === "turn" ? (
-              <TurnBlock key={ev.id} turn={ev} />
+            ev.kind === "round" ? (
+              <RoundBlock
+                key={ev.id}
+                round={ev}
+                canRegenerate={ev.summary?.id === lastAssistantEventId}
+                fullText={ev.summary ? assistantTurnTexts.get(ev.summary.id) : undefined}
+              />
             ) : (
               <EventRow
                 key={ev.id}
@@ -1812,6 +1820,61 @@ function groupAssistantTurns(
 }
 
 // ---------------------------------------------------------------------------
+// 整轮分组：用户消息之后、下一用户消息之前的所有内容 = 一个「轮次」。
+// 轮次 = 执行轨迹（turn 序列，可折叠隐藏）+ 收尾总结（无后续工具的最后一条
+// assistant-message，始终可见）。ZCode 式对话折叠的基础。
+// ---------------------------------------------------------------------------
+interface RoundGroup {
+  kind: "round";
+  id: string;
+  turns: TurnGroup[];
+  summary: (SessionEvent & { pairedResult?: SessionEvent }) | null;
+}
+
+type RenderedEvent = (SessionEvent & { pairedResult?: SessionEvent }) | RoundGroup;
+
+function groupRounds(events: GroupedEvent[]): RenderedEvent[] {
+  const result: RenderedEvent[] = [];
+  let open: RoundGroup | null = null;
+
+  const close = (): void => {
+    if (!open) return;
+    result.push(open);
+    open = null;
+  };
+
+  for (const ev of events) {
+    if (ev.kind === "turn") {
+      if (!open || open.summary) {
+        close();
+        open = { kind: "round", id: ev.id, turns: [], summary: null };
+      }
+      open.turns.push(ev);
+      continue;
+    }
+    if (ev.kind === "assistant-message") {
+      if (!open) {
+        open = { kind: "round", id: ev.id, turns: [], summary: ev };
+        continue;
+      }
+      if (open.summary) {
+        // 连续两条纯文本消息 → 各自成轮（ZCode 里每条消息一个头部）
+        close();
+        open = { kind: "round", id: ev.id, turns: [], summary: ev };
+        continue;
+      }
+      open.summary = ev;
+      continue;
+    }
+    // user / error / system / 游离工具事件 → 关轮，独立渲染
+    close();
+    result.push(ev);
+  }
+  close();
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Event rows — one component per EventKind
 // ---------------------------------------------------------------------------
 
@@ -1908,10 +1971,10 @@ function StreamingBubble({ text, reasoning }: { text: string; reasoning: string 
 // between tool calls stops being the main event; click to expand.
 // ---------------------------------------------------------------------------
 
-// 回合级汇总：工具调用次数 / 改动文件数 / 真实 +/- 行数（供收起态显示总结行）
-function turnStats(turn: TurnGroup): { calls: number; files: number; add: number; rem: number } | null {
+// 轮次级汇总：工具调用次数 / 改动文件数 / 真实 +/- 行数（供收起态显示总结行）
+function turnStats(turn: TurnGroup): { calls: number; fileSet: Set<string>; add: number; rem: number } | null {
   let calls = 0;
-  const files = new Set<string>();
+  const fileSet = new Set<string>();
   let add = 0;
   let rem = 0;
   for (const ev of turn.tools) {
@@ -1919,7 +1982,7 @@ function turnStats(turn: TurnGroup): { calls: number; files: number; add: number
     calls++;
     const diff = ev.pairedResult?.diff ?? null;
     if (!diff) continue;
-    files.add(diff.path);
+    fileSet.add(diff.path);
     const rows = lineDiff(
       diff.before.length === 0 ? [] : diff.before.split("\n"),
       diff.after.split("\n"),
@@ -1927,14 +1990,101 @@ function turnStats(turn: TurnGroup): { calls: number; files: number; add: number
     add += rows.filter((r) => r.type === "add").length;
     rem += rows.filter((r) => r.type === "del").length;
   }
-  return calls > 0 ? { calls, files: files.size, add, rem } : null;
+  return calls > 0 ? { calls, fileSet, add, rem } : null;
 }
 
+// 单段执行内容（叙述 + 思考过程 + 工具步骤卡）——不自带头部，由 RoundBlock 统一折叠
 function TurnBlock({ turn }: { turn: TurnGroup }) {
-  // 运行中保持展开（可实时看执行），结束后默认收起（ZCode 式：只给总结，点开向下弹出详情）
-  const running = turn.tools.some((ev) => !ev.pairedResult);
+  return (
+    <div className="space-y-1.5">
+      {/* 叙述文字：AI 的输出内容，在其应有的位置展示（不并入思考） */}
+      {turn.analysis && (
+        <div className="px-1 text-[#262626] dark:text-zinc-100">
+          <MarkdownRenderer text={turn.analysis} />
+        </div>
+      )}
+      {/* 思考过程：独立步骤，默认收起 */}
+      {turn.reasoning && turn.reasoning.trim().length > 0 && (
+        <ThinkingStep text={turn.reasoning} streaming={false} durationMs={turn.durationMs} />
+      )}
+      {/* 工具：每个动作一行可折叠步骤卡（运行中显示 xx中） */}
+      {turn.tools.map((ev) =>
+        ev.toolName === "dispatch_subagent" ? (
+          <SubagentCard
+            key={ev.id}
+            eventId={ev.id}
+            task={typeof ev.toolArgs?.task === "string" ? ev.toolArgs.task : ""}
+            running={!ev.pairedResult}
+          />
+        ) : (
+          <StepCard
+            key={ev.id}
+            name={ev.toolName!}
+            args={ev.toolArgs ?? {}}
+            result={ev.pairedResult}
+          />
+        ),
+      )}
+    </div>
+  );
+}
+
+/**
+ * 整轮渲染（ZCode 式对话折叠）：
+ * 收起态 = 「已工作 X 秒 ⌄」+ 一行统计 + 最终总结（始终可见）；
+ * 展开态 = 向下滑出完整执行轨迹（全部叙述 / 思考 / 工具步骤卡）。
+ */
+function RoundBlock({
+  round,
+  canRegenerate,
+  fullText,
+}: {
+  round: RoundGroup;
+  canRegenerate?: boolean;
+  fullText?: string;
+}) {
+  const running = round.turns.some((t) => t.tools.some((ev) => !ev.pairedResult));
   const [expanded, setExpanded] = useState(() => running);
-  const stats = useMemo(() => turnStats(turn), [turn]);
+  // 任务结束后自动收起（正在跑时保持展开实时可见）
+  const wasRunning = useRef(running);
+  useEffect(() => {
+    if (wasRunning.current && !running) setExpanded(false);
+    wasRunning.current = running;
+  }, [running]);
+  const stats = useMemo(() => {
+    let calls = 0;
+    const fileSet = new Set<string>();
+    let add = 0;
+    let rem = 0;
+    for (const t of round.turns) {
+      const s = turnStats(t);
+      if (!s) continue;
+      calls += s.calls;
+      s.fileSet.forEach((f) => fileSet.add(f));
+      add += s.add;
+      rem += s.rem;
+    }
+    return calls > 0 ? { calls, files: fileSet.size, add, rem } : null;
+  }, [round]);
+  // 该轮合计耗时（各片段 + 收尾总结的 duration 相加）
+  const totalMs = useMemo(() => {
+    let ms = 0;
+    let n = 0;
+    for (const t of round.turns) {
+      if (t.durationMs != null) {
+        ms += t.durationMs;
+        n++;
+      }
+    }
+    if (round.summary?.durationMs != null) {
+      ms += round.summary.durationMs;
+      n++;
+    }
+    return n > 0 ? ms : null;
+  }, [round]);
+  const summarize = round.summary?.text?.trim() ? round.summary.text : null;
+  const regenerate = useSession((s) => s.regenerate);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
@@ -1942,51 +2092,33 @@ function TurnBlock({ turn }: { turn: TurnGroup }) {
       transition={{ duration: 0.15 }}
       className="space-y-1.5"
     >
-      {/* 「已工作 X 秒」折叠开关：收起=只看总结；展开=向下弹出完整执行详情 */}
-      {(turn.durationMs != null && turn.durationMs > 0) || running ? (
+      {/* 「已工作 X 秒」整轮折叠头：收起=只看总结；展开=向下弹出完整执行详情 */}
+      {(totalMs != null || running) && (
         <button
           onClick={() => setExpanded((v) => !v)}
           className="flex items-center gap-1 pl-1 text-[12px] text-zinc-500 transition-colors hover:text-zinc-300"
           title={expanded ? "收起执行详情" : "展开执行详情"}
         >
-          <span>已工作 {running && turn.durationMs == null ? "…" : formatDuration(turn.durationMs ?? 0)}</span>
+          <span>已工作 {running && totalMs == null ? "…" : formatDuration(totalMs ?? 0)}</span>
           <ChevronRight className={cn("h-3 w-3 transition-transform", expanded && "rotate-90")} />
         </button>
-      ) : null}
+      )}
       {expanded ? (
-        /* 展开态：完整执行轨迹（叙述 + 思考过程 + 工具步骤），左侧时间线描边 */
-        <div className="ml-0.5 space-y-1.5 border-l border-[#333333] pl-2.5">
-          {/* 叙述文字：AI 的输出内容，在其应有的位置展示（不并入思考） */}
-          {turn.analysis && (
-            <div className="px-1 text-[#262626] dark:text-zinc-100">
-              <MarkdownRenderer text={turn.analysis} />
-            </div>
-          )}
-          {/* 思考过程：独立步骤，默认收起 */}
-          {turn.reasoning && turn.reasoning.trim().length > 0 && (
-            <ThinkingStep text={turn.reasoning} streaming={false} durationMs={turn.durationMs} />
-          )}
-          {/* 工具：每个动作一行可折叠步骤卡（运行中显示 xx中） */}
-          {turn.tools.map((ev) =>
-            ev.toolName === "dispatch_subagent" ? (
-              <SubagentCard
-                key={ev.id}
-                eventId={ev.id}
-                task={typeof ev.toolArgs?.task === "string" ? ev.toolArgs.task : ""}
-                running={!ev.pairedResult}
-              />
-            ) : (
-              <StepCard
-                key={ev.id}
-                name={ev.toolName!}
-                args={ev.toolArgs ?? {}}
-                result={ev.pairedResult}
-              />
-            ),
+        /* 展开态：完整执行轨迹（左侧时间线描边） */
+        <div className="ml-0.5 space-y-2.5 border-l border-[#333333] pl-2.5">
+          {round.turns.map((t) => (
+            <TurnBlock key={t.id} turn={t} />
+          ))}
+          {round.summary?.reasoning && round.summary.reasoning.trim().length > 0 && (
+            <ThinkingStep
+              text={round.summary.reasoning}
+              streaming={false}
+              durationMs={round.summary.durationMs}
+            />
           )}
         </div>
       ) : (
-        /* 收起态：一行总结（工具调用数 / 改动文件数 / +N -M） */
+        /* 收起态：一行统计（改动文件数 / +N -M） */
         stats && (
           <div className="flex items-center gap-1.5 pl-1 text-[12px] text-zinc-500">
             <span>
@@ -2000,6 +2132,45 @@ function TurnBlock({ turn }: { turn: TurnGroup }) {
             )}
           </div>
         )
+      )}
+      {/* 最终总结：始终可见（折叠时即唯一主体） */}
+      {summarize && (
+        <div className="min-w-0 break-words text-[#262626] dark:text-zinc-100">
+          <MarkdownRenderer text={summarize} />
+        </div>
+      )}
+      {!running && round.summary && (
+        <div className="flex items-center gap-0.5 pl-1 text-[#A6A6A6] dark:text-zinc-500">
+          <CopyButton text={fullText || round.summary.text || ""} />
+          <button
+            onClick={() => toast.info("感谢反馈，这对我们很有帮助")}
+            className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300"
+            title="有帮助"
+          >
+            <ThumbsUp className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => toast.info("已记录反馈")}
+            className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300"
+            title="没帮助"
+          >
+            <ThumbsDown className="h-3.5 w-3.5" />
+          </button>
+          {canRegenerate && (
+            <button
+              onClick={() => void regenerate()}
+              className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300"
+              title="重新生成"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {round.summary.ts && (
+            <span className="pl-1 text-[10px]">
+              {new Date(round.summary.ts).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+        </div>
       )}
     </motion.div>
   );
