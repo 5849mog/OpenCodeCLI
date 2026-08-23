@@ -9,7 +9,7 @@ import { SkillsDialog } from "@/components/skills-dialog";
 import {
   Settings,
   Plus,
-  MessageSquare,
+  CirclePlus,
   BookOpen,
   PanelLeftClose,
   PanelLeftOpen,
@@ -20,6 +20,9 @@ import {
   Search,
   FolderOpen,
   X,
+  LayoutGrid,
+  ArrowUpDown,
+  ChevronDown,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -41,8 +44,6 @@ import {
 import { useSession } from "@/store/session";
 import { useVfsView } from "@/store/vfs-view";
 import type { SessionMeta } from "@/lib/session-storage";
-import { presetBadgeLabel } from "@/lib/preset-badge";
-import { vfs } from "@/lib/vfs";
 import { cn } from "@/lib/utils";
 
 function formatRelativeTime(ts: number): string {
@@ -84,12 +85,12 @@ function SessionRow({
     <div
       onClick={onSwitch}
       className={cn(
-        "group flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[#262626] dark:text-zinc-200",
-        "cursor-pointer hover:bg-white dark:hover:bg-[#2A2A2A]",
-        active && "bg-[#E58F67]/10 text-[#E58F67] hover:bg-[#E58F67]/10 dark:bg-[#E58F67]/10 dark:text-[#E58F67]",
+        "group flex cursor-pointer items-center gap-2 rounded-lg py-1.5 pl-7 pr-2 text-[13px] text-[#6B6B6B] transition-colors hover:bg-white hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#262626] dark:hover:text-zinc-200",
+        active && "bg-white text-[#262626] hover:bg-white hover:text-[#262626] dark:bg-[#2A2A2A] dark:text-zinc-100 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-100",
       )}
     >
-      <MessageSquare className={cn("h-3.5 w-3.5 shrink-0 text-[#A6A6A6] dark:text-zinc-500", active && "text-[#E58F67]")} />
+      {/* 当前会话左侧圆点指示（ZCode 式） */}
+      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", active ? "bg-[#E58F67]" : "bg-transparent")} />
       {renaming ? (
         <input
           autoFocus
@@ -104,12 +105,7 @@ function SessionRow({
           className="w-full min-w-0 rounded border border-[#E58F67]/50 bg-white px-1.5 py-0.5 text-xs focus:outline-none dark:bg-[#161616] dark:text-zinc-100"
         />
       ) : (
-        <span className="truncate">{session.title || "新会话"}</span>
-      )}
-      {!renaming && (
-        <span className="shrink-0 text-[10px] text-[#8C8C8C] dark:text-zinc-500">
-          {presetBadgeLabel(session.agentPreset)}
-        </span>
+        <span className="min-w-0 truncate">{session.title || "新会话"}</span>
       )}
       <span className="ml-auto shrink-0 text-[10px] text-[#A6A6A6] dark:text-zinc-500">{formatRelativeTime(session.updatedAt)}</span>
       {!renaming && (
@@ -179,6 +175,8 @@ export default function Home() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [projectCollapsed, setProjectCollapsed] = useState(false);
+  const [sortAsc, setSortAsc] = useState(false);
   const [, setPanelDirection] = useState<"horizontal" | "vertical">("horizontal");
   const init = useSession((s) => s.init);
   const config = useSession((s) => s.config);
@@ -190,7 +188,6 @@ export default function Home() {
   const switchSession = useSession((s) => s.switchSession);
   const deleteSession = useSession((s) => s.deleteSession);
   const renameSession = useSession((s) => s.renameSession);
-  const [fileCount, setFileCount] = useState(0);
 
   useEffect(() => {
     init();
@@ -202,12 +199,21 @@ export default function Home() {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [init]);
 
+  // ZCode 式快捷键：⌘N / Ctrl+N 新建任务，⌘K / Ctrl+K 搜索会话
   useEffect(() => {
-    const update = () => setFileCount(vfs.allSync().filter((n) => n.type === "file").length);
-    update();
-    const interval = setInterval(update, 800);
-    return () => clearInterval(interval);
-  }, []);
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      } else if (e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        void newSession();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [newSession]);
 
   // Responsive: sidebar collapses by default below desktop breakpoint
   useEffect(() => {
@@ -240,7 +246,7 @@ export default function Home() {
       <aside
         className={cn(
           "flex flex-col border-r border-[#DEDEDE] bg-[#F5F5F5] transition-all duration-200 ease-in-out dark:border-sidebar-border dark:bg-sidebar",
-          sidebarCollapsed ? "w-14 shrink-0" : "w-56 shrink-0"
+          sidebarCollapsed ? "w-14 shrink-0" : "w-72 shrink-0"
         )}
       >
         {sidebarCollapsed ? (
@@ -287,33 +293,26 @@ export default function Home() {
         ) : (
           /* Expanded: full sidebar */
           <>
-            {/* Brand + collapse button */}
-            <div className="flex items-center justify-between px-4 py-4">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#E58F67] text-sm font-bold text-white shadow-sm">
-                  {"</>"}
-                </div>
-                <span className="text-sm font-medium text-[#262626] dark:text-zinc-100" style={{ fontFamily: "var(--font-fraunces), serif" }}>
-                  Open Code
-                </span>
-              </div>
+            {/* 顶部：仅折叠按钮（ZCode 无顶部品牌块，品牌在底部用户区） */}
+            <div className="flex justify-end px-2.5 pb-1 pt-2.5">
               <button
                 onClick={() => setSidebarCollapsed(true)}
-                className="touch-target flex items-center justify-center rounded-lg text-[#8C8C8C] hover:bg-white hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-200"
+                className="touch-target flex items-center justify-center rounded-lg p-1.5 text-[#8C8C8C] hover:bg-white hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-200"
                 title="折叠侧边栏"
               >
                 <PanelLeftClose className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Action rows — 新建任务 / 搜索会话 / 文件袋（ZCode 式朴素动作行，无边框） */}
+            {/* 顶部导航：新建任务 ⌘N / 搜索 ⌘K / 插件市场（ZCode 式，带快捷键提示） */}
             <div className="flex flex-col gap-0.5 px-2 pb-2">
               <button
                 onClick={() => void newSession()}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[#6B6B6B] transition-colors hover:bg-white hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
+                className="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[#6B6B6B] transition-colors hover:bg-white hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
               >
-                <Plus className="h-4 w-4 shrink-0" />
+                <CirclePlus className="h-4 w-4 shrink-0" />
                 新建任务
+                <span className="ml-auto text-[10px] text-[#A6A6A6] dark:text-zinc-600 dark:group-hover:text-zinc-400">⌘N</span>
               </button>
               <button
                 onClick={() => {
@@ -321,22 +320,27 @@ export default function Home() {
                   if (searchOpen) setSearchQuery("");
                 }}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white hover:text-[#262626] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200",
+                  "group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white hover:text-[#262626] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200",
                   searchOpen ? "text-[#E58F67]" : "text-[#6B6B6B] dark:text-zinc-400",
                 )}
               >
                 <Search className="h-4 w-4 shrink-0" />
-                搜索会话
+                搜索
+                <span
+                  className={cn(
+                    "ml-auto text-[10px] text-[#A6A6A6] dark:text-zinc-600 dark:group-hover:text-zinc-400",
+                    searchOpen && "text-[#E58F67]/70 dark:text-[#E58F67]/70",
+                  )}
+                >
+                  ⌘K
+                </span>
               </button>
               <button
-                onClick={() => useVfsView.getState().setRightPanelOpen(!rightPanelOpen)}
-                className={cn(
-                  "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-white hover:text-[#262626] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200",
-                  rightPanelOpen ? "text-[#E58F67]" : "text-[#6B6B6B] dark:text-zinc-400",
-                )}
+                onClick={() => setSkillsOpen(true)}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[#6B6B6B] transition-colors hover:bg-white hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
               >
-                <FolderOpen className="h-4 w-4 shrink-0" />
-                文件袋
+                <LayoutGrid className="h-4 w-4 shrink-0" />
+                插件市场
               </button>
               {searchOpen && (
                 <div className="mt-1 flex items-center gap-2 rounded-lg border border-[#DEDEDE] bg-white px-2.5 py-1.5 dark:border-[#333333] dark:bg-[#161616]">
@@ -368,78 +372,110 @@ export default function Home() {
               )}
             </div>
 
-            {/* Session list — 无分区标题，当前会话高亮置顶（ZCode 式），搜索时按标题过滤 */}
-            <div className="flex-1 overflow-y-auto px-2 py-2">
-              {(() => {
-                const q = searchQuery.trim().toLowerCase();
-                // 当前会话可能还没写入 sessions 列表（首条消息前）——兜底一个伪 meta，保证它始终显示
-                const fromList = sessions.find((s) => s.id === sessionId);
-                const current: SessionMeta =
-                  fromList ?? {
-                    id: sessionId,
-                    title: title || "新会话",
-                    createdAt: Date.now(),
-                    updatedAt: Date.now(),
-                    totalTokens: 0,
-                    messageCount: 0,
-                  };
-                const ordered = [
-                  current,
-                  ...sessions.filter((s) => s.id !== sessionId),
-                ];
-                const list = q
-                  ? ordered.filter((s) => (s.title || "新会话").toLowerCase().includes(q))
-                  : ordered;
-                if (list.length === 0) {
-                  return <div className="px-2 py-3 text-xs text-[#A6A6A6] dark:text-zinc-500">没有匹配的会话</div>;
-                }
-                return (
-                  <div className="space-y-0.5">
-                    {list.map((s) => (
-                      <SessionRow
-                        key={s.id}
-                        session={s}
-                        active={s.id === sessionId}
-                        onSwitch={() => void switchSession(s.id)}
-                        onRename={(t) => void renameSession(s.id, t)}
-                        onDelete={() => void deleteSession(s.id)}
-                      />
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Bottom controls */}
-            <div className="border-t border-[#DEDEDE] p-2 dark:border-sidebar-border">
-              <div className="flex items-center gap-1">
+            {/* 项目树（ZCode 式：项目 → 会话两级，可折叠） */}
+            <div className="flex items-center justify-between px-3 pb-1 pt-1.5">
+              <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => setSettingsOpen(true)}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs text-[#8C8C8C] hover:bg-white hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-200"
+                  onClick={() => setProjectCollapsed((v) => !v)}
+                  className="rounded p-0.5 text-[#A6A6A6] transition-colors hover:bg-white hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-200"
+                  title={projectCollapsed ? "展开项目树" : "收起项目树"}
                 >
-                  <Settings className="h-3.5 w-3.5" />
-                  <span>设置</span>
+                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", projectCollapsed && "-rotate-90")} />
+                </button>
+                <span className="text-xs font-medium text-[#8C8C8C] dark:text-zinc-400">项目</span>
+              </div>
+              <div className="flex items-center gap-0.5">
+                <button
+                  onClick={() => setSortAsc((v) => !v)}
+                  className="rounded p-1 text-[#A6A6A6] transition-colors hover:bg-white hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-200"
+                  title={sortAsc ? "排序：最早在前" : "排序：最新在前"}
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5" />
                 </button>
                 <button
-                  onClick={() => setHelpOpen(true)}
-                  className="flex items-center justify-center rounded-lg px-3 py-2 text-[#8C8C8C] hover:bg-white hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-200"
+                  onClick={() => void newSession()}
+                  className="rounded p-1 text-[#A6A6A6] transition-colors hover:bg-white hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-200"
+                  title="新建会话"
                 >
-                  <BookOpen className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  onClick={() => setSkillsOpen(true)}
-                  className="flex items-center justify-center rounded-lg px-3 py-2 text-[#8C8C8C] hover:bg-white hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-200"
-                  title="Skills 技能包"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <Plus className="h-3.5 w-3.5" />
                 </button>
               </div>
-              {config.hasApiKey ? (
-                <div className="mt-2 flex items-center gap-1.5 px-3 py-1 text-[10px] text-[#C08A5F] dark:text-[#E8A87C]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#E58F67]" />
-                  {config.model} · {fileCount} files
+            </div>
+            <div className="flex-1 overflow-y-auto px-2 pb-2">
+              {!projectCollapsed && (
+                <>
+                  {/* 项目节点：文件夹 + 项目名 + 会话数徽标 */}
+                  <div
+                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-[#262626] dark:text-zinc-200"
+                    title="当前项目：D:\测试\OpenCodeCLI-main"
+                  >
+                    <FolderOpen className="h-3.5 w-3.5 shrink-0 text-[#A6A6A6] dark:text-zinc-500" />
+                    <span className="truncate">OpenCodeCLI-main</span>
+                    <span className="ml-auto shrink-0 rounded-full bg-[#F0F0F0] px-1.5 py-px text-[10px] text-[#6B6B6B] dark:bg-[#2A2A2A] dark:text-zinc-400">
+                      {sessions.length}
+                    </span>
+                  </div>
+                  {/* 会话条目（当前会话高亮 + 圆点，ZCode 式） */}
+                  <div className="mt-0.5 space-y-0.5">
+                    {(() => {
+                      const q = searchQuery.trim().toLowerCase();
+                      // 当前会话可能还没写入 sessions 列表（首条消息前）——兜底一个伪 meta，保证它始终显示
+                      const fromList = sessions.find((s) => s.id === sessionId);
+                      const current: SessionMeta =
+                        fromList ?? {
+                          id: sessionId,
+                          title: title || "新会话",
+                          createdAt: Date.now(),
+                          updatedAt: Date.now(),
+                          totalTokens: 0,
+                          messageCount: 0,
+                        };
+                      const rest = sessions
+                        .filter((s) => s.id !== sessionId)
+                        .sort((a, b) => (sortAsc ? a.updatedAt - b.updatedAt : b.updatedAt - a.updatedAt));
+                      const ordered = [current, ...rest];
+                      const list = q
+                        ? ordered.filter((s) => (s.title || "新会话").toLowerCase().includes(q))
+                        : ordered;
+                      if (list.length === 0) {
+                        return (
+                          <div className="px-2 py-3 text-xs text-[#A6A6A6] dark:text-zinc-500">
+                            没有匹配的会话
+                          </div>
+                        );
+                      }
+                      return list.map((s) => (
+                        <SessionRow
+                          key={s.id}
+                          session={s}
+                          active={s.id === sessionId}
+                          onSwitch={() => void switchSession(s.id)}
+                          onRename={(t) => void renameSession(s.id, t)}
+                          onDelete={() => void deleteSession(s.id)}
+                        />
+                      ));
+                    })()}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* 底部用户区：头像 + 名称 + 设置（ZCode 式）；未配 Key 时保留配置入口 */}
+            <div className="border-t border-[#DEDEDE] px-2.5 py-2.5 dark:border-sidebar-border">
+              <div className="flex items-center gap-2.5 px-1">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E58F67] text-[10px] font-bold text-white">
+                  {"</>"}
                 </div>
-              ) : (
+                <span className="min-w-0 truncate text-[13px] text-[#262626] dark:text-zinc-100">Open Code</span>
+                <button
+                  onClick={() => setSettingsOpen(true)}
+                  className="ml-auto flex shrink-0 items-center justify-center rounded-lg p-1.5 text-[#8C8C8C] transition-colors hover:bg-white hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-200"
+                  title="设置"
+                >
+                  <Settings className="h-4 w-4" />
+                </button>
+              </div>
+              {!config.hasApiKey && (
                 <button
                   onClick={() => setSettingsOpen(true)}
                   className="mt-2 w-full rounded-lg border border-[#E58F67]/30 bg-[#E58F67]/5 px-3 py-1.5 text-[10px] text-[#E58F67] hover:bg-[#E58F67]/10"

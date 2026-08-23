@@ -41,6 +41,18 @@ import {
   FilePlus,
   FolderSearch,
   Pencil,
+  FolderOpen,
+  Zap,
+  Settings2,
+  MoreHorizontal,
+  Bell,
+  FlaskConical,
+  Lock,
+  GitMerge,
+  Bug,
+  PenLine,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -112,6 +124,31 @@ import { CollapsibleText } from "./collapsible-text";
 /** DeepSeek 官方模型兜底：即使 /models 尚未拉取，也保证模型菜单能看到这几个。 */
 const DEEPSEEK_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-flash-vision-exp"];
 
+// ---------------------------------------------------------------------------
+// 首页（空状态）建议区与功能区 —— ZCode 式快捷入口：点击填入输入框
+// ---------------------------------------------------------------------------
+const HOME_SUGGESTIONS = [
+  { icon: ClipboardList, text: "每周五总结这一周发生的事情。" },
+  { icon: FlaskConical, text: "请分析以下终端报错日志，找出导致该错误的根本原因，并提供可以直接运行的修复代码示例。" },
+  { icon: Lock, text: "帮我创建一份科技感十足的PPT，主题是「AI Agent 进化之路」。" },
+];
+
+const HOME_CARDS = [
+  {
+    icon: GitMerge,
+    title: "Git 站会摘要",
+    desc: "每周五总结这一周发生的事情。",
+    prompt: "总结这一周的 Git 提交与项目进展，生成本周末的站会摘要。",
+  },
+  {
+    icon: Bug,
+    title: "CI 失败与不稳定测试报告",
+    desc: "汇总近期 CI 失败和不稳定测试，并分析可能原因。",
+    prompt: "汇总近期 CI 失败和不稳定测试，并分析可能原因。",
+  },
+  { icon: PenLine, title: "自定义", desc: "跳过模板，直接告诉它你想做什么。", prompt: "" },
+];
+
 export function Terminal() {
   const events = useSession((s) => s.events);
   const isStreaming = useSession((s) => s.isStreaming);
@@ -130,6 +167,9 @@ export function Terminal() {
   const mode = useSession((s) => s.mode);
   const toggleMode = useSession((s) => s.toggleMode);
   const setAgentPreset = useSession((s) => s.setAgentPreset);
+  const sessionId = useSession((s) => s.sessionId);
+  const title = useSession((s) => s.title);
+  const renameSession = useSession((s) => s.renameSession);
   const streamingText = useSession((s) => s.streamingText);
   const streamingReasoning = useSession((s) => s.streamingReasoning);
   const send = useSession((s) => s.send);
@@ -155,6 +195,9 @@ export function Terminal() {
   // 思考强度 下拉
   const [effortMenuOpen, setEffortMenuOpen] = useState(false);
   const effortMenuRef = useRef<HTMLDivElement>(null);
+  // 顶栏 ⋯ 菜单（重命名 / 导出 / 清空）
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   // header 可选的模型：provider 拉取的 + DeepSeek 兜底 + 当前模型（可能手动输入不在列表）
   const headerModelChoices = useMemo(
     () =>
@@ -225,6 +268,18 @@ export function Terminal() {
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [modelMenuOpen]);
+
+  // 点击顶栏 ⋯ 菜单外部 → 关闭
+  useEffect(() => {
+    if (!moreMenuOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setMoreMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [moreMenuOpen]);
 
   // 点击运行模式/执行模式下拉外部 → 关闭
   useEffect(() => {
@@ -361,6 +416,12 @@ export function Terminal() {
     } else {
       setMentionQuery(null);
     }
+  };
+
+  // 首页建议/卡片点击 → 填入输入框并聚焦（不直接发送，方便用户修改）
+  const fillPrompt = (text: string) => {
+    setInput(text);
+    requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
   const insertMention = (filePath: string) => {
@@ -761,8 +822,73 @@ export function Terminal() {
     <div className="relative flex h-full flex-col bg-background text-foreground font-mono text-[length:var(--font-size-base)] leading-relaxed">
       {/* Header bar — model name centered, mode toggle right（空状态隐藏，首屏干净如 ZCode） */}
       {!isEmpty && (
-      <div className="flex items-center justify-end border-b border-[#DEDEDE] px-4 py-2.5 text-xs dark:border-[#333333]">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 border-b border-[#DEDEDE] px-3.5 py-2 text-xs dark:border-[#333333]">
+        {/* 左侧：会话标题 + 项目/分支上下文 chips（ZCode 式顶栏） */}
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span
+            className="max-w-[180px] truncate text-[13px] font-medium text-zinc-200"
+            title={title || "新会话"}
+          >
+            {title || "新会话"}
+          </span>
+          <span
+            className="hidden shrink-0 items-center gap-1 rounded-md bg-[#262626] px-2 py-1 text-[12px] text-zinc-300 sm:flex"
+            title="当前项目"
+          >
+            <FolderOpen className="h-3 w-3 text-zinc-500" />
+            OpenCodeCLI-main
+          </span>
+          <span
+            className="hidden shrink-0 items-center gap-1 rounded-md bg-[#262626] px-2 py-1 text-[12px] text-zinc-300 sm:flex"
+            title="当前分支"
+          >
+            <Zap className="h-3 w-3 text-zinc-500" />
+            main
+          </span>
+          <div className="relative shrink-0" ref={moreMenuRef}>
+            <button
+              onClick={() => setMoreMenuOpen((v) => !v)}
+              className="touch-target rounded px-1.5 py-1 text-[#8C8C8C] hover:bg-[#F0F0F0] hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
+              title="更多"
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </button>
+            {moreMenuOpen && (
+              <div className="absolute left-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] dark:bg-[#161616] dark:shadow-black/40">
+                <button
+                  onClick={() => {
+                    setMoreMenuOpen(false);
+                    const t = window.prompt("重命名会话", title || "新会话");
+                    if (t?.trim()) void renameSession(sessionId, t.trim());
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[length:var(--font-size-ui-sm)] text-[#383838] transition-colors hover:bg-[#F5F5F5] dark:text-zinc-300 dark:hover:bg-[#262626]"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> 重命名会话
+                </button>
+                <button
+                  onClick={() => {
+                    setMoreMenuOpen(false);
+                    handleSlashCommand("/export json");
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[length:var(--font-size-ui-sm)] text-[#383838] transition-colors hover:bg-[#F5F5F5] dark:text-zinc-300 dark:hover:bg-[#262626]"
+                >
+                  <Download className="h-3.5 w-3.5" /> 导出 JSON
+                </button>
+                <button
+                  onClick={() => {
+                    setMoreMenuOpen(false);
+                    reset();
+                  }}
+                  className="flex w-full items-center gap-2 border-t border-[#DEDEDE] px-3 py-2 text-left text-[length:var(--font-size-ui-sm)] text-[#E54D2E] transition-colors hover:bg-[#F5F5F5] dark:border-[#333333] dark:hover:bg-[#262626]"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> 清空会话
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* 右侧：文件袋 / 进度 / 导出 / Payload / 清空 / Stop */}
+        <div className="flex shrink-0 items-center gap-2">
           <button
             onClick={() =>
               useVfsView.getState().setRightPanelOpen(!useVfsView.getState().rightPanelOpen)
@@ -862,14 +988,43 @@ export function Terminal() {
         )}
       >
         {isEmpty && (
-          <div className="mb-5 text-lg font-medium text-zinc-300">{greeting}，接下来交给我吧</div>
+          <div className="pointer-events-none flex flex-col items-center">
+            {/* 背景装饰 Logo：超大低透明度几何图形（ZCode 式） */}
+            <svg viewBox="0 0 200 120" aria-hidden className="mb-10 h-32 w-56 text-white opacity-[0.05]">
+              <path
+                fill="currentColor"
+                d="M30 15 L60 15 L124 85 L124 15 L150 15 L150 105 L120 105 L56 35 L56 105 L30 105 Z"
+              />
+            </svg>
+            <div className="mb-6 text-[19px] font-medium text-zinc-300">{greeting}，接下来交给我吧</div>
+          </div>
         )}
         <div
           className={cn(
-            "group relative flex w-full items-center gap-1 rounded-[10px] border border-[#DEDEDE] bg-[#FAFAFA] px-2 py-1.5 transition-colors hover:border-[#C8C8C8] focus-within:border-[#E58F67]/70 focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.08)] dark:border-[#3D3D3D] dark:bg-[#1A1A1A] dark:hover:border-[#4A4A4A] dark:focus-within:border-[#E58F67]/70 dark:focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.10)]",
+            "group relative flex w-full flex-col rounded-[12px] border border-[#DEDEDE] bg-[#FAFAFA] transition-colors hover:border-[#C8C8C8] focus-within:border-[#E58F67]/70 focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.08)] dark:border-[#333333] dark:bg-[#1A1A1A] dark:hover:border-[#4A4A4A] dark:focus-within:border-[#E58F67]/70 dark:focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.10)]",
             isEmpty && "pointer-events-auto max-w-3xl",
           )}
         >
+          {/* 三明治 ① 顶栏：项目/上下文选择器 + 能力图标（仅空状态，ZCode 式） */}
+          {isEmpty && (
+            <div className="flex items-center justify-between gap-2 border-b border-[#DEDEDE] px-3.5 py-2 dark:border-[#2E2E2E]">
+              <span
+                className="flex min-w-0 items-center gap-1.5 text-[13px] text-zinc-300"
+                title="当前工作区：OpenCodeCLI-main"
+              >
+                <FolderOpen className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                <span className="truncate">OpenCodeCLI-main</span>
+                <ChevronDown className="h-3 w-3 shrink-0 text-zinc-500" />
+              </span>
+              <button
+                onClick={() => toast.info("能力与技能包：在输入框输入 /skills 查看列表，/help 查看帮助")}
+                className="shrink-0 rounded p-1 text-zinc-500 transition-colors hover:bg-[#F0F0F0] hover:text-zinc-300 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-100"
+                title="能力"
+              >
+                <Zap className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
           {/* 附件 chips（命令框上方） */}
           {attachments.length > 0 && (
             <div className="absolute bottom-full left-0 mb-2 flex max-w-full flex-wrap gap-1.5">
@@ -903,31 +1058,37 @@ export function Terminal() {
               ))}
             </div>
           )}
-          {/* 左侧：附件选择按钮（ZCode 式圆形细线描边 +） */}
-          <button
-            onClick={() => attachInputRef.current?.click()}
-            disabled={isStreaming || isCompacting || uploading}
-            className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full border border-[#C8C8C8] text-[#6B6B6B] transition-colors hover:border-[#383838] hover:text-[#262626] disabled:opacity-40 dark:border-[#4D4D4D] dark:text-[#C9C9C9] dark:hover:border-[#666666] dark:hover:text-zinc-100"
-            title={uploading ? "正在上传图片到 Files API…" : "上传文件（图片 / 文本，≤10MB）"}
-          >
-            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          </button>
-          {/* 中区：输入（flex-1 自适应增高，控件内联两侧） */}
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => onInputChange(e.target.value)}
-            onKeyDown={onKeyDown}
-            rows={1}
-            placeholder={
-              isStreaming
-                ? "agent is working…"
-                : "向 Open Code 提问，使用 @ 引用文件，使用 / 调用命令"
-            }
-            disabled={isStreaming || isCompacting}
-            className="max-h-[200px] min-w-0 flex-1 resize-none self-center bg-transparent py-1.5 text-[length:var(--font-size-base)] text-[#171717] placeholder:text-[#A6A6A6] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
-          />
-          {/* 右侧控件：模式 / 模型 / 思考 / 发送（同行内联，ZCode 式命令框） */}
+          {/* 三明治 ② 输入区（占位区，随内容增高，垂直居中） */}
+          <div className="flex min-h-[64px] items-center px-4 py-2">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => onInputChange(e.target.value)}
+              onKeyDown={onKeyDown}
+              rows={1}
+              placeholder={
+                isStreaming
+                  ? "agent is working…"
+                  : isEmpty
+                    ? "向 Open Code 提问、使用 @ 添加上下文、使用 / 选择命令或能力"
+                    : "提出后续修改要求"
+              }
+              disabled={isStreaming || isCompacting}
+              className="max-h-[200px] min-h-[24px] w-full min-w-0 resize-none bg-transparent py-1 text-[length:var(--font-size-base)] text-[#171717] placeholder:text-[#A6A6A6] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+            />
+          </div>
+          {/* 三明治 ③ 底部工具栏：附件 / 模式徽标 · 模型 / 思考 / 发送 */}
+          <div className="flex items-center justify-between gap-2 border-t border-[#DEDEDE] px-2.5 py-1.5 dark:border-[#2E2E2E]">
+            <div className="flex min-w-0 items-center gap-1">
+              {/* 附件：+（上传文件） */}
+              <button
+                onClick={() => attachInputRef.current?.click()}
+                disabled={isStreaming || isCompacting || uploading}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8C8C8C] transition-colors hover:bg-[#F0F0F0] hover:text-[#262626] disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-100"
+                title={uploading ? "正在上传图片到 Files API…" : "上传文件（图片 / 文本，≤10MB）"}
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              </button>
               {/* 运行模式 + 执行模式 下拉：橙色盾牌（向上弹出） */}
               <div className="relative" ref={modeMenuRef}>
                 <button
@@ -935,7 +1096,9 @@ export function Terminal() {
                   className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[length:var(--font-size-ui-sm)] font-medium text-zinc-300 transition-colors hover:bg-[#F0F0F0] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]"
                   title="运行模式（完整/精简/极简）+ 执行模式"
                 >
-                  <Shield className="h-3.5 w-3.5 text-[#E58F67]" />
+                  <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-[#E58F67] text-white">
+                    <Shield className="h-2.5 w-2.5" />
+                  </span>
                   <span>{mode === "plan" ? "计划模式" : "完全访问"}</span>
                   <ChevronDown className="h-3 w-3 text-[#8C8C8C]" />
                 </button>
@@ -995,6 +1158,9 @@ export function Terminal() {
                   </div>
                 )}
               </div>
+            </div>
+              {/* 右侧控件组：模型 / 思考 / 发送 */}
+              <div className="flex shrink-0 items-center gap-1">
               {/* 模型选择器 */}
               {config.hasApiKey && (
                 <div className="relative" ref={modelMenuRef}>
@@ -1003,6 +1169,7 @@ export function Terminal() {
                     className="flex max-w-[200px] items-center gap-1.5 rounded-lg px-2 py-1 text-[length:var(--font-size-ui-sm)] text-zinc-300 transition-colors hover:bg-[#F0F0F0] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]"
                     title="切换模型"
                   >
+                    <Settings2 className="h-3.5 w-3.5 shrink-0 text-[#8C8C8C]" />
                     <span className="truncate">{config.model}</span>
                     <ChevronDown className="h-3 w-3 shrink-0 text-[#8C8C8C]" />
                   </button>
@@ -1066,7 +1233,7 @@ export function Terminal() {
                   className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[length:var(--font-size-ui-sm)] text-zinc-300 transition-colors hover:bg-[#F0F0F0] dark:text-zinc-300 dark:hover:bg-[#2A2A2A]"
                   title="思考强度"
                 >
-                  <Sparkles className="h-3.5 w-3.5 text-[#8C8C8C]" />
+                  <Zap className="h-3.5 w-3.5 text-[#8C8C8C]" />
                   <span>
                     {!config.thinkingEnabled
                       ? "关闭"
@@ -1118,11 +1285,13 @@ export function Terminal() {
               <button
                 onClick={submit}
                 disabled={(!input.trim() && attachments.length === 0) || isStreaming || isCompacting}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-300 transition-all hover:bg-[#F0F0F0] hover:text-[#383838] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-100"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#2E2E2E] text-zinc-200 transition-colors hover:bg-[#3A3A3A] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-[#2E2E2E] dark:hover:bg-[#3A3A3A] dark:text-zinc-200"
                 title="Send (Enter)"
               >
-                <ArrowUp className="h-3.5 w-3.5" />
+                <ArrowUp className="h-4 w-4" />
               </button>
+              </div>
+          </div>
           <input
             ref={attachInputRef}
             type="file"
@@ -1154,6 +1323,44 @@ export function Terminal() {
             </div>
           )}
         </div>
+        {isEmpty && (
+          <div className="pointer-events-auto mt-5 flex w-full flex-col items-center">
+            {/* 建议区：三条可点击快捷任务（与输入框同宽对齐，ZCode 式） */}
+            <div className="w-full max-w-3xl space-y-1">
+              {HOME_SUGGESTIONS.map((s) => (
+                <button
+                  key={s.text}
+                  onClick={() => fillPrompt(s.text)}
+                  className="flex w-full items-start gap-2.5 rounded-lg px-3 py-1.5 text-left text-[13px] text-zinc-300 transition-colors hover:bg-white/5 hover:text-zinc-100"
+                >
+                  <s.icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                  <span>{s.text}</span>
+                </button>
+              ))}
+            </div>
+            {/* 订阅提示 */}
+            <div className="mt-10 flex items-center justify-center gap-1.5 text-[13px] text-zinc-500">
+              <Bell className="h-3.5 w-3.5 shrink-0" />
+              <span>订阅用户新功能体验：创建“闲时任务”，我们将免费在算力富余时段为你完成指派任务。</span>
+            </div>
+            {/* 功能卡片：Git 站会摘要 / CI 报告 / 自定义（ZCode 式） */}
+            <div className="mt-6 grid w-full max-w-[1080px] grid-cols-1 gap-4 md:grid-cols-3">
+              {HOME_CARDS.map((c) => (
+                <button
+                  key={c.title}
+                  onClick={() => (c.prompt ? fillPrompt(c.prompt) : textareaRef.current?.focus())}
+                  className="rounded-[10px] border border-[#DEDEDE] bg-[#FAFAFA] px-4 py-3.5 text-left transition-colors hover:border-[#C8C8C8] dark:border-[#333333] dark:bg-[#161616] dark:hover:border-[#4A4A4A]"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[#DEDEDE] dark:border-[#3A3A3A]">
+                    <c.icon className="h-3.5 w-3.5 text-zinc-300" />
+                  </span>
+                  <div className="mt-2.5 text-sm text-zinc-200">{c.title}</div>
+                  <div className="mt-0.5 text-xs text-zinc-500">{c.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {!isEmpty && (
         <div className="mt-2 flex items-center justify-between px-1 text-[length:var(--font-size-ui-sm)] text-[#A6A6A6] dark:text-zinc-500">
           <span className="flex items-center gap-3">
@@ -1236,10 +1443,6 @@ export function Terminal() {
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Empty state
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // QuestionModal — modal overlay that wraps QuestionPanel
@@ -1733,6 +1936,13 @@ function TurnBlock({ turn }: { turn: TurnGroup }) {
       transition={{ duration: 0.15 }}
       className="space-y-1.5"
     >
+      {/* 本轮工作耗时（ZCode 式「已工作 X 秒」） */}
+      {turn.durationMs != null && turn.durationMs > 0 && (
+        <div className="flex items-center gap-1 px-1 text-[12px] text-zinc-500" title="本轮工作耗时">
+          <span>已工作 {formatDuration(turn.durationMs)}</span>
+          <ChevronRight className="h-3 w-3" />
+        </div>
+      )}
       {/* 叙述文字：AI 的输出内容，在其应有的位置展示（不并入思考） */}
       {turn.analysis && (
         <div className="px-1 text-[#262626] dark:text-zinc-100">
@@ -2082,7 +2292,7 @@ function UserRow({
         </div>
       ) : (
         <>
-          <div className="max-w-[75%] rounded-2xl rounded-br-md bg-[#F5F5F5] px-4 py-2.5 text-[#262626] dark:bg-[#262626] dark:text-zinc-100">
+          <div className="max-w-[75%] rounded-[10px] bg-[#F5F5F5] px-4 py-2.5 text-[#262626] dark:bg-[#2A2A2A] dark:text-zinc-100">
             <CollapsibleText text={text} render={(t) => <MarkdownRenderer text={t} />} />
           </div>
           <div className="flex items-center gap-0.5 pr-1 text-[#A6A6A6] dark:text-zinc-500">
@@ -2179,6 +2389,13 @@ function AssistantRow({
   if (!text && !showReasoning) return null;
   return (
     <div className="flex flex-col gap-1">
+      {/* 本轮工作耗时（ZCode 式「已工作 X 秒」） */}
+      {!streaming && durationMs != null && durationMs > 0 && (
+        <div className="flex items-center gap-1 pl-1 text-[12px] text-zinc-500" title="本轮工作耗时">
+          <span>已工作 {formatDuration(durationMs)}</span>
+          <ChevronRight className="h-3 w-3" />
+        </div>
+      )}
       <div
         className="min-w-0 break-words text-[#262626] dark:text-zinc-100"
         style={{ opacity: isStale ? 0.95 : 1 }}
@@ -2192,6 +2409,20 @@ function AssistantRow({
       {!streaming && (
         <div className="flex items-center gap-0.5 pl-1 text-[#A6A6A6] dark:text-zinc-500">
           <CopyButton text={fullText || text || reasoning || ""} />
+          <button
+            onClick={() => toast.info("感谢反馈，这对我们很有帮助")}
+            className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300"
+            title="有帮助"
+          >
+            <ThumbsUp className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => toast.info("已记录反馈")}
+            className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300"
+            title="没帮助"
+          >
+            <ThumbsDown className="h-3.5 w-3.5" />
+          </button>
           {canRegenerate && (
             <button
               onClick={() => void regenerate()}
