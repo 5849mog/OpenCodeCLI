@@ -25,6 +25,8 @@ const records = out
     return { hash, date, fullHash, subject, rest };
   });
 
+// Product name is Open Code Web; the repo slug stays `OpenCodeCLI` because
+// renaming it would 404 the existing GitHub Pages URL.
 const REPO = "https://github.com/5849mog/OpenCodeCLI";
 const commitsUrl = `${REPO}/commit/`;
 
@@ -37,7 +39,7 @@ for (const r of records) {
 const dates = [...byDate.keys()].sort((a, b) => (a < b ? 1 : -1));
 
 let md = "";
-md += "# 🚀 OpenCodeCLI 成长日志\n\n";
+md += "# 🚀 Open Code Web 成长日志\n\n";
 md += `> 由 Git 历史自动整理，共 **${records.length}** 次提交。最新在最上方。\n\n`;
 md += "| 日期 | 提交数 | 高亮 |\n";
 md += "|------|--------|------|\n";

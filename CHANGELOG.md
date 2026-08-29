@@ -1,10 +1,10 @@
-# 🚀 OpenCodeCLI 成长日志
+# 🚀 Open Code Web 成长日志
 
-> 由 Git 历史自动整理，共 **188** 次提交。最新在最上方。
+> 由 Git 历史自动整理，共 **191** 次提交。最新在最上方。
 
 | 日期 | 提交数 | 高亮 |
 |------|--------|------|
-| 2026-08-23 | 11 | 6 个新功能、4 个修复 |
+| 2026-08-23 | 14 | 6 个新功能、5 个修复 |
 | 2026-08-22 | 20 | 9 个新功能、11 个修复 |
 | 2026-08-19 | 2 | 1 个新功能 |
 | 2026-08-18 | 12 | 9 个新功能 |
@@ -29,6 +29,39 @@
 ---
 
 ## 📅 2026-08-23
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/f225bf8a62484354a81f8bfb84e191a4a0598c92">f225bf8</a> — fix(docs): 修复 tokenizer Mermaid 词法错误（节点标签引号化）+ banner SVG 元素拉满</summary>
+
+> - Mermaid：[/tokens 精确占用] 等节点的 / 前缀被当作形状语法，改为带引号标签后正常渲染
+> - banner.svg 重制为 1600x520 复合版面：标题/副标题/特性胶囊/44-128k-0-100% 数据块、
+> 迷你侧栏(⌘N/⌘K/Skill/文件袋)、终端卡片(思考中/已编辑/探索/任务结束+token 徽标)，
+> WASM 工具徽标条(bash/lua/js/awk/sed/git)、真分词器数据流条、快捷键底条
+
+</details>
+
+<details open>
+<summary>📝 <a href="https://github.com/5849mog/OpenCodeCLI/commit/582eea64bf973f6bf1dd1722a11f175122752e6d">582eea6</a> — docs: README 升级至商业级 — hero banner + 架构/Agent循环/分词器 Mermaid 图 + 截图占位规划</summary>
+
+> - 新增 assets/banner.svg（深色产品风格 hero 图：标题/特性胶囊/终端卡片）
+> - 3 张 Mermaid 图：架构总览、Agent 序列循环、真分词器数据流
+> - 章节重组：功能总览分模块、安全模型、Token 精确性专节、界面预览(截图待补位)、
+> 部署(REPO_NAME/build:pages/Actions)、开发与测试(e2e 套件)、FAQ、生态、贡献
+> - 修正细节：Node ≥20.9、GPT 计费口径说明（图片 384/张）、命令表与真实一致
+
+</details>
+
+<details open>
+<summary>📝 <a href="https://github.com/5849mog/OpenCodeCLI/commit/6553b2fefe3be8caa0335b4b5579973ef8d3cae7">6553b2f</a> — docs: README 全面重写（现代可读风格）+ CHANGELOG 重新生成</summary>
+
+> - 废弃文言文体，改为现代中文分层结构：亮点/工具链/界面/真分词器/安全/限制/FAQ
+> - 补齐此前略写或未写的内容：DeepSeek 真分词器（128k BPE 官方词表、实时输入计数、
+> auto-compact 85% 判定、精确截断）、ZCode 像素级复刻（两层命令框/整轮对话折叠/
+> 全屏设置页）、安全约束（URL 白名单防 SSRF、导出不含密钥、闲时锁定）、
+> Plan 只读 bash、运行模式三档开销对比、zip 自动解压、Token 账本分源记录
+> - 修正过期信息：/tokens 精确计数、会话备份入口位置等
+
+</details>
 
 <details open>
 <summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/48642fc45bfdd10d94dba5c308bcff69dabf0d55">48642fc</a> — feat(tokenizer): 扩展真分词器用法 — 实时输入计数 + /tokens 与 /compact 精度化</summary>
