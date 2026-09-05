@@ -859,7 +859,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "list_skills",
       description:
-        "列出当前所有可用的 Skill（技能包）：名称 + 一句话描述 + 来源（内置/自定义）。当用户提到某个框架、任务类型或工作流，而你怀疑有对应 skill 可用时，先调用它看看。Skill 内容按需用 load_skill 加载——本工具只返回轻量列表，不含正文。",
+        "列出当前所有可用的 Skill（技能包）：名称 + 一句话描述 + 来源（内置/自定义）+ 文件数 + 依赖状态。Skill 是完整文件夹（SKILL.md + scripts/references/assets 支撑文件），可声明 dependencies 依赖其他 skill。当用户提到某个框架、任务类型或工作流，而你怀疑有对应 skill 可用时，先调用它看看。本工具只返回轻量列表，不含正文。",
       parameters: {
         type: "object",
         properties: {},
@@ -871,7 +871,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "load_skill",
       description:
-        "加载指定 Skill 的完整 SKILL.md 内容（工具结果返回全文）。在 list_skills 确认存在后调用；加载后严格遵循其中指令执行。名称不存在返回错误。",
+        "加载指定 Skill 的完整 SKILL.md 指令（工具结果返回正文），同时返回它的支撑文件树（scripts/references/assets…）并**自动连带加载它 dependencies 声明的依赖 skill 正文**。在 list_skills 确认存在后调用；加载后严格遵循其中指令执行。支撑文件按需用 read_skill_file(name, path) 读取。",
       parameters: {
         type: "object",
         properties: {
@@ -888,20 +888,55 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: "function",
     function: {
-      name: "create_skill",
+      name: "read_skill_file",
       description:
-        "创建一个 Skill 技能包（写 skills/<name>/SKILL.md）。内容用 Markdown 编写，首行作为 list_skills 显示的描述（若首行不是 # 标题会自动补）。名称只能含字母/数字/点/横线/下划线，不能重复已有名？——同名自定义会覆盖。创建后可被其他会话、子代理通过 load_skill 加载。只读模式（Plan）下被拦截。",
+        "按需读取某个 Skill 文件夹内的支撑文件（references/、scripts/、assets/ 下的文档或代码），内容作为工具结果返回（超长自动截断）。load_skill 的结果会列出文件树；只读你真正需要的文件，别把整个文件夹灌进上下文。只读操作，Plan 模式可用。",
       parameters: {
         type: "object",
         properties: {
           name: {
             type: "string",
-            description: "Skill 唯一名称（写入 skills/<name>/SKILL.md）。",
+            description: "Skill 名称（load_skill 用的同一个 name）。",
+          },
+          path: {
+            type: "string",
+            description:
+              "相对 skill 根的文件路径（load_skill 返回的文件树里的条目，如 'references/api.md'、'scripts/run.lua'）。",
+          },
+        },
+        required: ["name", "path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_skill",
+      description:
+        "创建/覆盖一个 Skill 技能包文件夹：<name>/SKILL.md + 可选支撑文件（files）+ 可选依赖（dependencies，写入 frontmatter，load_skill 时自动连带加载）。SKILL.md 支持标准 YAML frontmatter（name/description/version/dependencies）；不带 frontmatter 时首行 '# 标题' 作为描述。支撑文件放 references/（参考文档）或 scripts/（示例脚本）。名称只能含字母/数字/点/横线/下划线，同名覆盖。只读模式（Plan）下被拦截。",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "Skill 唯一名称（文件夹名 <name>/SKILL.md）。",
           },
           content: {
             type: "string",
             description:
-              "SKILL.md 的 Markdown 内容。首行建议用 '# 名称' 作为描述（list_skills 会显示它）。正文用 ## 分节、- 列表写步骤。",
+              "SKILL.md 的 Markdown 全文（可带 --- 包裹的 YAML frontmatter）。正文用 ## 分节、- 列表写步骤；需要更多资料时在正文里引用 references/ 下的文件。",
+          },
+          files: {
+            type: "object",
+            description:
+              "可选。支撑文件 { 相对路径: 文本内容 }，如 {\"references/api.md\": \"...\", \"scripts/run.lua\": \"...\"}。路径不能含 ..、不能是 SKILL.md。≤64 个文件，单个 ≤256KB。",
+            additionalProperties: { type: "string" },
+          },
+          dependencies: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "可选。依赖的其他 skill 名称列表（写入 frontmatter.dependencies）。加载本 skill 时会自动连带加载它们。",
           },
         },
         required: ["name", "content"],
@@ -913,13 +948,17 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     function: {
       name: "delete_skill",
       description:
-        "删除一个 Skill 技能包。自定义 skill 会物理删除其 skills/<name>/ 目录；内置 skill 会被隐藏（从列表和 load_skill 中消失）。删除后该 skill 不再对任何会话可用。只读模式（Plan）下被拦截。",
+        "删除一个 Skill 技能包。自定义 skill 会物理删除整个文件夹（含全部支撑文件）；内置 skill 会被隐藏（从列表和 load_skill 中消失）。若其他 skill 声明依赖它，会报错列出依赖方——先删依赖方，或传 force:true 强制删除。只读模式（Plan）下被拦截。",
       parameters: {
         type: "object",
         properties: {
           name: {
             type: "string",
             description: "要删除的 Skill 名称。",
+          },
+          force: {
+            type: "boolean",
+            description: "即使有其他 skill 依赖它也强制删除（默认 false，有依赖方时报错）。",
           },
         },
         required: ["name"],

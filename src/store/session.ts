@@ -467,57 +467,6 @@ function bashCommandMutates(command: string): boolean {
   return /(?<![0-9])>>?(?!&)/.test(command);
 }
 
-/** Skills 目录保护：判断写工具的 args 是否指向 skills/ 下的路径。
- *  write/edit/append/delete/move/insert/apply_patch 走 path/from/to/edits；
- *  bash 写命令里出现 skills/ 路径也拦截。 */
-function isToolTargetingSkills(tool: string, args: Record<string, unknown>): boolean {
-  const SKILLS_PREFIX = "skills/";
-  const inSkills = (p: unknown): boolean =>
-    typeof p === "string" && (p.startsWith(SKILLS_PREFIX) || p === "skills");
-  switch (tool) {
-    case "write_file":
-    case "edit_file":
-    case "delete_file":
-    case "append_file":
-    case "insert_at":
-      return inSkills(args.path);
-    case "move_file":
-      return inSkills(args.from) || inSkills(args.to);
-    case "batch_rename": {
-      // 保护 skills：pattern 选中的路径可能落在 skills/ 下，或 replace 会把文件改名为 skills/ 开头。
-      const pat = typeof args.pattern === "string" ? args.pattern : "";
-      const rep = typeof args.replace === "string" ? args.replace : "";
-      const basePath = typeof args.path === "string" ? args.path : "";
-      return /(^|\/)skills(\/|$)/.test(pat) || /(^|\/)skills(\/|$)/.test(basePath) || inSkills(rep);
-    }
-    case "create_dir":
-      return inSkills(args.path);
-    case "multi_edit": {
-      if (!Array.isArray(args.edits)) return false;
-      return args.edits.some((e) => inSkills((e as Record<string, unknown>)?.path));
-    }
-    case "apply_patch": {
-      const patch = typeof args.patch === "string" ? args.patch : "";
-      return /skills\/[^\s"']+/.test(patch);
-    }
-    case "bash": {
-      const cmd = typeof args.command === "string" ? args.command : "";
-      // bash 写操作（含重定向/rm/mkdir/cp/mv 等）指向 skills/ 时保护
-      return bashCommandMutates(cmd) && /\bskills\/|\bskills\b/.test(cmd);
-    }
-    // run_lua/run_js 的 outputs 写回不在 dispatch 外部校验，会绕过保护——
-    // 这里堵漏：outputs 含 skills/ 路径时也保护。
-    case "run_lua":
-    case "run_js": {
-      const outs = args.outputs;
-      if (Array.isArray(outs)) return outs.some((o) => inSkills(o));
-      return inSkills(outs);
-    }
-    default:
-      return false;
-  }
-}
-
 /* ────────────────────────── auto-compact ────────────────────────── */
 
 type SessionSet = (partial: Partial<SessionState> | ((s: SessionState) => Partial<SessionState>)) => void;
@@ -1741,18 +1690,7 @@ async function executeToolCall(
         "create_skill", "delete_skill",
         "transpile", // 编译器语义：file/files/path 模式把产物写入 VFS → Plan 模式拦截
       ]);
-      // Skills 目录保护：普通写工具（write_file 等）不可指向 skills/（防
-      // AI 乱写坏目录结构）；create_skill/delete_skill 是管理 skills/ 的
-      // 法定路径，不受此保护拦截（isToolTargetingSkills 对它们返回 false）。
-      const skillsProtected = isToolTargetingSkills(tc.function.name, args);
-      if (skillsProtected) {
-        result = {
-          ok: false,
-          output: `[Skills 保护] ${tc.function.name} 的目标路径位于 skills/ 目录——Skills 目录受保护，不可由 AI 修改。用户可通过 zip 导入或文件袋管理自定义 skill。`,
-          tool: tc.function.name,
-          args,
-        };
-      } else if (get().mode === "plan" && mutatingTools.has(tc.function.name)) {
+      if (get().mode === "plan" && mutatingTools.has(tc.function.name)) {
         result = {
           ok: false,
           output: `[Plan mode] This tool (${tc.function.name}) is blocked. In Plan mode you can only READ and ANALYZE files — you cannot modify them. Propose your plan in text, and the user will switch to Bypass mode to let you execute it.`,

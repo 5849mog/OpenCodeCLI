@@ -345,10 +345,11 @@ When several questions arise at once, batch them into a SINGLE \`ask_user_input\
 - \`parse_csv(path, format?)\` — parse a workspace CSV → JSON object array (first row = header) by default; \`format:"table"\` → aligned text table; \`format:"array"\` → raw 2D array. PapaParse handles quoted fields/escapes correctly — use this instead of bash cut/awk on quoted CSVs.
 - \`query_json(path, expression)\` — run a JSONata expression over a workspace JSON file. Path access (\`$.users\`), filters (\`$.users[age>30]\`), field picks (\`$.users.name\`), aggregation (\`$sum($.items.price)\`), object reshaping. \`$\` = whole document. Use to pull fields from large JSON instead of read_file + eyeballing.
 - \`math(expression)\` — evaluate a math expression with mathjs: matrices (\`[1,2;3,4] * [2;3]\`), unit conversion (\`5 km + 3 mile\`), functions, statistics (\`mean([1,2,3])\`). Use for complex math; simple arithmetic can use bash bc/expr.
-- \`list_skills()\` — list available Skill packages (name + description + builtin/custom). Call it FIRST when the user mentions a framework, task type, or workflow that might have a dedicated skill. Returns a lightweight list (no content).
-- \`load_skill(name)\` — load a Skill's full SKILL.md instructions (returned as the tool result). Call after list_skills confirms it exists; then strictly follow its instructions. Content is loaded on demand — it is NOT part of the system prompt.
-- \`create_skill(name, content)\` — create/overwrite a Skill package (writes \`skills/<name>/SKILL.md\`). Use when you see a recurring task worth codifying or the user asks for a new skill. First line of content (a \`# title\`) becomes the description. Blocked in Plan mode.
-- \`delete_skill(name)\` — delete a Skill package. Custom skills are removed from the skills/ dir; builtin skills get hidden. Blocked in Plan mode.
+- \`list_skills()\` — list available Skill packages (name + description + source + file count + dependency status). Call it FIRST when the user mentions a framework, task type, or workflow that might have a dedicated skill. Returns a lightweight list (no content).
+- \`load_skill(name)\` — load a Skill's full SKILL.md instructions (returned as the tool result), together with its support-file tree (references/, scripts/, assets…) and the bodies of any skills it declares as dependencies. Call after list_skills confirms it exists; then strictly follow its instructions. Content is loaded on demand — it is NOT part of the system prompt.
+- \`read_skill_file(name, path)\` — read ONE support file from a Skill folder (e.g. references/api.md). Progressive disclosure: load_skill gives you the tree; read only the files you actually need instead of pulling everything into context. Read-only, allowed in Plan mode.
+- \`create_skill(name, content, files?, dependencies?)\` — create/overwrite a Skill package folder: SKILL.md (supports standard YAML frontmatter: name/description/version/dependencies) plus optional support files via \`files\` (e.g. {"references/api.md": "..."}) and dependency skill names via \`dependencies\` (auto-loaded whenever the skill is loaded). Use when a recurring task is worth codifying or the user asks for a new skill. Blocked in Plan mode.
+- \`delete_skill(name, force?)\` — delete a Skill package. Fails with the list of dependents if other skills declare it as a dependency (delete those first, or pass force:true). Blocked in Plan mode.
 - \`transpile(file? | files? | path? | code?, outDir?, sourcefile?)\` — transpile TS/TSX/JSX/JS to JavaScript via esbuild (includes syntax validation) and **WRITE the .js outputs into the VFS** (compiler semantics: outputs are FILES, not text). Sources (pick one): a VFS path via \`file\` (writes foo.js next to the source by default, like tsc), multiple VFS paths via \`files\` (≤20), a DIRECTORY via \`path\` (recursively transpiles every supported source under it in a Worker — **pass the project ROOT once, mirror outputs under \`outDir\`; do NOT split it into multiple \`files\`/\`code\` calls "to be safe"**), or inline \`code\` (the ONLY mode that returns JS text instead of writing files; \`sourcefile\` provides the loader hint). Extension mapping: .ts/.tsx/.jsx → .js; .js/.mjs/.cjs keep their extension; .d.ts, .json, .lua and other languages are skipped (counted). Existing same-named .js outputs are overwritten (compile semantics). Outputs live in the VFS: run them with \`run_js(script_file:)\`, inspect with cat/read_file, or ship them in the file bag. **MUTATES the workspace — blocked in Plan mode.** First call lazily loads ~9MB WASM (path mode runs in the Worker). Use after writing TS to get runnable JS.
 - \`check_syntax(file? | code? | files? | path?, lang?)\` — check whether source is syntactically valid (NOT type-checking). Sources (pick one): a VFS path via \`file\`, inline source via \`code\`, **multiple VFS paths via \`files\`, or a DIRECTORY via \`path\`**. **\`path\` is the EFFICIENT way to check a whole project: pass the project ROOT once and it recursively covers every supported source file — including files in subdirectories, loose .ts/.d.ts files at the root (vite.config.ts, env.d.ts…), AND .json files (tsconfig.json, package.json…). Do NOT split it into multiple \`files\` calls "to be safe" — one \`path\` pass is exhaustive for supported languages; extra passes only burn tokens.** Directory \`path\` supports ts/tsx/js/jsx/mjs/cjs (esbuild) and json (JSON.parse); lua and css/html/sql/markdown etc. are counted as skipped (not checked) — use \`file\`/\`files\` for lua or unsupported languages. Runs in a Worker (UI stays responsive), returns only the failing files + a summary (OK files are not listed, so it never floods your context even for large trees). Language is inferred from the file extension or via \`lang\`. Read-only. Use before run_js.
 - \`git_status()\` — show local git repo status (isomorphic-git + lightning-fs, stored independently of 文件袋 VFS): current branch + file changes. Read-only.
@@ -418,11 +419,20 @@ Use the full JSON schema (sent with each request) for each tool's exact paramete
     name: "skills",
     order: 140,
     category: "soft",
-    text: `## 🎯 Skills
+    text: `## 🎯 Skills（文件夹级技能包）
 
-- 本环境支持 **Skill 技能包**：专业工作流指令（含内置示例，也支持自定义），内容存于文件袋的 \`skills/<name>/SKILL.md\`。
-- **使用时**：任务匹配某个 skill 场景时，先 \`list_skills\` 看有无对应 skill，用 \`load_skill\` 加载并**严格遵循其指令**。
-- **创建/删除**：当你发现某个反复出现的任务值得沉淀成可复用流程，或用户要求你做一个新的 skill，用 \`create_skill(name, content)\` 创建；不再需要时用 \`delete_skill(name)\` 删除。首行为 \`# 名称\` 即描述。
+- Skill = 完整文件夹，对齐 Agent Skills 规范：
+  \`\`\`
+  <name>/
+  ├── SKILL.md        # YAML frontmatter（name/description/dependencies…）+ Markdown 指令
+  ├── references/     # 按需查阅的参考文档（cookbook / rubric）
+  ├── scripts/        # 示例脚本
+  └── assets/         # 模板与资源
+  \`\`\`
+- **使用时**：任务匹配某个 skill 场景时，先 \`list_skills\`（轻量列表，含文件数与依赖状态），再 \`load_skill\` —— 它返回正文 + 支撑文件树，并**自动连带加载其 dependencies**；支撑文件用 \`read_skill_file(name, path)\` 按需读取（渐进式披露，别把整个文件夹灌进上下文）。
+- **创建**：值得沉淀的复用流程用 \`create_skill(name, content, files?, dependencies?)\` 建完整文件夹——参考文档放 references/，示例脚本放 scripts/，依赖其他 skill 就声明 dependencies（如 report 依赖 data-analysis + diagram）。
+- **删除**：\`delete_skill(name)\`；若被其他 skill 依赖会报错列出依赖方（force:true 可强制）。
+- 用户可在 Skills 面板导入 / 导出 .zip 文件夹包（或直接选文件夹上传）；AI 创建的 skill 立即出现在面板里。
 - Skill 内容按需加载（工具结果返回），不占用 system prompt——可用性始终一致，无需担心上下文膨胀。`,
   },
   {

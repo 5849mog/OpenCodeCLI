@@ -2406,6 +2406,13 @@ function stepMeta(name: string): {
     case "view_outline":
     case "read_multiple_files":
       return { icon: FolderSearch, running: "探索中", done: "探索", kind: "explore" };
+    case "list_skills":
+    case "load_skill":
+    case "read_skill_file":
+      return { icon: Sparkles, running: "读取中", done: "已加载", kind: "explore" };
+    case "create_skill":
+    case "delete_skill":
+      return { icon: Sparkles, running: "整理中", done: "已整理", kind: "write" };
     default:
       return { icon: Hammer, running: "执行中", done: name, kind: "tool" };
   }

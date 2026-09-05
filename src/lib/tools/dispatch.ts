@@ -8,7 +8,7 @@ import { toolAskUserInput } from "./user-input";
 import { toolWebSearch, toolFetchUrl } from "./web";
 import { toolZipArchive, toolUnzipArchive } from "./zip";
 import { toolParseYaml, toolParseCsv, toolQueryJson, toolMath } from "./data-tools";
-import { listSkills, loadSkill, createSkill, removeSkill } from "../skills";
+import { listSkills, loadSkillWithDependencies, readSkillFile, createSkill, removeSkill } from "../skills";
 import { esbuildWasm } from "../wasm/esbuild";
 import { gitEngine } from "../git";
 import * as luaWasm from "../wasm/lua-wasm";
@@ -457,12 +457,22 @@ export async function dispatchTool(
         if (skills.length === 0) {
           return { ok: true, output: "(没有可用的 skill)", tool: "list_skills", args };
         }
-        const lines = skills.map(
-          (s) => `- ${s.name} ${s.source === "builtin" ? "(内置)" : "(自定义)"} — ${s.description}`,
-        );
+        const lines = skills.map((s) => {
+          const bits = [
+            s.source === "builtin" ? "内置" : "自定义",
+            `${s.fileCount} 个文件`,
+            s.version ? `v${s.version}` : null,
+            s.dependencies.length > 0
+              ? s.missingDependencies.length > 0
+                ? `依赖 ${s.dependencies.join("/")}（⚠ 缺 ${s.missingDependencies.join("/")}）`
+                : `依赖 ${s.dependencies.join("/")}`
+              : null,
+          ].filter(Boolean);
+          return `- ${s.name} [${bits.join(" · ")}] — ${s.description}`;
+        });
         return {
           ok: true,
-          output: `可用 Skills（${skills.length} 个）：\n${lines.join("\n")}\n\n用 load_skill(name) 加载某个 skill 的完整指令。`,
+          output: `可用 Skills（${skills.length} 个）：\n${lines.join("\n")}\n\n用 load_skill(name) 加载某个 skill 的完整指令（自动连带其依赖）；用 read_skill_file(name, path) 按需读取它的支撑文件。`,
           tool: "list_skills",
           args,
         };
@@ -472,8 +482,8 @@ export async function dispatchTool(
         if (!name) {
           return { ok: false, output: "load_skill: missing 'name' — 先用 list_skills 查看可用 skill", tool: "load_skill", args };
         }
-        const skill = await loadSkill(name);
-        if (!skill) {
+        const loaded = await loadSkillWithDependencies(name);
+        if (!loaded.main) {
           const available = (await listSkills()).map((s) => s.name).join(", ");
           return {
             ok: false,
@@ -482,10 +492,47 @@ export async function dispatchTool(
             args,
           };
         }
+        const main = loaded.main;
+        const fmtSize = (n: number) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
+        const supportFiles = Object.entries(main.files)
+          .filter(([p]) => !/^SKILL\.md$/i.test(p))
+          .sort(([a], [b]) => a.localeCompare(b));
+        const sections: string[] = [];
+        const ver = main.version ? ` v${main.version}` : "";
+        sections.push(`# Skill: ${main.name}（${main.source === "builtin" ? "内置" : "自定义"}${ver}）\n\n${main.body.trim()}`);
+        if (supportFiles.length > 0) {
+          sections.push(
+            `## 支撑文件（${supportFiles.length} 个 — 按需用 read_skill_file("${main.name}", "路径") 读取，别全部拉进上下文）\n${supportFiles
+              .map(([p, f]) => `- ${p} (${fmtSize(f.content.length)})`)
+              .join("\n")}`,
+          );
+        }
+        if (loaded.deps.length > 0) {
+          const depSections = loaded.deps.map(({ skill, depth }) => {
+            const tag = depth > 1 ? "（传递依赖）" : "";
+            return `## 依赖 skill: ${skill.name}${tag}\n\n${skill.body.trim()}`;
+          });
+          sections.push(`已按 dependencies 连带加载 ${loaded.deps.length} 个依赖 skill：\n\n${depSections.join("\n\n")}`);
+        }
+        if (loaded.missing.length > 0) {
+          sections.push(`⚠️ 缺失依赖: ${loaded.missing.join(", ")} — 可用 create_skill 创建，或让用户在 Skills 面板导入。`);
+        }
+        if (loaded.truncated) {
+          sections.push("⚠️ 依赖内容过多，已按上限截断。");
+        }
+        return { ok: true, output: sections.join("\n\n"), tool: "load_skill", args };
+      }
+      case "read_skill_file": {
+        const name = String(args.name ?? "").trim();
+        const path = String(args.path ?? "").trim();
+        if (!name || !path) {
+          return { ok: false, output: "read_skill_file: 需要 'name' 和 'path'（相对 skill 根的路径，见 load_skill 返回的文件树）", tool: "read_skill_file", args };
+        }
+        const res = await readSkillFile(name, path);
         return {
-          ok: true,
-          output: `# Skill: ${skill.name} (${skill.source === "builtin" ? "内置" : "自定义"})\n\n${skill.content}`,
-          tool: "load_skill",
+          ok: res.ok,
+          output: res.ok ? `${res.content}` : `read_skill_file: ${res.error ?? "读取失败"}`,
+          tool: "read_skill_file",
           args,
         };
       }
@@ -493,29 +540,44 @@ export async function dispatchTool(
         if (opts?.readOnly) {
           return {
             ok: false,
-            output: "[Plan mode] create_skill (写 skills/ 目录) is blocked in Plan mode. 切到 Bypass 模式后才能创建 skill。",
+            output: "[Plan mode] create_skill (写技能包存储) is blocked in Plan mode. 切到 Bypass 模式后才能创建 skill。",
             tool: "create_skill",
             args,
           };
         }
         const name = String(args.name ?? "").trim();
         const content = String(args.content ?? "");
-        const res = await createSkill(name, content);
+        const rawFiles = args.files && typeof args.files === "object" && !Array.isArray(args.files)
+          ? (args.files as Record<string, unknown>)
+          : undefined;
+        const files: Record<string, string> | undefined = rawFiles
+          ? Object.fromEntries(Object.entries(rawFiles).map(([k, v]) => [k, String(v)]))
+          : undefined;
+        const dependencies = Array.isArray(args.dependencies) ? args.dependencies.map((d) => String(d)) : undefined;
+        const res = await createSkill(name, content, { files, dependencies });
+        if (res.ok) {
+          const fileCount = files ? Object.keys(files).length : 0;
+          const depNote = dependencies && dependencies.length > 0 ? `，依赖 ${dependencies.join("/")}` : "";
+          return {
+            ok: true,
+            output: `✓ 已创建 Skill "${res.name}"（${res.name}/SKILL.md${fileCount > 0 ? ` + ${fileCount} 个支撑文件` : ""}${depNote}）。list_skills / load_skill 即可用。`,
+            tool: "create_skill",
+            args,
+            mutated: true,
+          };
+        }
         return {
-          ok: res.ok,
-          output: res.ok
-            ? `✓ 已创建 Skill "${res.name}"（skills/${res.name}/SKILL.md）。首行即描述，AI 可用 load_skill 加载。`
-            : `create_skill 失败: ${res.error ?? "未知错误"}`,
+          ok: false,
+          output: `create_skill 失败: ${res.error ?? "未知错误"}`,
           tool: "create_skill",
           args,
-          mutated: res.ok,
         };
       }
       case "delete_skill": {
         if (opts?.readOnly) {
           return {
             ok: false,
-            output: "[Plan mode] delete_skill (删 skills/ 目录) is blocked in Plan mode. 切到 Bypass 模式后才能删除 skill。",
+            output: "[Plan mode] delete_skill (删技能包存储) is blocked in Plan mode. 切到 Bypass 模式后才能删除 skill。",
             tool: "delete_skill",
             args,
           };
@@ -524,15 +586,26 @@ export async function dispatchTool(
         if (!name) {
           return { ok: false, output: "delete_skill: missing 'name'", tool: "delete_skill", args };
         }
-        const exists = (await listSkills()).some((s) => s.name === name);
+        const metas = await listSkills();
+        const exists = metas.some((s) => s.name === name);
         if (!exists) {
           return { ok: false, output: `delete_skill: skill '${name}' 不存在`, tool: "delete_skill", args };
+        }
+        const dependents = metas.find((s) => s.name === name)?.dependents ?? [];
+        const force = args.force === true;
+        if (dependents.length > 0 && !force) {
+          return {
+            ok: false,
+            output: `delete_skill: '${name}' 被其他 skill 依赖（${dependents.join(", ")}）。先删除依赖方，或带 force: true 强制删除（依赖方之后会缺依赖）。`,
+            tool: "delete_skill",
+            args,
+          };
         }
         const res = await removeSkill(name);
         return {
           ok: true,
           output: res.ok
-            ? `✓ 已删除 Skill "${name}"（${res.source === "builtin" ? "内置，已隐藏" : "自定义，目录已移除"}）。`
+            ? `✓ 已删除 Skill "${name}"（${res.source === "builtin" ? "内置，已隐藏" : "自定义，文件夹已移除"}）。${force && dependents.length > 0 ? `注意：${dependents.join(", ")} 现在缺依赖。` : ""}`
             : `delete_skill 失败: ${name}`,
           tool: "delete_skill",
           args,
