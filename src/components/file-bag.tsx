@@ -198,7 +198,7 @@ function FileBagInner() {
   };
 
   return (
-    <div className="flex h-full flex-col bg-[#FFFFFF] text-[#262626] dark:bg-background dark:text-zinc-100">
+    <div className="flex h-full flex-col bg-[#FFFFFF] text-[#262626] [background-image:radial-gradient(900px_600px_at_100%_0%,var(--background-glow)_0%,var(--background)_60%)] dark:bg-background dark:text-zinc-100">
       {/* Toolbar + tabs */}
       <div className="flex flex-wrap items-center gap-1 border-b border-[#DEDEDE] px-2 py-2 text-[length:var(--font-size-ui-sm)] dark:border-[#333333]">
         {/* Panel tabs — sliding underline indicator */}

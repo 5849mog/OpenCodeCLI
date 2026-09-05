@@ -55,8 +55,12 @@
   --font-size-base: clamp(13px, 1.4vw, 15px);
   --font-size-code: clamp(12px, 1.3vw, 14px);
   --font-size-ui-sm: clamp(11px, 1.1vw, 12px);
-  /* Near-black warm grays */
+  /* Warm-tinted near-black — the "贵" version of #0A0A0A */
   --background: #0A0A0A;
+  /* Deep warm halo: only ~3% off black so dark stays dark */
+  --background-glow: #160D08;
+  /* Frosted surface: glass panels take this at .72-.85 opacity + blur */
+  --glass: rgb(22 22 22);
   --foreground: #e7e5e4;
   --card: #161616;
   --card-foreground: #e7e5e4;
@@ -128,9 +132,38 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Warm deep-space gradient: radial halo at top-right, falls to pure
+       #0A0A0A by 55% — reads as depth, not as "brown". */
+    background-image: radial-gradient(
+      1200px 800px at 70% -10%,
+      var(--background-glow) 0%,
+      var(--background) 55%
+    );
+    background-attachment: fixed;
     font-feature-settings: "cv11", "ss01";
+    /* Zed "comfortable" prose rhythm + slight optical tightening */
+    line-height: 1.618;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+  /* Film grain: kills banding on the gradient / large flat dark areas.
+     feTurbulence noise at 2.5% opacity + overlay blend — subtle, never
+     visible as texture, only as "no ugly steps". */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    pointer-events: none;
+    opacity: 0.025;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 140px 140px;
+  }
+  ::selection {
+    background: rgb(229 143 103 / 0.25);
   }
 }
 
@@ -328,6 +361,18 @@ pre[class*="language-"],
   .touch-target {
     min-height: 36px;
     min-width: 36px;
+  }
+  /* Frosted glass surface for floating panels (menus/dialogs/sheets).
+     Degrades to plain rgba on browsers without backdrop-filter. */
+  .glass-surface {
+    background-color: rgb(22 22 22 / 0.72);
+    backdrop-filter: blur(20px) saturate(1.4);
+    -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  }
+  .glass-panel {
+    background-color: rgb(20 20 20 / 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 }
 

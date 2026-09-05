@@ -12,7 +12,9 @@
  */
 
 import { memo, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import { Dots } from "@/components/ui/dots";
+import { fadeUp, fadeUpSmall, reveal, springPop } from "@/lib/motion";
 import {
   ArrowUp,
   Copy,
@@ -94,7 +96,7 @@ import "prismjs/components/prism-sql";
 import { useSession, type SessionEvent, type QuestionPanelData, type UploadedAttachment } from "@/store/session";
 import { uploadFileToDeepSeek } from "@/lib/files-api";
 import { apiKeyVault } from "@/lib/api-key-vault";
-import { countTokens, countConversationTokensAccurate } from "@/lib/wasm/tokenizer";
+import { countTokens, countConversationTokensAccurate, onTokenizerStatus, tokenizerStatus, warmup, type TokenizerStatus } from "@/lib/wasm/tokenizer";
 
 /** Read a File/Blob as a data: URL (base64) — used for image attachments. */
 function fileToDataUrl(file: Blob): Promise<string> {
@@ -181,6 +183,27 @@ export function Terminal() {
   // hydrate 完成（及后续文件袋增删）触发重渲染，否则下拉永远是空。
   const vfsHydrated = useVfsView((s) => s.hydrated);
   const vfsVersion = useVfsView((s) => s.version);
+
+  // 分词器 WASM 状态：footer 微标展示"后台加载的事"（就绪前 ≈N 为估算）
+  const [tokStatus, setTokStatus] = useState<TokenizerStatus>(() => tokenizerStatus());
+  useEffect(() => onTokenizerStatus(setTokStatus), []);
+  // 上下文占用百分比（budget 口径，防抖 2s——不打断流式渲染）
+  const [ctxPct, setCtxPct] = useState<number | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const timer = setTimeout(() => {
+      void (async () => {
+        const payload = useSession.getState().lastSentPayload;
+        if (!payload?.length) return;
+        const tokens = await countConversationTokensAccurate(payload);
+        if (alive) setCtxPct(Math.min(100, Math.round((tokens / config.tokenBudget) * 100)));
+      })();
+    }, 2000);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [events, streamingText, config.tokenBudget]);
 
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -855,10 +878,19 @@ export function Terminal() {
   const greeting = hour < 6 ? "夜深了" : hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好";
 
   return (
-    <div className="relative flex h-full flex-col bg-background text-foreground font-mono text-[length:var(--font-size-base)] leading-relaxed">
+    <div className="relative flex h-full flex-col bg-transparent text-foreground font-mono text-[length:var(--font-size-base)] leading-[1.618] tracking-[-0.01em]">
+      {/* 暖调光晕：静态装饰，衬在消息区后的深空里（仅低透明度，不抢内容） */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[420px]"
+        style={{
+          background:
+            "radial-gradient(640px 320px at 30% 12%, rgba(229,143,103,0.05) 0%, transparent 70%), radial-gradient(520px 280px at 72% 4%, rgba(229,143,103,0.04) 0%, transparent 70%)",
+        }}
+      />
       {/* Header bar — model name centered, mode toggle right（空状态隐藏，首屏干净如 ZCode） */}
       {!isEmpty && (
-      <div className="flex items-center justify-between gap-2 border-b border-[#DEDEDE] px-3.5 py-2 text-xs dark:border-[#333333]">
+      <div className="relative z-10 flex items-center justify-between gap-2 border-b border-[#DEDEDE] bg-background/40 px-3.5 py-2 text-xs backdrop-blur-sm dark:border-[#333333]">
         {/* 左侧：会话标题 + 项目/分支上下文 chips（ZCode 式顶栏） */}
         <div className="flex min-w-0 items-center gap-1.5">
           <span
@@ -876,7 +908,7 @@ export function Terminal() {
               <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
             {moreMenuOpen && (
-              <div className="absolute left-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] dark:bg-[#161616] dark:shadow-black/40">
+              <div className="absolute left-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] glass-surface dark:shadow-black/40">
                 <button
                   onClick={() => {
                     setMoreMenuOpen(false);
@@ -954,7 +986,7 @@ export function Terminal() {
           {isStreaming && (
             <button
               onClick={abort}
-              className="touch-target flex items-center gap-1 rounded bg-[#E54D2E]/10 px-3 py-1.5 text-[#E54D2E] hover:bg-[#E54D2E]/10"
+              className="touch-target flex items-center gap-1 rounded bg-[#E54D2E]/10 px-3 py-1.5 text-[#E54D2E] transition-transform duration-100 hover:bg-[#E54D2E]/10 active:scale-95"
               title="Stop"
             >
               <Square className="h-3 w-3 fill-current" />
@@ -969,7 +1001,7 @@ export function Terminal() {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] [&::-webkit-scrollbar-track]:bg-transparent"
+        className="relative z-10 flex-1 overflow-y-auto px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] [&::-webkit-scrollbar-track]:bg-transparent"
       >
         {/* 居中限宽列：对话内容与输入框同宽对齐（ZCode 式） */}
         <div className="mx-auto w-full max-w-3xl space-y-4">
@@ -979,6 +1011,7 @@ export function Terminal() {
                 key={ev.id}
                 round={ev}
                 streaming={isStreaming}
+                ctxPct={ctxPct}
                 canRegenerate={ev.summary?.id === lastAssistantEventId}
                 fullText={ev.summary ? assistantTurnTexts.get(ev.summary.id) : undefined}
               />
@@ -1016,7 +1049,16 @@ export function Terminal() {
         )}
       >
         {isEmpty && (
-          <div className="pointer-events-none flex flex-col items-center">
+          <div className="pointer-events-none relative flex flex-col items-center">
+            {/* 光晕衬底：logo 与问候语后的暖色雾——深度感来自这里 */}
+            <div
+              aria-hidden
+              className="absolute top-1/2 left-1/2 -z-10 h-64 w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+              style={{
+                background:
+                  "radial-gradient(280px 130px at 50% 55%, rgba(229,143,103,0.10) 0%, rgba(229,143,103,0.04) 45%, transparent 75%)",
+              }}
+            />
             {/* 背景装饰 Logo：超大低透明度几何图形（ZCode 式） */}
             <svg viewBox="0 0 200 120" aria-hidden className="mb-10 h-32 w-56 text-white opacity-[0.05]">
               <path
@@ -1024,12 +1066,14 @@ export function Terminal() {
                 d="M30 15 L60 15 L124 85 L124 15 L150 15 L150 105 L120 105 L56 35 L56 105 L30 105 Z"
               />
             </svg>
-            <div className="mb-6 text-[19px] font-medium text-zinc-300">{greeting}，接下来交给我吧</div>
+            <div className="mb-6 font-serif text-[21px] font-medium tracking-tight text-zinc-200 [font-variation-settings:'opsz'_40]">
+              {greeting}，接下来交给我吧
+            </div>
           </div>
         )}
         <div
           className={cn(
-            "group relative flex w-full flex-col rounded-[12px] border border-[#DEDEDE] bg-[#FAFAFA] transition-colors hover:border-[#C8C8C8] focus-within:border-[#E58F67]/70 focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.08)] dark:border-[#333333] dark:bg-[#1A1A1A] dark:hover:border-[#4A4A4A] dark:focus-within:border-[#E58F67]/70 dark:focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.10)]",
+            "group relative flex w-full flex-col rounded-[12px] border border-[#DEDEDE] bg-[#FAFAFA] transition-colors hover:border-[#C8C8C8] focus-within:border-[#E58F67]/70 focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.08)] dark:border-[#333333] dark:bg-[#1A1A1A]/65 dark:backdrop-blur-md dark:hover:border-[#4A4A4A] dark:focus-within:border-[#E58F67]/70 dark:focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.10),0_0_28px_rgba(229,143,103,0.14)]",
             isEmpty && "pointer-events-auto max-w-3xl",
           )}
         >
@@ -1085,6 +1129,16 @@ export function Terminal() {
               className="max-h-[200px] min-h-[24px] w-full min-w-0 resize-none bg-transparent py-1 text-[length:var(--font-size-base)] text-[#171717] placeholder:text-[#A6A6A6] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
             />
           </div>
+          {/* /compact 进行中：一行状态 + 滑条（agentStatus 已挂上，这里让它可见） */}
+          {isCompacting && (
+            <div className="flex items-center gap-2 border-t border-[#DEDEDE] px-3 pt-1.5 pb-1 text-[11px] text-zinc-500 dark:border-[#2E2E2E]">
+              <Loader2 className="h-3 w-3 shrink-0 animate-spin text-[#E58F67]" />
+              <span className="shrink-0">正在压缩对话历史…</span>
+              <span className="relative h-1 min-w-24 flex-1 overflow-hidden rounded-full bg-[#DEDEDE] dark:bg-[#2A2A2A]">
+                <span className="absolute inset-y-0 w-1/3 animate-[slide-progress_1.4s_ease-in-out_infinite] rounded-full bg-[#E58F67]/70" />
+              </span>
+            </div>
+          )}
           {/* 三明治 ③ 底部工具栏：附件 / 模式徽标 · 模型 / 思考 / 发送 */}
           <div className="flex items-center justify-between gap-2 border-t border-[#DEDEDE] px-2.5 py-1.5 dark:border-[#2E2E2E]">
             <div className="flex min-w-0 items-center gap-1">
@@ -1111,7 +1165,7 @@ export function Terminal() {
                   <ChevronDown className="h-3 w-3 text-[#8C8C8C]" />
                 </button>
                 {modeMenuOpen && (
-                  <div className="absolute bottom-full left-0 z-50 mb-1.5 w-56 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] dark:bg-[#161616] dark:shadow-black/40">
+                  <div className="absolute bottom-full left-0 z-50 mb-1.5 w-56 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] glass-surface dark:shadow-black/40">
                     <div className="px-3 py-2 text-[length:var(--font-size-ui-sm)] font-medium text-[#6B6B6B] dark:text-zinc-400">
                       运行模式
                     </div>
@@ -1182,7 +1236,7 @@ export function Terminal() {
                     <ChevronDown className="h-3 w-3 shrink-0 text-[#8C8C8C]" />
                   </button>
                   {modelMenuOpen && (
-                    <div className="absolute bottom-full left-0 z-50 mb-1.5 max-h-72 w-72 overflow-y-auto rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] dark:bg-[#161616] dark:shadow-black/40">
+                    <div className="absolute bottom-full left-0 z-50 mb-1.5 max-h-72 w-72 overflow-y-auto rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] glass-surface dark:shadow-black/40">
                       {headerModelChoices.length === 0 ? (
                         <div className="px-3 py-2 text-[length:var(--font-size-ui-sm)] text-[#A6A6A6] dark:text-zinc-500">
                           暂无模型列表——在设置里点 Test 拉取
@@ -1254,7 +1308,7 @@ export function Terminal() {
                   <ChevronDown className="h-3 w-3 text-[#8C8C8C]" />
                 </button>
                 {effortMenuOpen && (
-                  <div className="absolute bottom-full left-0 z-50 mb-1.5 w-44 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] dark:bg-[#161616] dark:shadow-black/40">
+                  <div className="absolute bottom-full left-0 z-50 mb-1.5 w-44 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] glass-surface dark:shadow-black/40">
                     {([
                       { id: "off" as const, label: "关闭", desc: "不启用思考" },
                       { id: "low" as const, label: "低", desc: "更快，更省 token" },
@@ -1289,6 +1343,36 @@ export function Terminal() {
                   </div>
                 )}
               </div>
+              {/* 分词器 WASM 状态微标：把「后台加载」变成看得见的一次性状态 */}
+              <button
+                onClick={() => {
+                  if (tokStatus !== "ready") warmup();
+                }}
+                className="hidden shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-zinc-600 transition-colors hover:text-zinc-400 md:flex"
+                title={
+                  tokStatus === "ready"
+                    ? "DeepSeek 真分词器已就绪（128k BPE）"
+                    : tokStatus === "failed"
+                      ? "分词器加载失败 · 点击重试（当前按字符估算）"
+                      : "分词器预热中…（就绪后计数自动精确）"
+                }
+              >
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    tokStatus === "ready"
+                      ? "bg-emerald-500"
+                      : tokStatus === "failed"
+                        ? "bg-[#E54D2E]"
+                        : "animate-pulse bg-[#E58F67]",
+                  )}
+                />
+                {tokStatus === "ready"
+                  ? "分词器就绪"
+                  : tokStatus === "failed"
+                    ? "分词器失败"
+                    : "分词器待命…"}
+              </button>
               {/* 实时输入计数徽标（Hero 与对话态同框生效） */}
               {liveTokens > 0 && (
                 <span
@@ -1322,7 +1406,7 @@ export function Terminal() {
           />
           {/* @mention autocomplete dropdown */}
           {mentionQuery !== null && mentionFiles.length > 0 && (
-            <div className="absolute bottom-full left-0 mb-2 w-72 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] dark:bg-[#161616] dark:shadow-black/40">
+            <div className="absolute bottom-full left-0 mb-2 w-72 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] glass-surface dark:shadow-black/40">
               {mentionFiles.map((f, i) => (
                 <button
                   key={f.path}
@@ -1475,7 +1559,7 @@ function QuestionModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-[#DEDEDE] bg-[#FFFFFF] shadow-2xl dark:border-[#333333] dark:bg-[#161616]">
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-[#DEDEDE] bg-[#FFFFFF] shadow-2xl dark:border-[#333333] glass-surface">
         <QuestionPanel panel={panel} onSubmit={onSubmit} />
       </div>
     </div>
@@ -1983,11 +2067,7 @@ function StreamingBubble({ text, reasoning }: { text: string; reasoning: string 
       <div className="flex items-center gap-1.5 text-[#C08A5F] dark:text-[#E8A87C]">
         <Sparkles className="h-3 w-3 text-[#E58F67]/70" />
         <span className="font-medium">正在分析…</span>
-        <span className="flex gap-0.5 pl-1">
-          <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "0ms" }} />
-          <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "120ms" }} />
-          <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "240ms" }} />
-        </span>
+        <Dots className="pl-1" />
       </div>
       {preview && <div className="mt-1 truncate text-[#A6A6A6] dark:text-zinc-500">{preview}</div>}
     </motion.div>
@@ -2068,11 +2148,13 @@ function RoundBlock({
   canRegenerate,
   fullText,
   streaming,
+  ctxPct,
 }: {
   round: RoundGroup;
   canRegenerate?: boolean;
   fullText?: string;
   streaming: boolean;
+  ctxPct?: number | null;
 }) {
   const running = round.turns.some((t) => t.tools.some((ev) => !ev.pairedResult));
   // 整轮完成的判据：流已结束 && 所有工具都有结果 && 总结已落地。
@@ -2132,39 +2214,63 @@ function RoundBlock({
           className="flex items-center gap-1 pl-1 text-[12px] text-zinc-500 transition-colors hover:text-zinc-300"
           title={expanded ? "收起执行详情" : "展开执行详情"}
         >
-          <span>已工作 {running && totalMs == null ? "…" : formatDuration(totalMs ?? 0)}</span>
+          <span className="tabular-nums">已工作 {running && totalMs == null ? "…" : formatDuration(totalMs ?? 0)}</span>
           <ChevronRight className={cn("h-3 w-3 transition-transform", expanded && "rotate-90")} />
+          {ctxPct != null && (
+            <span className="ml-1 flex items-center gap-1" title={`上下文占用约 ${ctxPct}%`}>
+              <span className="h-[3px] w-16 overflow-hidden rounded-full bg-[#2A2A2A]">
+                <span
+                  className={cn(
+                    "block h-full rounded-full transition-[width] duration-700",
+                    ctxPct >= 90 ? "bg-[#E54D2E]" : ctxPct >= 70 ? "bg-[#E8A87C]" : "bg-[#E58F67]/80",
+                  )}
+                  style={{ width: `${ctxPct}%` }}
+                />
+              </span>
+              <span className="text-[10px] tabular-nums text-zinc-600">{ctxPct}%</span>
+            </span>
+          )}
         </button>
       )}
-      {expanded ? (
-        /* 展开态：完整执行轨迹（左侧时间线描边） */
-        <div className="ml-0.5 space-y-2.5 border-l border-[#333333] pl-2.5">
-          {round.turns.map((t) => (
-            <TurnBlock key={t.id} turn={t} />
-          ))}
-          {round.summary?.reasoning && round.summary.reasoning.trim().length > 0 && (
-            <ThinkingStep
-              text={round.summary.reasoning}
-              streaming={false}
-              durationMs={round.summary.durationMs}
-            />
+      <AnimatePresence initial={false}>
+        {expanded && (
+          /* 展开态：完整执行轨迹（左侧时间线描边）——点「已工作 X 秒」向下弹出 */
+          <motion.div
+            key="trace"
+            initial={reveal.initial}
+            animate={reveal.animate}
+            exit={reveal.exit}
+            transition={reveal.transition}
+            className="overflow-hidden"
+          >
+            <div className="ml-0.5 space-y-2.5 border-l border-[#333333] pl-2.5">
+              {round.turns.map((t) => (
+                <TurnBlock key={t.id} turn={t} />
+              ))}
+              {round.summary?.reasoning && round.summary.reasoning.trim().length > 0 && (
+                <ThinkingStep
+                  text={round.summary.reasoning}
+                  streaming={false}
+                  durationMs={round.summary.durationMs}
+                />
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {!expanded && stats && (
+        /* 收起态：一行统计（改动文件数 / +N -M） */
+        <div className="flex items-center gap-1.5 pl-1 text-[12px] text-zinc-500">
+          <span>
+            {stats.files > 0 ? `${stats.files} 个文件已更改` : `${stats.calls} 次工具调用`}
+          </span>
+          {(stats.add > 0 || stats.rem > 0) && (
+            <span className="font-mono text-[10px]">
+              <span className="text-emerald-400">+{stats.add}</span>{" "}
+              <span className="text-red-400">-{stats.rem}</span>
+            </span>
           )}
         </div>
-      ) : (
-        /* 收起态：一行统计（改动文件数 / +N -M） */
-        stats && (
-          <div className="flex items-center gap-1.5 pl-1 text-[12px] text-zinc-500">
-            <span>
-              {stats.files > 0 ? `${stats.files} 个文件已更改` : `${stats.calls} 次工具调用`}
-            </span>
-            {(stats.add > 0 || stats.rem > 0) && (
-              <span className="font-mono text-[10px]">
-                <span className="text-emerald-400">+{stats.add}</span>{" "}
-                <span className="text-red-400">-{stats.rem}</span>
-              </span>
-            )}
-          </div>
-        )
       )}
       {/* 最终总结：始终可见（折叠时即唯一主体） */}
       {summarize && (
@@ -2300,6 +2406,29 @@ function formatDuration(ms: number): string {
   return `${Math.floor(s / 60)} 分 ${s % 60} 秒`;
 }
 
+/**
+ * Semantic tone for a tool result — Codex-style color grammar so the eye
+ * reads success/failure/warning at a glance without reading a word.
+ * "err": `ok:false` events or output that obviously failed (exit code,
+ * "Error:" prefix, exception). "warn": exit code/`warning` mentions that
+ * still succeeded. null: neutral (default gray).
+ */
+function resultTone(output: string, ok: boolean): "err" | "warn" | null {
+  if (!ok) return "err";
+  const s = output.toLowerCase();
+  if (/\(exit code \d+\)/i.test(output) && !/\(exit code 0\)/i.test(output)) return "err";
+  if (/^error|error:|exception|failed|失败/.test(s)) return "err";
+  if (/warning|警告|提示/.test(s)) return "warn";
+  return null;
+}
+
+/** Tailwind text class for a result tone (dark-first). */
+function toneText(tone: "err" | "warn" | null): string {
+  if (tone === "err") return "text-[#E54D2E] dark:text-[#E56A50]";
+  if (tone === "warn") return "text-amber-600 dark:text-amber-400";
+  return "text-[#A6A6A6]";
+}
+
 function ThinkingStep({ text, streaming, durationMs }: { text: string; streaming: boolean; durationMs?: number }) {
   const deferredText = useDeferredValue(text);
   const isStale = deferredText !== text;
@@ -2322,13 +2451,7 @@ function ThinkingStep({ text, streaming, durationMs }: { text: string; streaming
         <span className={cn("shrink-0 font-medium", streaming ? "text-shimmer" : "text-[#8C8C8C]")}>
           {streaming ? "思考中" : `思考过程${durationMs != null ? ` 持续了 ${formatDuration(durationMs)}` : ""}`}
         </span>
-        {streaming && (
-          <span className="flex gap-0.5 pl-1">
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "0ms" }} />
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "120ms" }} />
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "240ms" }} />
-          </span>
-        )}
+        {streaming && <Dots className="pl-1" />}
         {!streaming && collapsed && <span className="min-w-0 truncate pl-1 text-[#A6A6A6]">{preview}</span>}
         {!streaming && <span className="ml-auto text-[#8C8C8C]">{collapsed ? "展开" : "收起"}</span>}
       </button>
@@ -2359,6 +2482,7 @@ function StepCard({
   const expanded = running || !collapsed;
   const ok = result?.ok ?? false;
   const output = result?.toolOutput ?? "";
+  const tone = resultTone(output, ok);
   const diff = result?.diff ?? null;
   const path = diff?.path ?? (typeof args.path === "string" ? args.path : null);
   const command = typeof args.command === "string" ? args.command : null;
@@ -2397,20 +2521,33 @@ function StepCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15 }}
+      initial={fadeUp.initial}
+      animate={fadeUp.animate}
+      transition={fadeUp.transition}
+      className="group/step"
     >
       <button
         onClick={() => !running && setCollapsed((c) => !c)}
         disabled={running}
-        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-white/5 disabled:cursor-default dark:hover:bg-white/5"
+        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-[transform,color,background-color] duration-150 hover:bg-white/5 disabled:cursor-default group-hover/step:-translate-y-px dark:hover:bg-white/5"
       >
         <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 text-[#8C8C8C] transition-transform", expanded && "rotate-90")} />
         <Icon className={cn("h-3.5 w-3.5 shrink-0", running ? "text-[#E58F67]" : "text-[#A6A6A6]")} />
-        <span className={cn("shrink-0 font-medium", running ? "text-shimmer" : "text-[#8C8C8C]")}>
+        <span className={cn("shrink-0", running ? "text-shimmer font-medium" : "text-[#8C8C8C] font-medium")}>
           {running ? meta.running : meta.done}
         </span>
+        {!running && ok === false && (
+          <motion.span
+            key="fail"
+            initial={springPop.initial}
+            animate={springPop.animate}
+            transition={springPop.transition}
+            className="shrink-0 text-[#E54D2E]"
+            title="失败"
+          >
+            <X className="h-3 w-3" />
+          </motion.span>
+        )}
         {metaText && <span className="min-w-0 truncate font-mono text-[#A6A6A6]">{metaText}</span>}
         {(statAdd > 0 || statRem > 0) && (
           <span className="shrink-0 font-mono text-[10px]">
@@ -2418,13 +2555,7 @@ function StepCard({
             <span className="text-red-400">-{statRem}</span>
           </span>
         )}
-        {running && (
-          <span className="ml-auto flex gap-0.5">
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "0ms" }} />
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "120ms" }} />
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "240ms" }} />
-          </span>
-        )}
+        {running && <Dots className="ml-auto" />}
         {!running && <span className="ml-auto text-[#8C8C8C]">{expanded ? "收起" : "展开"}</span>}
       </button>
       {expanded && (
@@ -2447,12 +2578,14 @@ function StepCard({
               {meta.kind === "terminal" && command && (
                 <div className="mb-1.5 font-mono text-xs text-[#8C8C8C]">$ {command}</div>
               )}
-              <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-[#A6A6A6] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333333]">
+              <pre className={cn("max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333333]", toneText(tone))}>
                 {output}
               </pre>
             </div>
           ) : (
-            <div className="px-3 py-2 text-xs text-[#A6A6A6]">{ok ? "完成" : "失败"}</div>
+            <div className={cn("px-3 py-2 text-xs", ok ? "text-emerald-500 dark:text-[#34d399]" : "text-[#E54D2E]")}>
+              {ok ? "完成" : "失败"}
+            </div>
           )}
         </div>
       )}
@@ -2577,13 +2710,7 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
         <ChevronRight className={cn("h-3 w-3 transition-transform", !collapsed && "rotate-90")} />
         <Sparkles className="h-3 w-3 text-[#E58F67]/70" />
         <span className="font-medium">thinking</span>
-        {streaming && (
-          <span className="flex gap-0.5 pl-1">
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "0ms" }} />
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "120ms" }} />
-            <span className="h-1 w-1 animate-bounce rounded-full bg-[#E58F67]/70" style={{ animationDelay: "240ms" }} />
-          </span>
-        )}
+        {streaming && <Dots className="pl-1" />}
         {!streaming && collapsed && <span className="ml-2 truncate text-[#A6A6A6]">{preview}</span>}
         {!streaming && <span className="ml-auto text-[#A6A6A6]">{collapsed ? "show" : "hide"}</span>}
       </button>
@@ -2630,7 +2757,11 @@ function AssistantRow({
           <ChevronRight className="h-3 w-3" />
         </div>
       )}
-      <div
+      <motion.div
+        key={text ? "has-text" : "empty"}
+        initial={text ? fadeUpSmall.initial : false}
+        animate={fadeUpSmall.animate}
+        transition={fadeUpSmall.transition}
         className="min-w-0 break-words text-[#262626] dark:text-zinc-100"
         style={{ opacity: isStale ? 0.95 : 1 }}
       >
@@ -2639,7 +2770,7 @@ function AssistantRow({
         {streaming && (
           <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-emerald-400 align-middle dark:bg-[#34d399]" />
         )}
-      </div>
+      </motion.div>
       {!streaming && (
         <div className="flex items-center gap-0.5 pl-1 text-[#A6A6A6] dark:text-zinc-500">
           <CopyButton text={fullText || text || reasoning || ""} />

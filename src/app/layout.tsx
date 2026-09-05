@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Fraunces, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import "katex/dist/katex.min.css";
@@ -34,6 +34,11 @@ export const metadata: Metadata = {
     "LLM",
   ],
   authors: [{ name: "Open Code Web" }],
+  icons: { icon: "/logo.svg" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0A0A0A",
 };
 
 export default function RootLayout({

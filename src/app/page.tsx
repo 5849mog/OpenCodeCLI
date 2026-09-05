@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { MotionConfig } from "framer-motion";
 import { Terminal } from "@/components/terminal";
 import { FileBag } from "@/components/file-bag";
 import { SettingsDialog } from "@/components/settings-dialog";
@@ -193,6 +194,17 @@ export default function Home() {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [init]);
 
+  // 开发者签名（Copilot CLI 式的烙印）：打开 DevTools 即见
+  useEffect(() => {
+    console.log(
+      "%cOpen Code Web %c· 浏览器里的 AI 编程工作台\n%chttps://github.com/5849mog/OpenCodeCLI%c · 所有文件与密钥都留在你的浏览器里",
+      "color:#E58F67;font-weight:bold;font-size:12px",
+      "color:#8a8a8a;font-size:12px",
+      "color:#8a8a8a;font-size:11px",
+      "color:#8a8a8a;font-size:11px",
+    );
+  }, []);
+
   // ZCode 式快捷键：⌘N / Ctrl+N 新建任务，⌘K / Ctrl+K 搜索会话
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -235,7 +247,8 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="flex h-screen bg-background">
+    <MotionConfig reducedMotion="user">
+      <div className="flex h-screen bg-background">
       {/* Left sidebar — conversation list, collapsible */}
       <aside
         className={cn(
@@ -482,6 +495,7 @@ export default function Home() {
         open={skillsOpen}
         onClose={() => setSkillsOpen(false)}
       />
-    </div>
+      </div>
+    </MotionConfig>
   );
 }

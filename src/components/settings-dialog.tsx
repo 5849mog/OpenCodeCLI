@@ -478,7 +478,7 @@ export function SettingsDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex bg-background text-zinc-100">
+    <div className="fixed inset-0 z-[100] flex bg-background text-zinc-100 [background-image:radial-gradient(1000px_700px_at_70%_-10%,var(--background-glow)_0%,var(--background)_55%)]">
       {/* 左侧分类导航（ZCode 式设置页） */}
       <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-[#DEDEDE] bg-[#F5F5F5] text-[#262626] dark:border-[#333333] dark:bg-[#161616] dark:text-zinc-100">
         <button
@@ -490,7 +490,7 @@ export function SettingsDialog({
         </button>
         {NAV_GROUPS.map((g) => (
           <div key={g.label} className="px-2 pb-3">
-            <div className="px-3 pb-1.5 pt-1 text-[11px] font-medium text-[#8C8C8C] dark:text-zinc-500">
+            <div className="px-3 pb-1.5 pt-1 font-serif text-[12px] font-medium tracking-wide text-[#8C8C8C] dark:text-zinc-500">
               {g.label}
             </div>
             <div className="space-y-0.5">
