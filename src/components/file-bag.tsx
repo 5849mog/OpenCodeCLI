@@ -32,6 +32,7 @@ import {
   Bot,
   ScrollText,
 } from "lucide-react";
+import { AppIcon } from "@/components/ui/app-icon";
 import JSZip from "jszip";
 import { FileTypeIcon } from "@/lib/file-icon";
 import { vfs, normalizePath, parentPath, basename, onVfsEvent, type VfsNode } from "@/lib/vfs";
@@ -223,7 +224,7 @@ function FileBagInner() {
                     : "text-[#8C8C8C] hover:bg-[#F5F5F5] hover:text-[#383838] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-300",
                 )}
               >
-                <Icon className="h-3.5 w-3.5" />
+                <AppIcon icon={Icon} size={14} />
                 <span>{label}</span>
                 {key === "subagents" && subagentCount > 0 && (
                   <span

@@ -34,7 +34,11 @@ export const metadata: Metadata = {
     "LLM",
   ],
   authors: [{ name: "Open Code Web" }],
-  icons: { icon: "/logo.svg" },
+  icons: {
+    icon: ["/logo.svg", "/favicon-32x32.png"],
+    apple: "/apple-touch-icon.png",
+  },
+  manifest: "/site.webmanifest",
 };
 
 export const viewport: Viewport = {

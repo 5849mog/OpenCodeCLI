@@ -130,6 +130,11 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Icon stroke规范：lucide 默认 2px 在小尺寸发糊，全局统一 1.75。
+     CSS 覆盖 attribute（presentation attribute 优先级最低），一次性生效。 */
+  svg.lucide {
+    stroke-width: 1.75;
+  }
   body {
     @apply bg-background text-foreground;
     /* Warm deep-space gradient: radial halo at top-right, falls to pure

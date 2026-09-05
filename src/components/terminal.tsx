@@ -14,6 +14,7 @@
 import { memo, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Dots } from "@/components/ui/dots";
+import { AppIcon } from "@/components/ui/app-icon";
 import { fadeUp, fadeUpSmall, reveal, springPop } from "@/lib/motion";
 import {
   ArrowUp,
@@ -32,6 +33,7 @@ import {
   ChevronDown,
   XCircle,
   Wrench,
+  Hammer,
   Sparkles,
   RefreshCw,
   PanelRight,
@@ -1170,9 +1172,9 @@ export function Terminal() {
                       运行模式
                     </div>
                     {([
-                      { id: "full" as const, label: "🟢 完整", desc: "全部工具 + 完整提示词" },
-                      { id: "light" as const, label: "✨ 精简", desc: "核心工具 + 精简提示词" },
-                      { id: "minimal" as const, label: "⚡ 极简", desc: "仅 4 工具 + 一句话" },
+                      { id: "full" as const, label: "完整", desc: "全部工具 + 完整提示词", icon: Shield },
+                      { id: "light" as const, label: "精简", desc: "核心工具 + 精简提示词", icon: Sparkles },
+                      { id: "minimal" as const, label: "极简", desc: "仅 4 工具 + 一句话", icon: Zap },
                     ]).map((p) => (
                       <button
                         key={p.id}
@@ -1187,6 +1189,7 @@ export function Terminal() {
                             : "text-[#383838] hover:bg-[#F5F5F5] dark:text-zinc-300 dark:hover:bg-[#262626]",
                         )}
                       >
+                        <AppIcon icon={p.icon} size={14} className={cn(agentPreset === p.id && "text-[#E58F67]")} />
                         <span className="text-[length:var(--font-size-ui-sm)]">{p.label}</span>
                         <span className="text-[10px] text-[#A6A6A6] dark:text-zinc-500">{p.desc}</span>
                         {agentPreset === p.id && <Check className="ml-auto h-3 w-3 shrink-0" />}
@@ -1279,7 +1282,7 @@ export function Terminal() {
                             }}
                             className="flex w-full items-center gap-2 border-t border-[#DEDEDE] px-3 py-2 text-left text-[length:var(--font-size-ui-sm)] text-[#C08A5F] transition-colors hover:bg-[#F5F5F5] dark:border-[#333333] dark:text-[#E8A87C] dark:hover:bg-[#262626]"
                           >
-                            <Wrench className="h-3.5 w-3.5" />
+                            <AppIcon icon={Wrench} size={14} />
                             <span>管理模型</span>
                           </button>
                         </>
@@ -1802,28 +1805,6 @@ function QuestionPanel({
 }
 
 // ---------------------------------------------------------------------------
-// Agent status row — shows what the agent is currently doing
-// ---------------------------------------------------------------------------
-
-function AgentStatusRow({ status }: { status: string }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex items-center gap-2.5 rounded-md border border-[#E58F67]/20 bg-gradient-to-r from-[#E58F67]/10 to-zinc-900/40 px-3 py-2 text-xs dark:border-[#E58F67]/25 dark:from-[#E58F67]/15 dark:to-zinc-900/60"
-    >
-      <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#E58F67] opacity-60" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-[#E58F67]" />
-      </span>
-      <Sparkles className="h-3 w-3 text-[#E58F67]/70" />
-      <Loader2 className="h-3 w-3 animate-spin text-[#E58F67]/70" />
-      <span className="text-[#262626] dark:text-zinc-200">{status || "agent is working…"}</span>
-    </motion.div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Group tool-call + tool-result into pairs for merged rendering.
 // Each tool-call claims the first unclaimed tool-result after it with the
 // same toolName, handling both single and concurrent same-name tools.
@@ -2046,32 +2027,6 @@ function EventRow({
     default:
       return null;
   }
-}
-
-// ---------------------------------------------------------------------------
-// StreamingBubble — collapsed live indicator while the model is producing a
-// turn. Shows "正在分析…" + animation + a single preview line, instead of
-// scrolling the raw text. When the stream finishes, events take over.
-// ---------------------------------------------------------------------------
-
-function StreamingBubble({ text, reasoning }: { text: string; reasoning: string }) {
-  const deferred = useDeferredValue(text || reasoning);
-  const preview = deferred.split("\n").find((l) => l.trim()) ?? "";
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15 }}
-      className="overflow-hidden rounded-md border border-[#E58F67]/20 bg-[#E58F67]/5 px-2.5 py-1.5 text-xs dark:border-[#E58F67]/25"
-    >
-      <div className="flex items-center gap-1.5 text-[#C08A5F] dark:text-[#E8A87C]">
-        <Sparkles className="h-3 w-3 text-[#E58F67]/70" />
-        <span className="font-medium">正在分析…</span>
-        <Dots className="pl-1" />
-      </div>
-      {preview && <div className="mt-1 truncate text-[#A6A6A6] dark:text-zinc-500">{preview}</div>}
-    </motion.div>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -2396,7 +2351,7 @@ function stepMeta(name: string): {
     case "read_multiple_files":
       return { icon: FolderSearch, running: "探索中", done: "探索", kind: "explore" };
     default:
-      return { icon: Wrench, running: "执行中", done: name, kind: "tool" };
+      return { icon: Hammer, running: "执行中", done: name, kind: "tool" };
   }
 }
 
@@ -2447,7 +2402,7 @@ function ThinkingStep({ text, streaming, durationMs }: { text: string; streaming
         className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-white/5 disabled:cursor-default dark:hover:bg-white/5"
       >
         <ChevronRight className={cn("h-3 w-3 shrink-0 text-[#8C8C8C] transition-transform", !collapsed && "rotate-90")} />
-        <Brain className={cn("h-3.5 w-3.5 shrink-0", streaming ? "text-[#E58F67]" : "text-[#A6A6A6]")} />
+        <AppIcon icon={Brain} size={14} className={streaming ? "text-[#E58F67]" : "text-[#A6A6A6]"} />
         <span className={cn("shrink-0 font-medium", streaming ? "text-shimmer" : "text-[#8C8C8C]")}>
           {streaming ? "思考中" : `思考过程${durationMs != null ? ` 持续了 ${formatDuration(durationMs)}` : ""}`}
         </span>
@@ -2532,7 +2487,7 @@ function StepCard({
         className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-[transform,color,background-color] duration-150 hover:bg-white/5 disabled:cursor-default group-hover/step:-translate-y-px dark:hover:bg-white/5"
       >
         <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 text-[#8C8C8C] transition-transform", expanded && "rotate-90")} />
-        <Icon className={cn("h-3.5 w-3.5 shrink-0", running ? "text-[#E58F67]" : "text-[#A6A6A6]")} />
+        <AppIcon icon={Icon} size={14} className={running ? "text-[#E58F67]" : "text-[#A6A6A6]"} />
         <span className={cn("shrink-0", running ? "text-shimmer font-medium" : "text-[#8C8C8C] font-medium")}>
           {running ? meta.running : meta.done}
         </span>
@@ -2708,7 +2663,7 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
         className="flex w-full items-center gap-1.5 px-2.5 py-1 text-left text-xs text-[#C08A5F] disabled:cursor-default dark:text-[#E8A87C]"
       >
         <ChevronRight className={cn("h-3 w-3 transition-transform", !collapsed && "rotate-90")} />
-        <Sparkles className="h-3 w-3 text-[#E58F67]/70" />
+        <AppIcon icon={Brain} size={12} className="text-[#E58F67]/70" />
         <span className="font-medium">thinking</span>
         {streaming && <Dots className="pl-1" />}
         {!streaming && collapsed && <span className="ml-2 truncate text-[#A6A6A6]">{preview}</span>}
@@ -2851,7 +2806,7 @@ function SubagentCard({
           <span className="relative inline-flex h-2 w-2 rounded-full bg-[#E58F67]" />
         </span>
       ) : (
-        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#34d399]" />
+        <AppIcon icon={CheckCircle2} size={14} className="text-[#34d399]" />
       )}
       <span className="shrink-0 font-semibold text-[#383838]">子智能体</span>
       <span className="shrink-0 rounded bg-[#0D9488]/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0F766E]">
@@ -2893,7 +2848,7 @@ function ToolCallRow({
       style={{ borderLeft: "3px solid rgba(217, 119, 6, 0.5)" }}
     >
       <div className="flex items-center gap-2 text-[#B87B5A] dark:text-[#E8A87C]">
-        <Wrench className="h-3.5 w-3.5" />
+        <AppIcon icon={Wrench} size={14} className="text-[#B87B5A] dark:text-[#E8A87C]" />
         <span className="font-semibold tracking-wide">tool · {name}</span>
       </div>
       <div className="mt-1.5 space-y-0.5 pl-5 text-[#6B6B6B] dark:text-zinc-400">
@@ -2952,15 +2907,15 @@ function ToolGroupRow({
     >
       {/* Header — tool name + status */}
       <div className="flex items-center gap-2 bg-gradient-to-r from-amber-950/15 to-zinc-900/30 px-3 py-2 dark:from-amber-950/25 dark:to-zinc-900/50">
-        <Wrench className="h-3.5 w-3.5 text-[#B87B5A] dark:text-[#E8A87C]" />
+        <AppIcon icon={Wrench} size={14} className="text-[#B87B5A] dark:text-[#E8A87C]" />
         <span className="font-semibold tracking-wide text-[#B87B5A] dark:text-[#E8A87C]">
           tool · {name}
         </span>
         <span className="ml-auto flex items-center gap-1">
           {ok ? (
-            <CheckCircle2 className="h-3.5 w-3.5 text-[#E58F67]" />
+            <AppIcon icon={CheckCircle2} size={14} className="text-[#E58F67]" />
           ) : (
-            <XCircle className="h-3.5 w-3.5 text-[#E54D2E]" />
+            <AppIcon icon={XCircle} size={14} className="text-[#E54D2E]" />
           )}
         </span>
       </div>
@@ -2993,7 +2948,7 @@ function ToolGroupRow({
               className="flex items-center gap-1 truncate rounded px-1 text-[#C08A5F] hover:bg-[#F0F0F0] dark:text-[#E8A87C] dark:hover:bg-[#2A2A2A]"
               title="Open in editor"
             >
-              <FileText className="h-3 w-3" />
+              <AppIcon icon={FileText} size={12} />
               <span className="truncate">{showPath}</span>
             </button>
           )}
@@ -3014,7 +2969,7 @@ function ToolGroupRow({
 
         {isPlan ? (
           <div className="mt-2 flex items-center gap-2 text-xs">
-            <span className="text-[#E58F67]">📋</span>
+            <AppIcon icon={ClipboardList} size={12} className="text-[#E58F67]" />
             <span className="text-[#6B6B6B] dark:text-zinc-400">Plan updated. </span>
             <button
               onClick={() => useVfsView.getState().setRightPanelTab("plan")}
@@ -3088,9 +3043,9 @@ function ToolResultRow({
     >
       <div className="flex items-center gap-2">
         {ok ? (
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#E58F67]" />
+          <AppIcon icon={CheckCircle2} size={14} className="text-[#E58F67]" />
         ) : (
-          <XCircle className="h-3.5 w-3.5 shrink-0 text-[#E54D2E]" />
+          <AppIcon icon={XCircle} size={14} className="text-[#E54D2E]" />
         )}
         <span className="font-semibold text-[#383838] dark:text-zinc-200">
           {ok ? "result" : "failed"} · {name}
@@ -3101,7 +3056,7 @@ function ToolResultRow({
             className="ml-1 flex items-center gap-1 truncate rounded px-1 text-[#C08A5F] hover:bg-[#F0F0F0] dark:text-[#E8A87C] dark:hover:bg-[#2A2A2A]"
             title="Open in editor"
           >
-            <FileText className="h-3 w-3" />
+            <AppIcon icon={FileText} size={12} />
             <span className="truncate">{showPath}</span>
           </button>
         )}
@@ -3122,7 +3077,7 @@ function ToolResultRow({
 
       {isPlan ? (
         <div className="mt-2 flex items-center gap-2 pl-5 text-xs">
-          <span className="text-[#E58F67]">📋</span>
+          <span className="text-[#E58F67]"><AppIcon icon={ClipboardList} size={12} /></span>
           <span className="text-[#6B6B6B] dark:text-zinc-400">Plan updated. </span>
           <button
             onClick={() => useVfsView.getState().setRightPanelTab("plan")}
@@ -3185,7 +3140,7 @@ function ErrorRow({ text }: { text: string }) {
   return (
     <div className="rounded-md border border-[#E54D2E]/20 bg-[#E54D2E]/5 px-3 py-2 text-xs text-[#E54D2E]">
       <div className="flex items-center gap-2 font-semibold">
-        <XCircle className="h-3.5 w-3.5" />
+        <AppIcon icon={XCircle} size={14} />
         <span>error</span>
       </div>
       <pre className="mt-1 whitespace-pre-wrap break-words pl-5 text-[#E54D2E]">

@@ -264,9 +264,11 @@ export default function Home() {
           /* Collapsed: icon-only sidebar */
           <>
             <div className="flex flex-col items-center gap-3 px-3 py-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#E58F67] text-sm font-bold text-white shadow-sm">
-                {"</>"}
-              </div>
+              <img
+                src="/logo.svg"
+                alt="Open Code Web"
+                className="h-8 w-8 rounded-lg shadow-sm"
+              />
               {/* Expand button */}
               <button
                 onClick={() => setSidebarCollapsed(false)}
@@ -460,9 +462,11 @@ export default function Home() {
             {/* 底部用户区：头像 + 名称 + 设置（ZCode 式）；未配 Key 时保留配置入口 */}
             <div className="border-t border-[#DEDEDE] px-2.5 py-2.5 dark:border-sidebar-border">
               <div className="flex items-center gap-2.5 px-1">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E58F67] text-[10px] font-bold text-white">
-                  {"</>"}
-                </div>
+                <img
+                  src="/logo.svg"
+                  alt="Open Code Web"
+                  className="h-8 w-8 shrink-0 rounded-lg"
+                />
                 <span className="min-w-0 truncate text-[13px] text-[#262626] dark:text-zinc-100">Open Code</span>
                 <button
                   onClick={() => setSettingsOpen(true)}

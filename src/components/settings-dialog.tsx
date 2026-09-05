@@ -26,7 +26,10 @@ import {
   LockKeyhole,
   DatabaseBackup,
   Gauge,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
+import { AppIcon } from "@/components/ui/app-icon";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/store/session";
 import { fetchModels, fetchBalance, type BalanceResult } from "@/lib/ai-client";
@@ -506,7 +509,7 @@ export function SettingsDialog({
                       : "text-[#6B6B6B] hover:bg-white hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#262626] dark:hover:text-zinc-200",
                   )}
                 >
-                  <item.icon className="h-4 w-4 shrink-0" />
+                  <AppIcon icon={item.icon} size={16} />
                   {item.name}
                 </button>
               ))}
@@ -516,14 +519,26 @@ export function SettingsDialog({
         <div className="mt-auto hidden shrink-0 border-t border-[#DEDEDE] px-5 py-4 text-xs dark:border-[#333333] md:block">
           <div className="space-y-1 text-[#8C8C8C] dark:text-zinc-500">
             {config.hasApiKey ? (
-              <span className="text-[#E58F67]">◉ Key configured</span>
+              <span className="flex items-center gap-1.5 text-[#E58F67]">
+                <AppIcon icon={CheckCircle2} size={12} />
+                Key configured
+              </span>
             ) : (
-              <span>◉ No API key</span>
+              <span className="flex items-center gap-1.5">
+                <AppIcon icon={AlertCircle} size={12} />
+                No API key
+              </span>
             )}
             {config.hasSearchKey ? (
-              <span className="block text-[#E58F67]">◉ Search configured</span>
+              <span className="flex items-center gap-1.5 text-[#E58F67]">
+                <AppIcon icon={CheckCircle2} size={12} />
+                Search configured
+              </span>
             ) : (
-              <span className="block">◉ No search key</span>
+              <span className="flex items-center gap-1.5">
+                <AppIcon icon={AlertCircle} size={12} />
+                No search key
+              </span>
             )}
           </div>
         </div>

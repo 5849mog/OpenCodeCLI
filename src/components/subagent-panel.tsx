@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle2, Loader2, Search } from "lucide-react";
+import { AppIcon } from "@/components/ui/app-icon";
 import { useSession, type SessionEvent } from "@/store/session";
 import { useVfsView } from "@/store/vfs-view";
 import { cn } from "@/lib/utils";
@@ -180,9 +181,9 @@ function RunCard({
       {/* Card header */}
       <div className="flex items-center gap-2 border-b border-[#DEDEDE] bg-[#FAFAFA]/60 px-3 py-2 text-xs dark:border-[#333333] dark:bg-[#0A0A0A]/60">
         {run.running ? (
-          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#E58F67]" />
+          <AppIcon icon={Loader2} size={14} className="animate-spin text-[#E58F67]" />
         ) : run.completed ? (
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#34d399]" />
+          <AppIcon icon={CheckCircle2} size={14} className="text-[#34d399]" />
         ) : (
           <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
             未完成
