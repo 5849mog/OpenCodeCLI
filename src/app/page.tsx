@@ -184,6 +184,9 @@ export default function Home() {
   const switchSession = useSession((s) => s.switchSession);
   const deleteSession = useSession((s) => s.deleteSession);
   const renameSession = useSession((s) => s.renameSession);
+  const resetSession = useSession((s) => s.reset);
+  const isStreaming = useSession((s) => s.isStreaming);
+  const abortSession = useSession((s) => s.abort);
 
   useEffect(() => {
     init();
@@ -249,15 +252,46 @@ export default function Home() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="flex h-screen bg-background">
+      <div className="flex h-screen flex-col bg-background">
+      {/* 手机页级顶栏（ZCode「← 任务会话」式）：手机隐藏左侧轨道，会话列表走抽屉 */}
+      <header
+        className="flex shrink-0 items-center gap-2 border-b border-[#DEDEDE] px-2 py-2 dark:border-[#333333] md:hidden"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <button
+          onClick={() => setSidebarCollapsed(false)}
+          className="touch-target flex items-center justify-center rounded-lg text-zinc-400 hover:bg-[#2A2A2A]"
+          title="任务会话列表"
+        >
+          <PanelLeftOpen className="h-4 w-4" />
+        </button>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-zinc-200">任务会话</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="touch-target flex items-center justify-center rounded-lg text-zinc-400 hover:bg-[#2A2A2A]">
+            <MoreHorizontal className="h-4 w-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="glass-surface border-[#333333]">
+            {isStreaming && (
+              <DropdownMenuItem onSelect={() => void abortSession()}>停止</DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={() => void newSession()}>新建任务</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>设置</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setHelpOpen(true)}>帮助</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setSkillsOpen(true)}>Skills 技能包</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setRightPanelOpen(!rightPanelOpen)}>文件袋</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void resetSession()}>清除会话</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </header>
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
       {/* Left sidebar — conversation list, collapsible.
-          手机（<md）：展开态是覆盖层抽屉；桌面：常驻 288px 列 */}
+          手机（<md）：侧轨隐藏（顶栏 ← 打开覆盖层抽屉）；桌面：常驻 288px 列 */}
       <aside
         className={cn(
-          "flex flex-col border-r border-[#DEDEDE] bg-[#F5F5F5] transition-all duration-200 ease-in-out dark:border-sidebar-border dark:bg-sidebar",
+          "flex-col border-r border-[#DEDEDE] bg-[#F5F5F5] transition-all duration-200 ease-in-out dark:border-sidebar-border dark:bg-sidebar",
           sidebarCollapsed
-            ? "w-14 shrink-0"
-            : "fixed inset-y-0 left-0 z-40 w-[86vw] max-w-[300px] shadow-2xl md:static md:z-auto md:w-72 md:max-w-none md:shrink-0 md:shadow-none",
+            ? "hidden w-14 shrink-0 md:flex"
+            : "fixed inset-y-0 left-0 z-40 flex w-[86vw] max-w-[300px] shadow-2xl md:static md:z-auto md:w-72 md:max-w-none md:shrink-0 md:shadow-none",
         )}
       >
         {sidebarCollapsed ? (
@@ -265,7 +299,7 @@ export default function Home() {
           <>
             <div className="flex flex-col items-center gap-3 px-3 py-4">
               <img
-                src="/logo.svg"
+                src="./logo.svg"
                 alt="Open Code Web"
                 className="h-8 w-8 rounded-lg shadow-sm"
               />
@@ -463,7 +497,7 @@ export default function Home() {
             <div className="border-t border-[#DEDEDE] px-2.5 py-2.5 dark:border-sidebar-border">
               <div className="flex items-center gap-2.5 px-1">
                 <img
-                  src="/logo.svg"
+                  src="./logo.svg"
                   alt="Open Code Web"
                   className="h-8 w-8 shrink-0 rounded-lg"
                 />
@@ -525,6 +559,7 @@ export default function Home() {
           )}
         </div>
       </main>
+      </div>
 
       <SettingsDialog
         open={settingsOpen}

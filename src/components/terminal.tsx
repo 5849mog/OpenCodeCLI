@@ -35,6 +35,8 @@ import {
   Wrench,
   Hammer,
   Sparkles,
+  Sigma,
+  FolderOpen,
   RefreshCw,
   PanelRight,
   Shield,
@@ -185,6 +187,8 @@ export function Terminal() {
   // hydrate 完成（及后续文件袋增删）触发重渲染，否则下拉永远是空。
   const vfsHydrated = useVfsView((s) => s.hydrated);
   const vfsVersion = useVfsView((s) => s.version);
+  const rightPanelOpen = useVfsView((s) => s.rightPanelOpen);
+  const setRightPanelOpen = useVfsView((s) => s.setRightPanelOpen);
 
   // 分词器 WASM 状态：footer 微标展示"后台加载的事"（就绪前 ≈N 为估算）
   const [tokStatus, setTokStatus] = useState<TokenizerStatus>(() => tokenizerStatus());
@@ -892,7 +896,7 @@ export function Terminal() {
       />
       {/* Header bar — model name centered, mode toggle right（空状态隐藏，首屏干净如 ZCode） */}
       {!isEmpty && (
-      <div className="relative z-10 flex items-center justify-between gap-2 border-b border-[#DEDEDE] bg-background/40 px-3.5 py-2 text-xs backdrop-blur-sm dark:border-[#333333]">
+      <div className="relative z-10 hidden items-center justify-between gap-2 border-b border-[#DEDEDE] bg-background/40 px-3.5 py-2 text-xs backdrop-blur-sm dark:border-[#333333] md:flex">
         {/* 左侧：会话标题 + 项目/分支上下文 chips（ZCode 式顶栏） */}
         <div className="flex min-w-0 items-center gap-1.5">
           <span
@@ -1163,8 +1167,8 @@ export function Terminal() {
                   <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-[#E58F67] text-white">
                     <Shield className="h-2.5 w-2.5" />
                   </span>
-                  <span>{mode === "plan" ? "计划模式" : "完全访问"}</span>
-                  <ChevronDown className="h-3 w-3 text-[#8C8C8C]" />
+                  <span className="hidden md:inline">{mode === "plan" ? "计划模式" : "完全访问"}</span>
+                  <ChevronDown className="hidden h-3 w-3 text-[#8C8C8C] md:block" />
                 </button>
                 {modeMenuOpen && (
                   <div className="absolute bottom-full left-0 z-50 mb-1.5 w-56 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] glass-surface dark:shadow-black/40">
@@ -1235,8 +1239,8 @@ export function Terminal() {
                     title="切换模型"
                   >
                     <Settings2 className="h-3.5 w-3.5 shrink-0 text-[#8C8C8C]" />
-                    <span className="truncate">{config.model}</span>
-                    <ChevronDown className="h-3 w-3 shrink-0 text-[#8C8C8C]" />
+                    <span className="hidden truncate md:block">{config.model}</span>
+                    <ChevronDown className="hidden h-3 w-3 shrink-0 text-[#8C8C8C] md:block" />
                   </button>
                   {modelMenuOpen && (
                     <div className="absolute bottom-full left-0 z-50 mb-1.5 max-h-72 w-72 overflow-y-auto rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] glass-surface dark:shadow-black/40">
@@ -1299,7 +1303,7 @@ export function Terminal() {
                   title="思考强度"
                 >
                   <Zap className="h-3.5 w-3.5 text-[#8C8C8C]" />
-                  <span>
+                  <span className="hidden md:block">
                     {!config.thinkingEnabled
                       ? "关闭"
                       : config.reasoningEffort === "low"
@@ -1308,7 +1312,7 @@ export function Terminal() {
                           ? "超高"
                           : "高"}
                   </span>
-                  <ChevronDown className="h-3 w-3 text-[#8C8C8C]" />
+                  <ChevronDown className="hidden h-3 w-3 text-[#8C8C8C] md:block" />
                 </button>
                 {effortMenuOpen && (
                   <div className="absolute bottom-full left-0 z-50 mb-1.5 w-44 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] glass-surface dark:shadow-black/40">
@@ -1376,6 +1380,24 @@ export function Terminal() {
                     ? "分词器失败"
                     : "分词器待命…"}
               </button>
+              {/* token 面板 Σ：手机底栏的统计入口（ZCode 同款位） */}
+              {totalTokens > 0 && (
+                <button
+                  onClick={() => setTokenSheetOpen(true)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8C8C8C] transition-colors hover:bg-[#F0F0F0] hover:text-[#262626] disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-100"
+                  title={`Token 面板（累计 ${totalTokens.toLocaleString()}）`}
+                >
+                  <Sigma className="h-4 w-4" />
+                </button>
+              )}
+              {/* 文件袋：打开右侧工作区面板（箱包位） */}
+              <button
+                onClick={() => setRightPanelOpen(!rightPanelOpen)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8C8C8C] transition-colors hover:bg-[#F0F0F0] hover:text-[#262626] disabled:opacity-40 dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-100"
+                title="文件袋（工作区）"
+              >
+                <FolderOpen className="h-4 w-4" />
+              </button>
               {/* 实时输入计数徽标（Hero 与对话态同框生效） */}
               {liveTokens > 0 && (
                 <span
@@ -1429,8 +1451,21 @@ export function Terminal() {
         </div>
         {isEmpty && (
           <div className="pointer-events-auto mt-5 flex w-full flex-col items-center">
+            {/* 手机：快捷任务为一行小胶囊（ZCode 式）；桌面保留列表 + 卡片 */}
+            <div className="flex w-full flex-wrap items-center gap-2 px-1 md:hidden">
+              {HOME_SUGGESTIONS.map((s) => (
+                <button
+                  key={s.text}
+                  onClick={() => fillPrompt(s.text)}
+                  className="flex max-w-full items-center gap-1.5 rounded-lg border border-[#DEDEDE] px-3 py-1.5 text-[12px] text-zinc-400 transition-colors hover:border-[#4A4A4A] hover:text-zinc-200 dark:border-[#333333]"
+                >
+                  <s.icon className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                  <span className="max-w-[52vw] truncate">{s.text}</span>
+                </button>
+              ))}
+            </div>
             {/* 建议区：三条可点击快捷任务（与输入框同宽对齐，ZCode 式） */}
-            <div className="w-full max-w-3xl space-y-1">
+            <div className="hidden w-full max-w-3xl space-y-1 md:block">
               {HOME_SUGGESTIONS.map((s) => (
                 <button
                   key={s.text}
@@ -1443,12 +1478,12 @@ export function Terminal() {
               ))}
             </div>
             {/* 订阅提示 */}
-            <div className="mt-10 flex items-center justify-center gap-1.5 text-[13px] text-zinc-500">
+            <div className="mt-10 hidden items-center justify-center gap-1.5 text-[13px] text-zinc-500 md:flex">
               <Bell className="h-3.5 w-3.5 shrink-0" />
               <span>订阅用户新功能体验：创建“闲时任务”，我们将免费在算力富余时段为你完成指派任务。</span>
             </div>
-            {/* 功能卡片：Git 站会摘要 / CI 报告 / 自定义（ZCode 式） */}
-            <div className="mt-6 grid w-full max-w-[1080px] grid-cols-1 gap-4 md:grid-cols-3">
+            {/* 功能卡片：Git 站会摘要 / CI 报告 / 自定义（ZCode 式，桌面） */}
+            <div className="mt-6 hidden w-full max-w-[1080px] grid-cols-3 gap-4 md:grid">
               {HOME_CARDS.map((c) => (
                 <button
                   key={c.title}
@@ -1466,7 +1501,7 @@ export function Terminal() {
           </div>
         )}
         {!isEmpty && (
-        <div className="mt-2 flex items-center justify-between px-1 text-[length:var(--font-size-ui-sm)] text-[#A6A6A6] dark:text-zinc-500">
+        <div className="mt-2 hidden items-center justify-between px-1 text-[length:var(--font-size-ui-sm)] text-[#A6A6A6] dark:text-zinc-500 md:flex">
           <span className="flex items-center gap-3">
             {totalTokens > 0 && (
               <button

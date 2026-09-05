@@ -34,11 +34,13 @@ export const metadata: Metadata = {
     "LLM",
   ],
   authors: [{ name: "Open Code Web" }],
+  // 相对路径（不用 / 前缀）——部署 basePath 是 /OpenCodeCLI/，绝对路径会解析到
+  // 站点根导致 404；相对路径在根部署与子路径部署下都正确。
   icons: {
-    icon: ["/logo.svg", "/favicon-32x32.png"],
-    apple: "/apple-touch-icon.png",
+    icon: ["./logo.svg", "./favicon-32x32.png"],
+    apple: "./apple-touch-icon.png",
   },
-  manifest: "/site.webmanifest",
+  manifest: "./site.webmanifest",
 };
 
 export const viewport: Viewport = {
