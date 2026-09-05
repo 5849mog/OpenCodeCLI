@@ -135,6 +135,20 @@
   svg.lucide {
     stroke-width: 1.75;
   }
+  html {
+    /* Full-height: body scroll lives inside layout panels; the root never
+       rubber-bands. Combined with min-h-dvh on the app shell, iOS keyboard
+       pushes content up instead of covering it. */
+    height: 100%;
+  }
+  html,
+  body {
+    /* Rubber-band: keep page-level scroll but suppress edge bounce on pull. */
+    overscroll-behavior-y: contain;
+    /* Faster taps + avoid gesture conflict (pinch/double-tap zoom). */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
   body {
     @apply bg-background text-foreground;
     /* Warm deep-space gradient: radial halo at top-right, falls to pure
@@ -364,8 +378,28 @@ pre[class*="language-"],
 
 @layer utilities {
   .touch-target {
-    min-height: 36px;
-    min-width: 36px;
+    min-height: 40px;
+    min-width: 40px;
+  }
+  /* Higher-stakes header / nav buttons — Apple HIG 44pt. */
+  .header-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* Dynamic viewport (iOS keyboard / chrome resize). Tailwind v4 ships
+     h-dvh by name; these are belt-and-suspenders for older pipelines. */
+  .h-dvh {
+    height: 100dvh;
+  }
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+  /* Safe-area paddings: iOS notch + Android gesture bar / home indicator. */
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+  .safe-top {
+    padding-top: max(env(safe-area-inset-top), 0px);
   }
   /* Frosted glass surface for floating panels (menus/dialogs/sheets).
      Degrades to plain rgba on browsers without backdrop-filter. */
@@ -394,4 +428,26 @@ pre[class*="language-"],
 @keyframes text-shimmer {
   from { background-position: 100% 0; }
   to { background-position: -100% 0; }
+}
+
+/* ----- Mobile drawer / overlay entrances ----- */
+@keyframes drawer-in {
+  from { transform: translateX(-12%); opacity: 0.45; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.drawer-in {
+  animation: drawer-in 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes fade-in-soft {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.fade-in-soft {
+  animation: fade-in-soft 0.2s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer-in,
+  .fade-in-soft {
+    animation: none;
+  }
 }

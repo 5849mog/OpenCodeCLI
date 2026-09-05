@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type TouchEvent } from "react";
 import { MotionConfig } from "framer-motion";
 import { Terminal } from "@/components/terminal";
 import { FileBag } from "@/components/file-bag";
@@ -71,6 +71,9 @@ function SessionRow({
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(session.title);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // 移动端左滑露出删除（纯 touch，不干扰纵向滚动与桌面的 hover/点击）
+  const [revealed, setRevealed] = useState(false);
+  const touchStartX = useRef<number | null>(null);
 
   const commitRename = () => {
     const t = draft.trim();
@@ -78,14 +81,52 @@ function SessionRow({
     setRenaming(false);
   };
 
+  const onTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const onTouchMove = (e: TouchEvent<HTMLDivElement>) => {
+    if (touchStartX.current === null) return;
+    const dx = e.touches[0].clientX - touchStartX.current;
+    if (!revealed && dx < -8) {
+      e.preventDefault();
+      setRevealed(true);
+      touchStartX.current = e.touches[0].clientX;
+    } else if (revealed && dx > 8) {
+      e.preventDefault();
+      setRevealed(false);
+      touchStartX.current = e.touches[0].clientX;
+    }
+  };
+  const onTouchEnd = () => {
+    touchStartX.current = null;
+  };
+
   return (
-    <div
-      onClick={onSwitch}
-      className={cn(
-        "group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] text-[#6B6B6B] transition-colors hover:bg-white hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#262626] dark:hover:text-zinc-200",
-        active && "bg-white text-[#262626] hover:bg-white hover:text-[#262626] dark:bg-[#2A2A2A] dark:text-zinc-100 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-100",
-      )}
-    >
+    <div className="relative overflow-hidden rounded-lg">
+      {/* 左滑露出的红色删除区 */}
+      <button
+        aria-label="删除会话"
+        onClick={(e) => {
+          e.stopPropagation();
+          setRevealed(false);
+          setConfirmOpen(true);
+        }}
+        className="absolute inset-y-0 right-0 flex w-[76px] items-center justify-center bg-[#E54D2E] text-white"
+        style={{ opacity: revealed ? 1 : 0, pointerEvents: revealed ? "auto" : "none" }}
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+      <div
+        onClick={onSwitch}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        style={{ transform: `translateX(${revealed ? -76 : 0}px)`, touchAction: "pan-y" }}
+        className={cn(
+          "group relative flex cursor-pointer touch-pan-y items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] text-[#6B6B6B] transition-transform duration-200 ease-out hover:bg-white hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#262626] dark:hover:text-zinc-200",
+          active && "bg-white text-[#262626] hover:bg-white hover:text-[#262626] dark:bg-[#2A2A2A] dark:text-zinc-100 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-100",
+        )}
+      >
       {/* 当前会话左侧圆点指示（ZCode 式） */}
       <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", active ? "bg-[#E58F67]" : "bg-transparent")} />
       {renaming ? (
@@ -161,6 +202,7 @@ function SessionRow({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }
@@ -193,9 +235,7 @@ export default function Home() {
     // 仅"从未配置过 Key"才首次弹设置；有持久化主密钥/Key → 静默打开
     // （Key 已在 init 的 tryRestore 中从 localStorage 恢复，无需重填）。
     const shouldOpen = !hasPersistentMasterKey();
-    /* eslint-disable react-hooks/set-state-in-effect */
     if (shouldOpen) setSettingsOpen(true);
-    /* eslint-enable react-hooks/set-state-in-effect */
   }, [init]);
 
   // 开发者签名（Copilot CLI 式的烙印）：打开 DevTools 即见
@@ -225,6 +265,26 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [newSession]);
 
+  // Terminal 内「未配置 API Key」模型入口等发送 open-settings 事件 → 打开设置面板
+  useEffect(() => {
+    const open = () => setSettingsOpen(true);
+    window.addEventListener("open-settings", open);
+    return () => window.removeEventListener("open-settings", open);
+  }, []);
+
+  // iOS Safari: 软键盘弹起时 layout viewport 不变、100dvh 不会缩小，
+  // 命令框会被键盘盖住。改用 visualViewport 实时高度驱动根容器
+  // （--app-vh，桌面/无 var 时回落 100dvh）。
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () =>
+      document.documentElement.style.setProperty("--app-vh", `${vv.height}px`);
+    onResize();
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
+
   // Responsive: sidebar collapses by default below desktop breakpoint
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -250,9 +310,26 @@ export default function Home() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  // Body scroll lock when the session drawer is open.
+  // Mobile: must lock — drawer is overlay and we don't want body to scroll behind.
+  // Desktop: harmless — drawer is just a static column and body has no overflow.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const open = !sidebarCollapsed;
+    document.body.style.overflow = open ? "hidden" : "";
+    document.body.style.touchAction = open ? "none" : "";
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    };
+  }, [sidebarCollapsed]);
+
   return (
     <MotionConfig reducedMotion="user">
-      <div className="flex h-screen flex-col bg-background">
+      <div
+        className="flex min-h-dvh h-screen flex-col bg-background"
+        style={{ height: "var(--app-vh, 100dvh)" }}
+      >
       {/* 手机页级顶栏（ZCode「← 任务会话」式）：手机隐藏左侧轨道，会话列表走抽屉 */}
       <header
         className="flex shrink-0 items-center gap-2 border-b border-[#DEDEDE] px-2 py-2 dark:border-[#333333] md:hidden"
@@ -260,14 +337,19 @@ export default function Home() {
       >
         <button
           onClick={() => setSidebarCollapsed(false)}
-          className="touch-target flex items-center justify-center rounded-lg text-zinc-400 hover:bg-[#2A2A2A]"
+          className="header-target flex items-center justify-center rounded-lg text-zinc-400 hover:bg-[#2A2A2A]"
           title="任务会话列表"
         >
           <PanelLeftOpen className="h-4 w-4" />
         </button>
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-zinc-200">任务会话</span>
+        <span className="flex min-w-0 flex-1 items-center gap-1.5">
+          <img src="./logo.svg" alt="Open Code Web" className="h-4 w-4 shrink-0 rounded-[3px]" />
+          <span className="min-w-0 truncate text-[13px] font-medium text-zinc-200">
+            {title || "任务会话"}
+          </span>
+        </span>
         <DropdownMenu>
-          <DropdownMenuTrigger className="touch-target flex items-center justify-center rounded-lg text-zinc-400 hover:bg-[#2A2A2A]">
+          <DropdownMenuTrigger className="header-target flex items-center justify-center rounded-lg text-zinc-400 hover:bg-[#2A2A2A]">
             <MoreHorizontal className="h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="glass-surface border-[#333333]">
@@ -291,7 +373,7 @@ export default function Home() {
           "flex-col border-r border-[#DEDEDE] bg-[#F5F5F5] transition-all duration-200 ease-in-out dark:border-sidebar-border dark:bg-sidebar",
           sidebarCollapsed
             ? "hidden w-14 shrink-0 md:flex"
-            : "fixed inset-y-0 left-0 z-40 flex w-[86vw] max-w-[300px] shadow-2xl md:static md:z-auto md:w-72 md:max-w-none md:shrink-0 md:shadow-none",
+            : "drawer-in fixed inset-y-0 left-0 z-40 flex w-[86vw] max-w-[300px] shadow-2xl md:static md:z-auto md:w-72 md:max-w-none md:shrink-0 md:shadow-none",
         )}
       >
         {sidebarCollapsed ? (
@@ -526,7 +608,7 @@ export default function Home() {
       {/* 手机端抽屉遮罩：点击关闭（桌面 md:hidden 不显示） */}
       {!sidebarCollapsed && (
         <div
-          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          className="fade-in-soft fixed inset-0 z-30 bg-black/50 md:hidden"
           onClick={() => setSidebarCollapsed(true)}
         />
       )}
@@ -553,7 +635,7 @@ export default function Home() {
           </div>
           {rightPanelOpen && (
             <div
-              className="fixed inset-0 z-30 bg-black/50 md:hidden"
+              className="fade-in-soft fixed inset-0 z-30 bg-black/50 md:hidden"
               onClick={() => setRightPanelOpen(false)}
             />
           )}

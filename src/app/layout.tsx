@@ -41,10 +41,23 @@ export const metadata: Metadata = {
     apple: "./apple-touch-icon.png",
   },
   manifest: "./site.webmanifest",
+  // PWA: full-screen when added to iOS home screen. statusBarStyle "black-translucent"
+  // draws the status bar over the content; matches our dark gradient backdrop.
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Open Code Web",
+  },
+  applicationName: "Open Code Web",
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
   themeColor: "#0A0A0A",
+  // iOS Safari: extend layout under the notch so env(safe-area-inset-*) works.
+  viewportFit: "cover",
+  // Chrome Android: resize visual viewport so content lifts above the keyboard.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

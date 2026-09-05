@@ -15,6 +15,7 @@ import { memo, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, us
 import { AnimatePresence, motion } from "framer-motion";
 import { Dots } from "@/components/ui/dots";
 import { AppIcon } from "@/components/ui/app-icon";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { fadeUp, fadeUpSmall, reveal, springPop } from "@/lib/motion";
 import {
   ArrowUp,
@@ -156,6 +157,7 @@ const HOME_CARDS = [
 ];
 
 export function Terminal() {
+  const isMobile = useIsMobile();
   const events = useSession((s) => s.events);
   const isStreaming = useSession((s) => s.isStreaming);
   const isCompacting = useSession((s) => s.isCompacting);
@@ -1050,29 +1052,29 @@ export function Terminal() {
       <div
         className={cn(
           isEmpty
-            ? "pointer-events-none absolute inset-0 z-10 flex flex-col items-center overflow-x-hidden overflow-y-auto"
+            ? "pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 overflow-x-hidden overflow-y-auto px-4 py-4 md:justify-start md:gap-0 md:px-0 md:py-0"
             : "mx-auto w-full max-w-3xl px-4 py-3",
         )}
       >
         {isEmpty && (
-          <div className="pointer-events-none relative my-auto flex w-full flex-col items-center px-4 py-10">
-            {/* 光晕衬底：logo 与问候语后的暖色雾——深度感来自这里 */}
+          <div className="pointer-events-none relative my-0 flex w-full flex-col items-center px-0 py-1 md:my-auto md:px-4 md:py-10">
+            {/* 光晕衬底：logo 与问候语后的暖色雾——深度感来自这里（手机精简，桌面保留） */}
             <div
               aria-hidden
-              className="absolute top-1/2 left-1/2 -z-10 h-64 w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+              className="absolute top-1/2 left-1/2 -z-10 hidden h-64 w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full md:block"
               style={{
                 background:
                   "radial-gradient(280px 130px at 50% 55%, rgba(229,143,103,0.10) 0%, rgba(229,143,103,0.04) 45%, transparent 75%)",
               }}
             />
-            {/* 背景装饰 Logo：超大低透明度几何图形（ZCode 式） */}
-            <svg viewBox="0 0 200 120" aria-hidden className="mb-6 h-20 w-36 text-white opacity-[0.05] sm:mb-10 sm:h-32 sm:w-56">
+            {/* 背景装饰 Logo：超大低透明度几何图形（桌面 ZCode 式；手机移至页级顶栏，此处隐藏避免重复） */}
+            <svg viewBox="0 0 200 120" aria-hidden className="hidden text-white opacity-[0.05] md:mb-10 md:block md:h-32 md:w-56">
               <path
                 fill="currentColor"
                 d="M30 15 L60 15 L124 85 L124 15 L150 15 L150 105 L120 105 L56 35 L56 105 L30 105 Z"
               />
             </svg>
-            <div className="mb-5 font-serif text-[18px] font-medium tracking-tight text-zinc-200 [font-variation-settings:'opsz'_40] sm:mb-6 sm:text-[21px]">
+            <div className="mb-4 font-serif text-[15px] font-medium tracking-tight text-zinc-200 [font-variation-settings:'opsz'_40] sm:text-[16px] md:mb-6 md:text-[21px]">
               {greeting}，接下来交给我吧
             </div>
           </div>
@@ -1128,7 +1130,9 @@ export function Terminal() {
                 isStreaming
                   ? "agent is working…"
                   : isEmpty
-                    ? "向 Open Code 提问、使用 @ 添加上下文、使用 / 选择命令或能力"
+                    ? isMobile
+                      ? "问 Open Code 任何事 — @ 文件 / / 命令"
+                      : "向 Open Code 提问、使用 @ 添加上下文、使用 / 选择命令或能力"
                     : "提出后续修改要求"
               }
               disabled={isStreaming || isCompacting}
@@ -1230,8 +1234,8 @@ export function Terminal() {
             </div>
               {/* 右侧控件组：模型 / 思考 / 发送 */}
               <div className="flex shrink-0 items-center gap-1">
-              {/* 模型选择器 */}
-              {config.hasApiKey && (
+              {/* 模型选择器：有 Key → 切换下拉；无 Key → 设置入口(红点提示，点击打开设置) */}
+              {config.hasApiKey ? (
                 <div className="relative" ref={modelMenuRef}>
                   <button
                     onClick={() => setModelMenuOpen((v) => !v)}
@@ -1294,6 +1298,16 @@ export function Terminal() {
                     </div>
                   )}
                 </div>
+              ) : (
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent("open-settings"))}
+                  className="relative flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-lg px-2 text-[length:var(--font-size-ui-sm)] text-[#C08A5F] transition-colors hover:bg-[#F0F0F0] dark:text-[#E8A87C] dark:hover:bg-[#2A2A2A] md:h-auto md:justify-start"
+                  title="未配置 API Key — 点此打开设置"
+                >
+                  <Settings2 className="h-3.5 w-3.5 shrink-0 text-[#C08A5F] dark:text-[#E8A87C]" />
+                  <span className="hidden md:inline">设置模型</span>
+                  <span aria-hidden className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-[#E54D2E]" />
+                </button>
               )}
               {/* 思考强度 下拉：关闭 / 低 / 高 / 超高 */}
               <div className="relative" ref={effortMenuRef}>
@@ -1350,12 +1364,14 @@ export function Terminal() {
                   </div>
                 )}
               </div>
-              {/* 分词器 WASM 状态微标：把「后台加载」变成看得见的一次性状态 */}
+              {/* 分词器 WASM 状态微标：把「后台加载」变成看得见的一次性状态。
+                  手机：仅一个圆点(绿=就绪 / 红=失败 / 橙闪=加载中)，点击可重试；
+                  桌面：圆点 + 文字标签。 */}
               <button
                 onClick={() => {
                   if (tokStatus !== "ready") warmup();
                 }}
-                className="hidden shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-zinc-600 transition-colors hover:text-zinc-400 md:flex"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-[#F0F0F0] dark:hover:bg-[#2A2A2A] md:h-auto md:w-auto md:gap-1 md:rounded md:px-1.5 md:py-0.5 md:text-[10px] md:text-zinc-600 md:hover:text-zinc-400"
                 title={
                   tokStatus === "ready"
                     ? "DeepSeek 真分词器已就绪（128k BPE）"
@@ -1366,7 +1382,7 @@ export function Terminal() {
               >
                 <span
                   className={cn(
-                    "h-1.5 w-1.5 rounded-full",
+                    "h-1.5 w-1.5 shrink-0 rounded-full",
                     tokStatus === "ready"
                       ? "bg-emerald-500"
                       : tokStatus === "failed"
@@ -1374,11 +1390,13 @@ export function Terminal() {
                         : "animate-pulse bg-[#E58F67]",
                   )}
                 />
-                {tokStatus === "ready"
-                  ? "分词器就绪"
-                  : tokStatus === "failed"
-                    ? "分词器失败"
-                    : "分词器待命…"}
+                <span className="hidden md:inline">
+                  {tokStatus === "ready"
+                    ? "分词器就绪"
+                    : tokStatus === "failed"
+                      ? "分词器失败"
+                      : "分词器待命…"}
+                </span>
               </button>
               {/* token 面板 Σ：手机底栏的统计入口（ZCode 同款位） */}
               {totalTokens > 0 && (
@@ -1451,16 +1469,16 @@ export function Terminal() {
         </div>
         {isEmpty && (
           <div className="pointer-events-auto mt-5 flex w-full flex-col items-center">
-            {/* 手机：快捷任务为一行小胶囊（ZCode 式）；桌面保留列表 + 卡片 */}
-            <div className="flex w-full flex-wrap items-center gap-2 px-1 md:hidden">
+            {/* 手机：快捷任务纵向条目（图标 + 文案，可两行不截断；ZCode 式建议区） */}
+            <div className="flex w-full flex-col gap-1.5 px-0 md:hidden">
               {HOME_SUGGESTIONS.map((s) => (
                 <button
                   key={s.text}
                   onClick={() => fillPrompt(s.text)}
-                  className="flex max-w-full items-center gap-1.5 rounded-lg border border-[#DEDEDE] px-3 py-1.5 text-[12px] text-zinc-400 transition-colors hover:border-[#4A4A4A] hover:text-zinc-200 dark:border-[#333333]"
+                  className="flex w-full items-center gap-2 rounded-lg border border-[#DEDEDE] bg-[#161616]/30 px-3 py-2 text-left text-[12px] leading-snug text-zinc-400 transition-colors hover:border-[#4A4A4A] hover:text-zinc-200 dark:border-[#333333]"
                 >
                   <s.icon className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-                  <span className="max-w-[52vw] truncate">{s.text}</span>
+                  <span className="min-w-0">{s.text}</span>
                 </button>
               ))}
             </div>
@@ -2153,7 +2171,10 @@ function RoundBlock({
   const [expanded, setExpanded] = useState(() => !done);
   const wasDone = useRef(done);
   useEffect(() => {
-    if (!wasDone.current && done) setExpanded(false);
+    if (!wasDone.current && done) {
+      // 微任务内收起（避免 effect 中同步 setState 的级联渲染；行为等价）
+      queueMicrotask(() => setExpanded(false));
+    }
     wasDone.current = done;
   }, [done]);
   const stats = useMemo(() => {
