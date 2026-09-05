@@ -1,10 +1,13 @@
 # 🚀 Open Code Web 成长日志
 
-> 由 Git 历史自动整理，共 **191** 次提交。最新在最上方。
+> 由 Git 历史自动整理，共 **201** 次提交。最新在最上方。
 
 | 日期 | 提交数 | 高亮 |
 |------|--------|------|
-| 2026-08-23 | 14 | 6 个新功能、5 个修复 |
+| 2026-09-05 | 6 | 2 个新功能、2 个修复 |
+| 2026-08-31 | 2 | — |
+| 2026-08-29 | 1 | — |
+| 2026-08-23 | 15 | 6 个新功能、5 个修复 |
 | 2026-08-22 | 20 | 9 个新功能、11 个修复 |
 | 2026-08-19 | 2 | 1 个新功能 |
 | 2026-08-18 | 12 | 9 个新功能 |
@@ -28,7 +31,184 @@
 
 ---
 
+## 📅 2026-09-05
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/fcca7786f1a3657a1f8f1812332c5012d84dba7a">fcca778</a> — feat(skills): 文件夹级 Skill 体系 — frontmatter + 依赖关系 + 支撑文件 + zip 导入导出</summary>
+
+> - Skill = 完整文件夹：SKILL.md（YAML frontmatter）+ references/scripts/assets 支撑文件
+> - 依赖关系：frontmatter 声明 dependencies，load_skill 自动连带加载（环安全 + 截断保护）；
+> delete_skill 被依赖时报错（force 可强制），UI 展示依赖/被依赖徽章
+> - 新工具 read_skill_file(name, path)：渐进式读取支撑文件（路径穿越防护）
+> - create_skill 支持 files/dependencies；覆盖时保留既有支撑文件
+> - 内置 skill 全部文件夹化（code-review/data-analysis/diagram + 新增 report 演示依赖）
+> - .zip 文件夹包导入导出（兼容 anthropic/skills 仓库布局）+ 文件夹直传 + JSON v1/v2 备份
+> - Skills 面板重建：文件树/文件查看器/编辑/增删支撑文件/单包导出
+> - 清理过时的 VFS skills/ 写保护（skill 已存独立 IndexedDB，不再占用文件袋路径）
+
+</details>
+
+<details open>
+<summary>✨ <a href="https://github.com/5849mog/OpenCodeCLI/commit/b75edf8c9912c41212c6e8a3ef847393f6d6b9f0">b75edf8</a> — feat(mobile): 移动端体验全面重构</summary>
+
+> - 首屏命令框+快捷任务整组居中，消除大面积空黑；N logo 上移至页级顶栏
+> - iOS 软键盘适配：viewport-fit + visualViewport 驱动 --app-vh，命令框不再被键盘遮挡
+> - 抽屉开合锁 body 滚动；会话列表左滑露出删除区（带既有删除确认）
+> - 模型/分词器状态移动端始终可见：无 Key 时红点入口直达设置（open-settings 事件）
+> - 触摸热区 36→40(通用)/44(顶栏)；快捷任务与占位文案适配小屏不再截断
+> - PWA standalone meta 补齐；桌面零回归（tsc/eslint/build 全绿）
+> 顺手修复：terminal.tsx 原 setState-in-effect（改 queueMicrotask）；移除 page.tsx unused eslint-disable。
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/94731d1b0e9e4735c083b0910df2f52486cedba2">94731d1</a> — fix(mobile): 手机端 ZCode 复刻布局 + 修复 GitHub Pages 图标 404</summary>
+
+> 按用户手机梦境截图逐项对齐：
+> 【布局】
+> - 手机移除 56px 左侧轨道（桌面保留）；会话列表改为抽屉，入口 = 顶部页级
+> 头「← 任务会话 + ⋯」
+> - 新增 MobileTopBar（md:hidden）：← 开抽屉 / 标题 / ⋯ 下拉（停止/新建任务/
+> 设置/帮助/Skills/文件袋/清除会话）——terminal 对话页头部手机隐藏
+> - hero：提示区手机化为一行小胶囊（桌面保留列表+卡片）；订阅文案行手机隐藏；
+> 统计条（累计/本轮/Enter 发送）手机隐藏（桌面保留）
+> - 命令框底栏手机图标化：＋/盾牌/模型/思考 全部只显图标（文字 md 才显示），
+> 不再被模型全名挤成竖排；新增 Σ（Token 面板，ZCode 同款位）与箱包（文件袋）
+> 两个手机底栏按钮
+> - Terminal header（会话标题栏）手机隐藏，移动端由 MobileTopBar 承担
+> 【图标 404 修复（用户 GitHub Pages 实测不显示）】
+> - layout.tsx metadata icons/apple/manifest 与 page.tsx 两处 <img> 的
+> /logo.svg 绝对路径 → ./ 相对路径：部署 basePath=/OpenCodeCLI/ 时绝对
+> 路径解析到站点根 404，相对路径在根部署与子路径部署均正确
+> 验证：390×844 实机截图与梦境图逐项对比（顶栏/无轨道/图标底栏/胶囊提示区）
+> 一致；tsc 0 错误；build 0 警告。
+
+</details>
+
+<details open>
+<summary>🔧 <a href="https://github.com/5849mog/OpenCodeCLI/commit/40b602eaed7a1066ab2bbaadd6a869ca480679a7">40b602e</a> — chore(ui): 图标规范 + 双色 N 折纸品牌标识 + PWA 图标套装</summary>
+
+> 【图标规范（治"用着怪"）】
+> - 新增 src/components/ui/app-icon.tsx：唯一图标包装层（默认 strokeWidth
+> 1.75 + 尺寸 token + shrink-0），未来换库只需换这一处
+> - 全局 CSS svg.lucide { stroke-width: 1.75 }：一次性细化全部图标描边
+> （原来 2px 在 12-16px 尺寸发糊）
+> - emoji 图标化：模式菜单 🟢/✨/⚡ 标签 → Shield/Sparkles/Zap lucide 图标；
+> ToolResultRow 的 📋 → ClipboardList；设置页 ◉ 状态点 → CheckCircle2/AlertCircle
+> - 语义校正：未知工具 Wrench→Hammer；ThinkingBlock Sparkles→Brain（思考）
+> - 重点面（终端工具步骤/结果行/思考块、模式菜单、设置导航、文件袋标签、
+> 子智能体卡片）全部过 AppIcon
+> - 删除死代码 StreamingBubble 与 AgentStatusRow（流式路径替代后从未渲染）
+> 【双色 N 折纸品牌标识】
+> - public/logo.svg 重绘：深近黑圆角方块 + N 折纸 monogram（左/斜切面橙
+> #E58F67、右下角灰白，保留呼吸动画）；不再与轨道 `</>`、侧栏 N 头像三套
+> mark 分裂——全部位置统一为新标识
+> - scripts/gen-icons.mjs（sharp 离线渲染）：favicon-32 / apple-touch-180 /
+> icon-192 / icon-512
+> - public/site.webmanifest（standalone + 主题色 #0A0A0A + 192/512，含 maskable）；
+> layout.tsx metadata 全套引用——iPad 添加主屏后是正式 App 图标
+> 验证：tsc 0 错误；build 0 警告；实机截图（桌面 hero/模式菜单/390 移动端）
+> 新标识与图标描边全部到位。
+
+</details>
+
+<details open>
+<summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/4eee5da5c410f370868ff02ff01a9c2ddc66567d">4eee5da</a> — fix(mobile): 手机端从"几乎不能用"到可日常使用</summary>
+
+> 布局（page.tsx）
+> - 侧栏展开态：手机（<md）转为 286px 覆盖抽屉 + 半透明遮罩（点击关闭），
+> 桌面保持静态 288px 列（md:static 前缀切换）
+> - 折叠轨道新增两个手机端快捷键：新建任务（CirclePlus）+ 搜索会话（Search，
+> 自动弹抽屉并聚焦搜索框）——此前新建任务要两跳才能到
+> - 右面板（文件袋侧）手机端转全视口 92vw 浮层 + 遮罩 + 阴影，不再挤压主区
+> （桌上仍为常驻列）；遮罩关闭走 vfs 的 setRightPanelOpen
+> 终端（terminal.tsx）
+> - hero 空状态：改 my-auto 居中技巧——内容超高时自动转顶部对齐可滚动，
+> 不再上下裁切；logo/问候语手机尺寸收敛（h-20 w-36 / 18px，sm 恢复）
+> - 事件流区 px-6→px-4 sm:px-6；终端根加 iOS 安全区底部 env() padding
+> 设置页（settings-dialog.tsx）
+> - 手机：整体 flex-col，左栏变顶部栏——分组导航横向两行 chips（标签隐藏），
+> 状态区（Key configured）隐藏；内容 px-4 py-6
+> - 桌面维持原纵向布局
+> 验证：390×844 实机截图 4 场景（hero/抽屉/文件袋浮层/设置页）全部正常；
+> 1280 桌面回验无回归；tsc 0 错误；build 0 警告。
+
+</details>
+
+<details open>
+<summary>🔧 <a href="https://github.com/5849mog/OpenCodeCLI/commit/daa284d0ad400a9beac76262b4c725a9ee2e20a0">daa284d</a> — chore(ui): 质感升级（拉满版）——深空暖调 + grain + 玻璃浮层 + 字体/动效/语义色体系</summary>
+
+> 【A 场景基底】
+> - body 暖调深空渐变（radial 1200x800 @70%-10% #160D08→#0A0A0A）+ background-attachment: fixed
+> - 全局 feTurbulence film grain（2.5% overlay 混合，消灭渐变色带阶跃）
+> - 浮层玻璃化：5 处下拉菜单 / 问询弹窗 / Radix Dialog 内容层 → glass-surface（rgba(.72)+blur 20px+saturate）
+> - hero 光晕：logo 后暖雾 + terminal 顶部双径向光；命令框暗底 65% + backdrop-blur-md + focus 外晕 28px
+> - 设置页/文件袋面板：不透明暖调渐变（浮层不穿帮）
+> 【B 字体系统】
+> - Fraunces 出场：hero 问候语、设置页分组标题（serif + tracking）
+> - body 行高 1.618 + tracking -0.01em + tabular-nums 全局；「已工作 X 秒」补 tabular-nums
+> - 全局 ::selection 橙（之前仅 CodeMirror 内）
+> 【C 动效预算】
+> - 新增 src/lib/motion.ts（ease [0.22,1,0.36,1] / fadeUp / springPop / reveal 唯一词表）+ ui/dots.tsx（三弹点收敛，5 处手写替换）
+> - 轮次折叠/展开 AnimatePresence 高度过渡（点开向下弹出的直觉）
+> - 工具卡完成态 spring 弹入 ✓/✗ 微标；StepCard hover 上浮 1px；Stop 按钮 active:scale-95
+> - MotionConfig reducedMotion="user" 包根
+> 【D 语义色语法】
+> - resultTone() 三态判定（ok:false / exit code≠0 / Error 前缀 → 红；warning → 琥珀；其余中性）
+> - StepCard 输出 pre 按态着色；「完成/失败」行改 emerald/红
+> 【E 反馈透明度】
+> - 每轮折叠头右侧上下文占用条（64px，≥70% 浅橙 ≥90% 红，真分词器 2s 防抖统计 budget 占比）
+> - /compact 进行中行内滑条动画（复用 slide-progress keyframe）
+> - 分词器 WASM 微标：待命脉冲/就绪绿点/失败红点可点击重试
+> 【F 平台收尾】
+> - themeColor 移入 viewport 导出 + favicon /logo.svg
+> - DevTools 开发者签名（橙字烙印 + repo 链接）
+> 验证：tsc 0 错误；next build 0 警告；hero 实机截图确认（光晕/衬线/微标/玻璃都渲染正常）。
+
+</details>
+
+## 📅 2026-08-31
+
+<details open>
+<summary>• <a href="https://github.com/5849mog/OpenCodeCLI/commit/f1a2648d8b46af467b9d54ea7a418213af7c75ea">f1a2648</a> — Merge pull request #5 from 5849mog/learn-anything-skill</summary>
+
+> docs(skills): 存档 learn-anything 学习框架 skill
+
+</details>
+
+<details open>
+<summary>📝 <a href="https://github.com/5849mog/OpenCodeCLI/commit/9de7d09428fe7f62177c6597f0c514c1cd8c509d">9de7d09</a> — docs(skills): 存档 learn-anything 学习框架 skill</summary>
+
+> 一个知识学习类框架 skill，核心主张是「学会的唯一证据是学习者的产出」。
+> 含八类知识的教学模式路由、出题与批改细则、23 条反 AI 教学清单。
+> 仅作存档放在 docs/ 下，不参与站点构建（根目录 /skills/ 被 gitignore 排除）。
+
+</details>
+
+## 📅 2026-08-29
+
+<details open>
+<summary>🔧 <a href="https://github.com/5849mog/OpenCodeCLI/commit/1f9bcae2950c7ff8e0cdf6416ab74570475c016b">1f9bcae</a> — chore(naming): 产品名收口为 Open Code Web（方案 A：仓库 slug 不动）</summary>
+
+> - package.json name: nextjs_tailwind_shadcn_ts → open-code-web
+> （脚手架模板残留，全仓无任何代码读取该字段，改动惰性）
+> - gen-changelog.mjs 日志标题 → 「Open Code Web 成长日志」，并就近注明
+> 仓库 slug 保留 OpenCodeCLI 的原因（改名会 404 现有 Pages URL）
+> - CHANGELOG 重新生成：188 → 191 条提交
+> 不动的部分（有意为之）：仓库 slug、Pages URL、README 的克隆命令与
+> REPO_NAME basePath 示例、layout.tsx 里「replica of the Open Code CLI」
+> （此处 CLI 指被复刻的参照物，用法正确）。CHANGELOG 历史条目不改写。
+
+</details>
+
 ## 📅 2026-08-23
+
+<details open>
+<summary>• <a href="https://github.com/5849mog/OpenCodeCLI/commit/c6a792985d382cc6cdf64382528e4f624c5c04a8">c6a7929</a> — Update README.md</summary>
+
+> _（无详细说明）_
+
+</details>
 
 <details open>
 <summary>🐛 <a href="https://github.com/5849mog/OpenCodeCLI/commit/f225bf8a62484354a81f8bfb84e191a4a0598c92">f225bf8</a> — fix(docs): 修复 tokenizer Mermaid 词法错误（节点标签引号化）+ banner SVG 元素拉满</summary>
