@@ -478,9 +478,9 @@ export function SettingsDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex bg-background text-zinc-100 [background-image:radial-gradient(1000px_700px_at_70%_-10%,var(--background-glow)_0%,var(--background)_55%)]">
-      {/* 左侧分类导航（ZCode 式设置页） */}
-      <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-[#DEDEDE] bg-[#F5F5F5] text-[#262626] dark:border-[#333333] dark:bg-[#161616] dark:text-zinc-100">
+    <div className="fixed inset-0 z-[100] flex flex-col bg-background text-zinc-100 [background-image:radial-gradient(1000px_700px_at_70%_-10%,var(--background-glow)_0%,var(--background)_55%)] md:flex-row">
+      {/* 左侧分类导航（ZCode 式设置页）；手机（<md）为顶部横向栏 */}
+      <aside className="flex w-full shrink-0 flex-col overflow-y-auto border-b border-[#DEDEDE] bg-[#F5F5F5] text-[#262626] dark:border-[#333333] dark:bg-[#161616] dark:text-zinc-100 md:w-72 md:border-b-0 md:border-r">
         <button
           onClick={() => void handleClose()}
           className="flex shrink-0 items-center gap-2.5 px-4 py-4 text-sm text-[#6B6B6B] transition-colors hover:bg-white hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
@@ -489,17 +489,18 @@ export function SettingsDialog({
           返回工作区
         </button>
         {NAV_GROUPS.map((g) => (
-          <div key={g.label} className="px-2 pb-3">
-            <div className="px-3 pb-1.5 pt-1 font-serif text-[12px] font-medium tracking-wide text-[#8C8C8C] dark:text-zinc-500">
+          <div key={g.label} className="flex items-center gap-1 py-1 md:block md:gap-0 md:px-2 md:py-0 md:pb-3">
+            <div className="hidden px-3 pb-1.5 pt-1 font-serif text-[12px] font-medium tracking-wide text-[#8C8C8C] md:block dark:text-zinc-500">
               {g.label}
             </div>
-            <div className="space-y-0.5">
+            {/* 手机：分组横向排成一行可滑动；桌面：纵向列表 */}
+            <div className="flex items-start gap-1 overflow-x-auto px-2 pb-2 md:block md:px-2 md:pb-3">
               {g.items.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setPage(item.id)}
                   className={cn(
-                    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                    "flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors md:w-full md:shrink md:px-3",
                     page === item.id
                       ? "bg-white text-[#262626] dark:bg-[#2A2A2A] dark:text-zinc-100"
                       : "text-[#6B6B6B] hover:bg-white hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#262626] dark:hover:text-zinc-200",
@@ -512,7 +513,7 @@ export function SettingsDialog({
             </div>
           </div>
         ))}
-        <div className="mt-auto shrink-0 border-t border-[#DEDEDE] px-5 py-4 text-xs dark:border-[#333333]">
+        <div className="mt-auto hidden shrink-0 border-t border-[#DEDEDE] px-5 py-4 text-xs dark:border-[#333333] md:block">
           <div className="space-y-1 text-[#8C8C8C] dark:text-zinc-500">
             {config.hasApiKey ? (
               <span className="text-[#E58F67]">◉ Key configured</span>
@@ -529,7 +530,7 @@ export function SettingsDialog({
       </aside>
 
       {/* 右侧内容页 */}
-      <main className="min-w-0 flex-1 overflow-y-auto bg-background px-8 py-10 md:px-12 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333333] [&::-webkit-scrollbar-track]:bg-transparent">
+      <main className="min-w-0 flex-1 overflow-y-auto bg-background px-4 py-6 md:px-8 md:py-10 lg:px-12 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333333] [&::-webkit-scrollbar-track]:bg-transparent">
         <div className="mx-auto w-full max-w-3xl pb-16">
           <div className="mb-7">
             <h1 className="text-2xl font-semibold text-zinc-100">{PAGE_TITLES[page]}</h1>

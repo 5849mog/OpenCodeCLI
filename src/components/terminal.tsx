@@ -878,7 +878,7 @@ export function Terminal() {
   const greeting = hour < 6 ? "夜深了" : hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好";
 
   return (
-    <div className="relative flex h-full flex-col bg-transparent text-foreground font-mono text-[length:var(--font-size-base)] leading-[1.618] tracking-[-0.01em]">
+    <div className="relative flex h-full flex-col bg-transparent pb-[env(safe-area-inset-bottom)] text-foreground font-mono text-[length:var(--font-size-base)] leading-[1.618] tracking-[-0.01em]">
       {/* 暖调光晕：静态装饰，衬在消息区后的深空里（仅低透明度，不抢内容） */}
       <div
         aria-hidden
@@ -1001,7 +1001,7 @@ export function Terminal() {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="relative z-10 flex-1 overflow-y-auto px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] [&::-webkit-scrollbar-track]:bg-transparent"
+        className="relative z-10 flex-1 overflow-y-auto px-4 py-4 sm:px-6 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] [&::-webkit-scrollbar-track]:bg-transparent"
       >
         {/* 居中限宽列：对话内容与输入框同宽对齐（ZCode 式） */}
         <div className="mx-auto w-full max-w-3xl space-y-4">
@@ -1044,12 +1044,12 @@ export function Terminal() {
       <div
         className={cn(
           isEmpty
-            ? "pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center px-4"
+            ? "pointer-events-none absolute inset-0 z-10 flex flex-col items-center overflow-x-hidden overflow-y-auto"
             : "mx-auto w-full max-w-3xl px-4 py-3",
         )}
       >
         {isEmpty && (
-          <div className="pointer-events-none relative flex flex-col items-center">
+          <div className="pointer-events-none relative my-auto flex w-full flex-col items-center px-4 py-10">
             {/* 光晕衬底：logo 与问候语后的暖色雾——深度感来自这里 */}
             <div
               aria-hidden
@@ -1060,13 +1060,13 @@ export function Terminal() {
               }}
             />
             {/* 背景装饰 Logo：超大低透明度几何图形（ZCode 式） */}
-            <svg viewBox="0 0 200 120" aria-hidden className="mb-10 h-32 w-56 text-white opacity-[0.05]">
+            <svg viewBox="0 0 200 120" aria-hidden className="mb-6 h-20 w-36 text-white opacity-[0.05] sm:mb-10 sm:h-32 sm:w-56">
               <path
                 fill="currentColor"
                 d="M30 15 L60 15 L124 85 L124 15 L150 15 L150 105 L120 105 L56 35 L56 105 L30 105 Z"
               />
             </svg>
-            <div className="mb-6 font-serif text-[21px] font-medium tracking-tight text-zinc-200 [font-variation-settings:'opsz'_40]">
+            <div className="mb-5 font-serif text-[18px] font-medium tracking-tight text-zinc-200 [font-variation-settings:'opsz'_40] sm:mb-6 sm:text-[21px]">
               {greeting}，接下来交给我吧
             </div>
           </div>

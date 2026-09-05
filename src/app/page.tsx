@@ -178,6 +178,7 @@ export default function Home() {
   const sessionId = useSession((s) => s.sessionId);
   const title = useSession((s) => s.title);
   const rightPanelOpen = useVfsView((s) => s.rightPanelOpen);
+  const setRightPanelOpen = useVfsView((s) => s.setRightPanelOpen);
   const sessions = useSession((s) => s.sessions);
   const newSession = useSession((s) => s.newSession);
   const switchSession = useSession((s) => s.switchSession);
@@ -249,11 +250,14 @@ export default function Home() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="flex h-screen bg-background">
-      {/* Left sidebar — conversation list, collapsible */}
+      {/* Left sidebar — conversation list, collapsible.
+          手机（<md）：展开态是覆盖层抽屉；桌面：常驻 288px 列 */}
       <aside
         className={cn(
           "flex flex-col border-r border-[#DEDEDE] bg-[#F5F5F5] transition-all duration-200 ease-in-out dark:border-sidebar-border dark:bg-sidebar",
-          sidebarCollapsed ? "w-14 shrink-0" : "w-72 shrink-0"
+          sidebarCollapsed
+            ? "w-14 shrink-0"
+            : "fixed inset-y-0 left-0 z-40 w-[86vw] max-w-[300px] shadow-2xl md:static md:z-auto md:w-72 md:max-w-none md:shrink-0 md:shadow-none",
         )}
       >
         {sidebarCollapsed ? (
@@ -270,6 +274,24 @@ export default function Home() {
                 title="展开侧边栏"
               >
                 <PanelLeftOpen className="h-4 w-4" />
+              </button>
+              {/* 手机端快捷：新建任务 / 搜索会话（抽屉两跳的捷径） */}
+              <button
+                onClick={() => void newSession()}
+                className="touch-target flex items-center justify-center rounded-lg text-[#8C8C8C] hover:bg-white hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-200"
+                title="新建任务 (⌘N / Ctrl+N)"
+              >
+                <CirclePlus className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => {
+                  setSidebarCollapsed(false);
+                  setSearchOpen(true);
+                }}
+                className="touch-target flex items-center justify-center rounded-lg text-[#8C8C8C] hover:bg-white hover:text-[#262626] dark:text-zinc-500 dark:hover:bg-[#262626] dark:hover:text-zinc-200"
+                title="搜索会话"
+              >
+                <Search className="h-4 w-4" />
               </button>
             </div>
             <div className="flex-1" />
@@ -463,23 +485,40 @@ export default function Home() {
         )}
       </aside>
 
+      {/* 手机端抽屉遮罩：点击关闭（桌面 md:hidden 不显示） */}
+      {!sidebarCollapsed && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      )}
+
       {/* Main area — terminal + file bag */}
       <main className="min-w-0 flex-1">
         <div className="flex h-full min-w-0">
           <div className="min-w-0 flex-1">
             <Terminal />
           </div>
-          {/* 右栏：默认隐藏，顶部右上角按钮滑入 */}
+          {/* 右栏：默认隐藏，顶部右上角按钮滑入
+              手机（<md）：全视口浮层抽屉；桌面：常驻 380px 列 */}
           <div
             className={cn(
               "h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-out",
-              rightPanelOpen ? "w-[380px] max-w-[90vw]" : "w-0",
+              rightPanelOpen
+                ? "fixed inset-y-0 right-0 z-40 w-[92vw] max-w-[380px] shadow-2xl md:static md:z-auto md:w-[380px] md:max-w-none md:shadow-none"
+                : "w-0",
             )}
           >
             <div className="h-full w-[380px] max-w-[90vw]">
               <FileBag />
             </div>
           </div>
+          {rightPanelOpen && (
+            <div
+              className="fixed inset-0 z-30 bg-black/50 md:hidden"
+              onClick={() => setRightPanelOpen(false)}
+            />
+          )}
         </div>
       </main>
 
