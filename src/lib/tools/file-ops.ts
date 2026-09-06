@@ -174,7 +174,6 @@ async function toolEditFile(args: Record<string, unknown>): Promise<ToolResult> 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("not found") && !replaceAll) {
-      const occurrences = countOccurrences(existing, oldString);
       return {
         ok: false,
         output: `Could not edit ${path}: ${msg}. (The exact string was not found. Check indentation, whitespace, and line endings. The file has ${existing.split("\n").length} lines.)`,

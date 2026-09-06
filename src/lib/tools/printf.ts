@@ -152,9 +152,7 @@ function formatInt(
 
   let sign = "";
   let v: bigint | number;
-  let unsigned = false;
   if (conv === "u" || conv === "x" || conv === "X" || conv === "o") {
-    unsigned = true;
     // 负数做 64 位补码回绕（模拟 x86_64：-1 → 18446744073709551615）
     v = n < 0 ? BigInt.asUintN(64, BigInt(n)) : BigInt(n);
   } else {

@@ -48,7 +48,6 @@ export interface JsResult {
 }
 
 let quickjsModule: Awaited<ReturnType<typeof getQuickJS>> | null = null;
-let wasmBinary: ArrayBuffer | null = null;
 let wasmReady = false;
 let initPromise: Promise<boolean> | null = null;
 
@@ -72,8 +71,9 @@ async function init(): Promise<boolean> {
   if (initPromise) return initPromise;
   initPromise = (async () => {
     try {
-      // 预取 wasm，显式注入（绕过打包器对 wasm 的默认处理）
-      wasmBinary = await fetchWasm();
+      // 预取 wasm 暖化 HTTP 缓存（绕过打包器对 wasm 的默认处理；
+      // 结果不再注入，quickjs-emscripten 自行加载）
+      await fetchWasm();
       // 加载 quickjs-emscripten 模块（打包器 import）
       quickjsModule = await getQuickJS();
       // 暖机测试：现代 JS + JSON 必须正常工作
@@ -207,7 +207,7 @@ function createContext(
       return { ok: false, output: `run_js: ${val.__error}` };
     }
 
-    let outParts: string[] = [...stdout];
+    const outParts: string[] = [...stdout];
     if (val && typeof val === "object" && "__result" in val && val.__result !== undefined) {
       outParts.push(typeof val.__result === "string" ? val.__result : JSON.stringify(val.__result));
     }

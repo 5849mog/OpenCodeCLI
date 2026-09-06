@@ -27,7 +27,6 @@ import {
   X,
   Search,
   ClipboardList,
-  Menu,
   PanelLeft,
   Bot,
   ScrollText,
@@ -58,7 +57,6 @@ import {
 
 export function FileBag() {
   const hydrated = useVfsView((s) => s.hydrated);
-  const version = useVfsView((s) => s.version);
   const init = useVfsView((s) => s.init);
 
   useEffect(() => {
@@ -94,7 +92,6 @@ function FileBagInner() {
   const bump = useVfsView((s) => s.bump);
   const rightPanelTab = useVfsView((s) => s.rightPanelTab);
   const setRightPanelTab = useVfsView((s) => s.setRightPanelTab);
-  const vfsVersion = useVfsView((s) => s.version);
   const sessionEvents = useSession((s) => s.events);
   // 子智能体角标：计算当前 runs 数量 + 是否有运行中。
   const subagentRuns = useMemo(() => buildRuns(sessionEvents), [sessionEvents]);
@@ -808,7 +805,6 @@ function TabbedEditor() {
   if (!activeTab) return null;
 
   const content = contents[activeTab] ?? "";
-  const savedContent = savedContents[activeTab] ?? "";
   const dirty = dirtyTabs[activeTab] ?? false;
   const language = detectLanguage(activeTab);
 

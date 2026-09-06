@@ -44,7 +44,9 @@ export function PayloadInspector({
 
   useEffect(() => {
     if (open) {
-      // The first two entries are system + workspace-context (read-only).
+      // 对话框打开时重置本地可编辑副本（dialog-open 状态重置惯用法，
+      // 依赖 lastSentPayload 变化同步刷新）。
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditable(lastSentPayload && lastSentPayload.length > 0
         ? lastSentPayload.slice(2).map((m) => ({ ...m }))
         : []);

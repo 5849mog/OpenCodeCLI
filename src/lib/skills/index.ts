@@ -71,7 +71,7 @@ interface StoredSkill {
 
 let skillDbPromise: Promise<IDBPDatabase> | null = null;
 /** 内存缓存的独立 store（读走 cache，写同步更新 + 后台持久化）。 */
-let skillCache = new Map<string, StoredSkill>();
+const skillCache = new Map<string, StoredSkill>();
 let skillHydrated = false;
 
 // --- 变化通知：自定义 skill 增删时 bump，供 UI（SkillsDialog）订阅实时刷新 ---
@@ -708,10 +708,6 @@ function bumpSkillVersion(): void {
 // ---------------------------------------------------------------------------
 // 发现 + 加载
 // ---------------------------------------------------------------------------
-
-function builtinToRecord(def: BuiltinSkillDef): StoredSkill {
-  return { name: def.name, files: def.files, createdAt: 0, updatedAt: 0 };
-}
 
 function frontmatterVersion(fm: Record<string, unknown> | null): string | undefined {
   const v = fm?.version;

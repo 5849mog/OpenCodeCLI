@@ -153,7 +153,7 @@ export async function truncateConversation(
   // the recent section. We drop in pairs (assistant tool_call + tool result)
   // to avoid orphaned tool_call_ids which some APIs reject.
   const droppedMsgs: ChatMessage[] = [];
-  let workingMiddle = [...compressedMiddle];
+  const workingMiddle = [...compressedMiddle];
 
   while (tokensAfter > maxTokens && workingMiddle.length > 0) {
     // Find a pair to drop: an assistant message with tool_calls followed by

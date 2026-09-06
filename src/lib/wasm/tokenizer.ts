@@ -39,7 +39,7 @@ function getClient(): WorkerClient {
 export type TokenizerStatus = "idle" | "loading" | "ready" | "failed";
 
 let status: TokenizerStatus = "idle";
-let statusSubs = new Set<(s: TokenizerStatus) => void>();
+const statusSubs = new Set<(s: TokenizerStatus) => void>();
 
 function setStatus(s: TokenizerStatus): void {
   if (status === s) return;
@@ -155,7 +155,7 @@ export async function countConversationTokensAccurate(msgs: ChatMessage[]): Prom
 
   const counts = flat.length > 0 ? await countTexts(flat) : [];
   let total = 0;
-  perMsg.forEach((p, i) => {
+  perMsg.forEach((p) => {
     let sum = p.local;
     for (const idx of p.partIdx) sum += counts[idx] ?? 0;
     total += p.overhead + sum;

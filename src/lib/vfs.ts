@@ -627,7 +627,7 @@ export const vfs = {
     const prefix = norm ? norm + "/" : "";
     const seen = new Set<string>();
     const result: VfsNode[] = [];
-    for (const [p, node] of cache.entries()) {
+    for (const p of cache.keys()) {
       if (p === norm) continue;
       if (!p.startsWith(prefix)) continue;
       const rest = p.slice(prefix.length);

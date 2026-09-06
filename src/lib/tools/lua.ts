@@ -13,7 +13,7 @@ export interface LuaResult {
 }
 
 /** JS 降级：不假意执行，明确告知原生引擎不可用。 */
-export function runLuaJs(script: string, _stdin?: string): LuaResult {
+export function runLuaJs(_script: string, _stdin?: string): LuaResult {
   return {
     ok: false,
     output:

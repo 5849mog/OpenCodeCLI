@@ -29,7 +29,6 @@ async function toolMultiEdit(args: Record<string, unknown>): Promise<ToolResult>
     const newString = String(edit.new_string ?? "");
     const replaceAll = Boolean(edit.replace_all);
     try {
-      const before = vfs.readFileSync(path) ?? "";
       const result = await vfs.editFile(path, oldString, newString, replaceAll);
       results.push({
         path,

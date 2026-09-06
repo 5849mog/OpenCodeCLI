@@ -14,7 +14,7 @@ export interface JsResult {
 }
 
 /** JS 降级：不假意执行，明确告知原生引擎不可用。 */
-export function runJsFallback(script: string, _stdin?: string): JsResult {
+export function runJsFallback(_script: string, _stdin?: string): JsResult {
   return {
     ok: false,
     output:

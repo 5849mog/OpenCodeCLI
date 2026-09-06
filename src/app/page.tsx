@@ -214,7 +214,6 @@ export default function Home() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [, setPanelDirection] = useState<"horizontal" | "vertical">("horizontal");
   const init = useSession((s) => s.init);
   const config = useSession((s) => s.config);
   const sessionId = useSession((s) => s.sessionId);
@@ -291,19 +290,6 @@ export default function Home() {
     const mq = window.matchMedia("(max-width: 80rem)");
     const handler = (e: MediaQueryListEvent | MediaQueryList) => {
       setSidebarCollapsed(e.matches);
-    };
-    mq.addEventListener("change", handler);
-    handler(mq);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-
-  // Responsive: panel direction switches to vertical on tablet
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 64rem)");
-    const handler = (e: MediaQueryListEvent | MediaQueryList) => {
-      const isVertical = e.matches;
-      setPanelDirection(isVertical ? "vertical" : "horizontal");
     };
     mq.addEventListener("change", handler);
     handler(mq);

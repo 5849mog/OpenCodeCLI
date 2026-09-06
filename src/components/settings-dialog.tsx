@@ -142,7 +142,6 @@ export function SettingsDialog({
   const setConfig = useSession((s) => s.setConfig);
   const refreshSessionList = useSession((s) => s.refreshSessionList);
   const setAvailableModels = useSession((s) => s.setAvailableModels);
-  const availableModels = useSession((s) => s.availableModels);
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [importing, setImporting] = useState(false);

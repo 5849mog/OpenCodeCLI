@@ -161,9 +161,7 @@ export function Terminal() {
   const events = useSession((s) => s.events);
   const isStreaming = useSession((s) => s.isStreaming);
   const isCompacting = useSession((s) => s.isCompacting);
-  const agentStatus = useSession((s) => s.agentStatus);
   const agentIteration = useSession((s) => s.agentIteration);
-  const agentMaxIterations = useSession((s) => s.agentMaxIterations);
   const totalTokens = useSession((s) => s.totalTokens);
   const compactedReleases = useSession((s) => s.compactedReleases ?? 0);
   const compactCount = useSession((s) => s.compactCount ?? 0);
@@ -2699,51 +2697,6 @@ function UserRow({
   );
 }
 
-/**
- * Thinking block — shows the model's reasoning_content (real thinking) as a
- * collapsible plain-text panel. Live (streaming) and final states share this
- * component, distinguished by the `streaming` prop.
- */
-function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }) {
-  const deferredText = useDeferredValue(text);
-  const isStale = deferredText !== text;
-  // Live always stays open (the thinking must be visible); final long blocks
-  // default collapsed. Evaluated once on mount — no cross-instance state.
-  const [collapsed, setCollapsed] = useState(() => !streaming && text.length > 400);
-  const preview = text.split("\n").find((l) => l.trim()) ?? text;
-  const shown = streaming ? deferredText : text;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 2 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15 }}
-      className="mb-1.5 overflow-hidden rounded-md border border-[#E58F67]/20 bg-[#E58F67]/5 dark:border-[#E58F67]/25"
-    >
-      <button
-        onClick={() => setCollapsed((c) => !c)}
-        disabled={streaming}
-        className="flex w-full items-center gap-1.5 px-2.5 py-1 text-left text-xs text-[#C08A5F] disabled:cursor-default dark:text-[#E8A87C]"
-      >
-        <ChevronRight className={cn("h-3 w-3 transition-transform", !collapsed && "rotate-90")} />
-        <AppIcon icon={Brain} size={12} className="text-[#E58F67]/70" />
-        <span className="font-medium">thinking</span>
-        {streaming && <Dots className="pl-1" />}
-        {!streaming && collapsed && <span className="ml-2 truncate text-[#A6A6A6]">{preview}</span>}
-        {!streaming && <span className="ml-auto text-[#A6A6A6]">{collapsed ? "show" : "hide"}</span>}
-      </button>
-      {!collapsed && (
-        <pre
-          className="max-h-64 overflow-auto whitespace-pre-wrap break-words px-3 pb-2.5 pt-0.5 font-mono text-xs leading-relaxed text-[#6B6B6B] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4]"
-          style={{ opacity: isStale ? 0.9 : 1 }}
-        >
-          {shown}
-        </pre>
-      )}
-    </motion.div>
-  );
-}
-
 function AssistantRow({
   text,
   reasoning,
@@ -2892,275 +2845,6 @@ function SubagentCard({
         <span className="shrink-0 text-[#A6A6A6]">查看详情 →</span>
       )}
     </motion.button>
-  );
-}
-
-function ToolCallRow({
-  name,
-  args,
-}: {
-  name: string;
-  args: Record<string, unknown>;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15 }}
-      className="rounded-md border border-[#DEDEDE] bg-gradient-to-r from-amber-950/15 to-zinc-900/30 px-3 py-2 text-xs dark:border-[#333333] dark:from-amber-950/25 dark:to-zinc-900/50"
-      style={{ borderLeft: "3px solid rgba(217, 119, 6, 0.5)" }}
-    >
-      <div className="flex items-center gap-2 text-[#B87B5A] dark:text-[#E8A87C]">
-        <AppIcon icon={Wrench} size={14} className="text-[#B87B5A] dark:text-[#E8A87C]" />
-        <span className="font-semibold tracking-wide">tool · {name}</span>
-      </div>
-      <div className="mt-1.5 space-y-0.5 pl-5 text-[#6B6B6B] dark:text-zinc-400">
-        {Object.entries(args).slice(0, 6).map(([k, v]) => (
-          <div key={k} className="flex gap-2">
-            <span className="text-[#8C8C8C] dark:text-zinc-500">{k}:</span>
-            <span className="flex-1 break-all text-[#383838] dark:text-zinc-300">
-              {formatArgValue(v)}
-            </span>
-          </div>
-        ))}
-        {Object.keys(args).length > 6 && (
-          <div className="text-[#A6A6A6] dark:text-zinc-500">… {Object.keys(args).length - 6} more</div>
-        )}
-      </div>
-    </motion.div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// ToolGroupRow — merged tool-call + tool-result card
-// Shows the tool name + args at top, and the result (collapsible) below.
-// ---------------------------------------------------------------------------
-
-function ToolGroupRow({
-  name,
-  args,
-  result,
-}: {
-  name: string;
-  args: Record<string, unknown>;
-  result: SessionEvent;
-}) {
-  const isPlan = !!result.plan;
-  const [collapsed, setCollapsed] = useState(!isPlan);
-  const showPath =
-    result.diff?.path ??
-    (typeof args.path === "string" ? args.path : null);
-  const select = useVfsView((s) => s.select);
-  const bump = useVfsView((s) => s.bump);
-  const output = result.toolOutput ?? "";
-  const ok = !!result.ok;
-
-  useEffect(() => {
-    if (result.diff || isPlan) bump();
-  }, [result.diff, isPlan, bump]);
-
-  const outputLineCount = output ? output.split("\n").length : 0;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15 }}
-      className="overflow-hidden rounded-md border border-[#DEDEDE] bg-[#FFFFFF] text-xs shadow-sm dark:border-[#333333] dark:bg-[#161616]"
-    >
-      {/* Header — tool name + status */}
-      <div className="flex items-center gap-2 bg-gradient-to-r from-amber-950/15 to-zinc-900/30 px-3 py-2 dark:from-amber-950/25 dark:to-zinc-900/50">
-        <AppIcon icon={Wrench} size={14} className="text-[#B87B5A] dark:text-[#E8A87C]" />
-        <span className="font-semibold tracking-wide text-[#B87B5A] dark:text-[#E8A87C]">
-          tool · {name}
-        </span>
-        <span className="ml-auto flex items-center gap-1">
-          {ok ? (
-            <AppIcon icon={CheckCircle2} size={14} className="text-[#E58F67]" />
-          ) : (
-            <AppIcon icon={XCircle} size={14} className="text-[#E54D2E]" />
-          )}
-        </span>
-      </div>
-
-      {/* Args — compact key-value pairs */}
-      {Object.keys(args).length > 0 && (
-        <div className="border-b border-[#DEDEDE] px-3 py-1.5 text-[#6B6B6B] dark:border-[#333333] dark:text-zinc-400">
-          {Object.entries(args).slice(0, 6).map(([k, v]) => (
-            <div key={k} className="flex gap-2">
-              <span className="shrink-0 text-[#8C8C8C] dark:text-zinc-500">{k}:</span>
-              <span className="break-all text-[#383838] dark:text-zinc-300">
-                {formatArgValue(v)}
-              </span>
-            </div>
-          ))}
-          {Object.keys(args).length > 6 && (
-            <div className="text-[#A6A6A6] dark:text-zinc-500">
-              … {Object.keys(args).length - 6} more
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Result section — collapsible */}
-      <div className="px-3 py-2">
-        <div className="flex items-center gap-2">
-          {showPath && !isPlan && (
-            <button
-              onClick={() => select(showPath)}
-              className="flex items-center gap-1 truncate rounded px-1 text-[#C08A5F] hover:bg-[#F0F0F0] dark:text-[#E8A87C] dark:hover:bg-[#2A2A2A]"
-              title="Open in editor"
-            >
-              <AppIcon icon={FileText} size={12} />
-              <span className="truncate">{showPath}</span>
-            </button>
-          )}
-          {!result.diff && !isPlan && output && (
-            <span className="text-[length:var(--font-size-ui-sm)] text-[#A6A6A6] dark:text-zinc-500">
-              {outputLineCount} line{outputLineCount !== 1 ? "s" : ""}
-            </span>
-          )}
-          {!isPlan && (
-            <button
-              onClick={() => setCollapsed((c) => !c)}
-              className="ml-auto text-[#8C8C8C] hover:text-[#383838] dark:text-zinc-500 dark:hover:text-zinc-200"
-            >
-              {collapsed ? "show" : "hide"}
-            </button>
-          )}
-        </div>
-
-        {isPlan ? (
-          <div className="mt-2 flex items-center gap-2 text-xs">
-            <AppIcon icon={ClipboardList} size={12} className="text-[#E58F67]" />
-            <span className="text-[#6B6B6B] dark:text-zinc-400">Plan updated. </span>
-            <button
-              onClick={() => useVfsView.getState().setRightPanelTab("plan")}
-              className="text-[#E58F67] underline hover:no-underline"
-            >
-              Open Plan panel →
-            </button>
-          </div>
-        ) : !collapsed && result.diff ? (
-          <div className="mt-2">
-            <DiffView
-              before={result.diff.before}
-              after={result.diff.after}
-            />
-          </div>
-        ) : (
-          !collapsed && output && (
-            <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words text-[#6B6B6B] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:text-zinc-400 dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
-              {output}
-            </pre>
-          )
-        )}
-      </div>
-    </motion.div>
-  );
-}
-
-function ToolResultRow({
-  name,
-  args,
-  output,
-  diff,
-  plan,
-  ok,
-}: {
-  name: string;
-  args: Record<string, unknown>;
-  output: string;
-  diff?: { path: string; before: string; after: string };
-  plan?: string;
-  ok: boolean;
-}) {
-  // update_plan uses a dedicated PlanView (checkbox list), never collapsed.
-  // All other tool results default to collapsed — diffs and long outputs can
-  // flood the terminal and push context out of view. User clicks "show" to
-  // expand any result they want to inspect.
-  const isPlan = !!plan;
-  const [collapsed, setCollapsed] = useState(!isPlan);
-  const showPath = diff?.path ?? (typeof args.path === "string" ? args.path : null);
-  const isMutation = !!diff;
-  const select = useVfsView((s) => s.select);
-  const bump = useVfsView((s) => s.bump);
-
-  useEffect(() => {
-    if (isMutation || isPlan) bump();
-  }, [isMutation, isPlan, bump]);
-
-  const outputLineCount = output ? output.split("\n").length : 0;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 4 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15 }}
-      className={cn(
-        "rounded-md border px-3 py-2 text-xs",
-        ok
-          ? "border-[#DEDEDE] bg-[#F5F5F5] dark:border-[#333333] dark:bg-[#161616]"
-          : "border-[#E54D2E]/20 bg-[#E54D2E]/5",
-      )}
-    >
-      <div className="flex items-center gap-2">
-        {ok ? (
-          <AppIcon icon={CheckCircle2} size={14} className="text-[#E58F67]" />
-        ) : (
-          <AppIcon icon={XCircle} size={14} className="text-[#E54D2E]" />
-        )}
-        <span className="font-semibold text-[#383838] dark:text-zinc-200">
-          {ok ? "result" : "failed"} · {name}
-        </span>
-        {showPath && !isPlan && (
-          <button
-            onClick={() => select(showPath)}
-            className="ml-1 flex items-center gap-1 truncate rounded px-1 text-[#C08A5F] hover:bg-[#F0F0F0] dark:text-[#E8A87C] dark:hover:bg-[#2A2A2A]"
-            title="Open in editor"
-          >
-            <AppIcon icon={FileText} size={12} />
-            <span className="truncate">{showPath}</span>
-          </button>
-        )}
-        {!diff && !isPlan && output && (
-          <span className="text-[10px] text-[#A6A6A6] dark:text-zinc-500">
-            {outputLineCount} line{outputLineCount !== 1 ? "s" : ""}
-          </span>
-        )}
-        {!isPlan && (
-          <button
-            onClick={() => setCollapsed((c) => !c)}
-            className="ml-auto text-[#8C8C8C] hover:text-[#383838] dark:text-zinc-500 dark:hover:text-zinc-200"
-          >
-            {collapsed ? "show" : "hide"}
-          </button>
-        )}
-      </div>
-
-      {isPlan ? (
-        <div className="mt-2 flex items-center gap-2 pl-5 text-xs">
-          <span className="text-[#E58F67]"><AppIcon icon={ClipboardList} size={12} /></span>
-          <span className="text-[#6B6B6B] dark:text-zinc-400">Plan updated. </span>
-          <button
-            onClick={() => useVfsView.getState().setRightPanelTab("plan")}
-            className="text-[#E58F67] underline hover:no-underline"
-          >
-            Open Plan panel →
-          </button>
-        </div>
-      ) : !collapsed && diff ? (
-        <div className="mt-2 pl-5">
-          <DiffView before={diff.before} after={diff.after} />
-        </div>
-      ) : (
-        !collapsed && output && (
-          <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words pl-5 text-[#6B6B6B] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] dark:text-zinc-400 dark:[&::-webkit-scrollbar-thumb]:bg-[#333333]">
-            {output}
-          </pre>
-        )
-      )}
-    </motion.div>
   );
 }
 
@@ -3417,7 +3101,6 @@ function MermaidBlock({ code }: { code: string }) {
   return <div ref={ref} className="my-2 flex justify-center" />;
 }
 
-let graphvizId = 0;
 // Graphviz.load() 返回的实例类型签名复杂（Format 枚举等），动态 import +
 // 已 Node 冒烟验证 dot() 用法，此处用 any 保持轻量。
 let graphvizPromise: Promise<any> | null = null;
@@ -3440,7 +3123,6 @@ function GraphvizBlock({ code }: { code: string }) {
   useEffect(() => {
     if (done.current || !ref.current || !isComplete) return;
     done.current = true;
-    const id = ++graphvizId;
     (async () => {
       try {
         const graphviz = await getGraphviz();
@@ -3473,7 +3155,6 @@ function GraphvizBlock({ code }: { code: string }) {
   return <div ref={ref} className="my-2 flex justify-center" />;
 }
 
-let chartId = 0;
 /** Chart.js — fenced code block with language "chart".
  *  Body is a JSON config: { type, data, options }. Renders a responsive
  *  line/bar/pie/scatter chart from data (e.g. parsed by parse_csv/query_json). */
@@ -3485,7 +3166,6 @@ function ChartBlock({ code }: { code: string }) {
   useEffect(() => {
     if (done.current || !canvasRef.current || !isComplete) return;
     done.current = true;
-    const id = ++chartId;
     (async () => {
       try {
         const config = JSON.parse(code);
@@ -3544,8 +3224,6 @@ const markdownComponents: Components = {
     <p className="my-1.5 leading-relaxed text-[#262626] dark:text-zinc-300">{children}</p>
   ),
   ul: ({ children, ...props }) => {
-    // task list?
-    const items = Array.isArray(children) ? children : [children];
     return (
       <ul className="my-1.5 ml-4 list-disc space-y-0.5 text-[#262626] dark:text-zinc-300" {...props}>
         {children}

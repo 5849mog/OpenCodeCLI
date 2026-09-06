@@ -387,42 +387,6 @@ function tokenizeWithOperators(cmd: string): string[] {
   return tokens;
 }
 
-async function runOneShellCommand(cmd: string, stdin?: string): Promise<{
-  ok: boolean;
-  output: string;
-  mutated?: boolean;
-}> {
-  return runOneShellCommandFromTokens(tokenize(cmd), stdin);
-}
-
-function tokenize(cmd: string): string[] {
-  const tokens: string[] = [];
-  let i = 0;
-  while (i < cmd.length) {
-    while (i < cmd.length && /\s/.test(cmd[i])) i++;
-    if (i >= cmd.length) break;
-    let token = "";
-    if (cmd[i] === '"' || cmd[i] === "'") {
-      const quote = cmd[i];
-      i++;
-      while (i < cmd.length && cmd[i] !== quote) {
-        token += cmd[i];
-        i++;
-      }
-      i++;
-    } else {
-      // Stop the word at a quote too, so `-t' '` yields ["-t", " "] instead of
-      // a single unterminated-quoted token that swallows the rest of the line.
-      while (i < cmd.length && !/\s/.test(cmd[i]) && cmd[i] !== '"' && cmd[i] !== "'") {
-        token += cmd[i];
-        i++;
-      }
-    }
-    tokens.push(token);
-  }
-  return tokens;
-}
-
 /** Split lines and strip trailing empty string from terminal \n. */
 function splitLines(s: string): string[] {
   const l = s.split("\n");
@@ -830,7 +794,7 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
       const pattern = useIname ? rest[inameIdx + 1] : nameIdx >= 0 ? rest[nameIdx + 1] : null;
       const execIdx = rest.indexOf("-exec");
       const execTokens = execIdx >= 0 ? rest.slice(execIdx + 1) : [];
-      let execCmd: string[] = [];
+      const execCmd: string[] = [];
       if (execIdx >= 0) {
         for (const t of execTokens) {
           if (/\\+;/.test(t) || t === ";") break;
@@ -1431,7 +1395,6 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
 
       // --- Unified diff ---
       const CTX = 3; // context lines per hunk
-      const MIN_SEP = CTX * 2 + 1; // min equal lines to split hunks
       const out: string[] = [`--- ${files[0]}`, `+++ ${files[1]}`];
       const maxLen = Math.max(aLines.length, bLines.length);
       let i = 0;
@@ -1586,7 +1549,6 @@ async function runOneShellCommandFromTokens(tokens: string[], stdin?: string, re
     }
     case "head_dash":
     case "strings": {
-      const minLen = 4;
       const file = resolvePath(rest.find((t) => !t.startsWith("-")) ?? "");
       if (!file) return { ok: false, output: `${program}: missing file` };
       const content = vfs.readFileSync(file);

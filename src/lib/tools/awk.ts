@@ -190,7 +190,7 @@ export function runAwk(script: string, content: string, fieldSep: RegExp | strin
     if (script[pos] === "{") {
       pos++;
       let depth = 1;
-      let actionStart = pos;
+      const actionStart = pos;
       while (pos < script.length && depth > 0) {
         if (script[pos] === "{") depth++;
         else if (script[pos] === "}") depth--;
@@ -331,12 +331,12 @@ export function runAwk(script: string, content: string, fieldSep: RegExp | strin
   }
 
   function evalCondition(cond: string, lineVars: Record<string, string | number>): boolean {
-    let expr = evalExpr(cond, lineVars);
+    const expr = evalExpr(cond, lineVars);
     const compMatch = expr.match(/^(.+?)\s*(<=|>=|==|!=|<|>|~|!~)\s*(.+)$/);
     if (compMatch) {
-      let [, left, op, right] = compMatch;
-      left = left.trim().replace(/^["']|["']$/g, "");
-      right = right.trim().replace(/^["']|["']$/g, "");
+      const [, leftRaw, op, rightRaw] = compMatch;
+      let left = leftRaw.trim().replace(/^["']|["']$/g, "");
+      let right = rightRaw.trim().replace(/^["']|["']$/g, "");
       if (op === "~" || op === "!~") {
         return op === "~" ? new RegExp(right).test(left) : !new RegExp(right).test(left);
       }

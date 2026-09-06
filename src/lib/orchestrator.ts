@@ -175,7 +175,7 @@ Output format: ["subtask 1 description", "subtask 2 description", ...]`;
       return parsed.slice(0, maxSubTasks).map(String);
     }
     return [];
-  } catch (e) {
+  } catch {
     return [];
   }
 }
@@ -288,7 +288,7 @@ Provide a concise, organized summary of the overall outcome.`;
 
     const c = result.message?.content;
     return (typeof c === "string" ? c : "") || collected;
-  } catch (e) {
+  } catch {
     return results
       .map((r) => `**${r.description}**: ${r.summary}`)
       .join("\n\n");

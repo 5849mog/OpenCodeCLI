@@ -24,10 +24,12 @@ const nextConfig: NextConfig = {
   // Trailing slash so GitHub Pages serves index.html for all routes.
   trailingSlash: true,
 
+  // 类型检查纳入构建门禁（tsc --noEmit 已全绿）。
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
-  reactStrictMode: false,
+  // StrictMode：dev 下双调 effect/渲染，暴露副作用清理缺失（全部监听器已有 cleanup）。
+  reactStrictMode: true,
 };
 
 export default nextConfig;

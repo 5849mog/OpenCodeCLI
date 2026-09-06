@@ -8,7 +8,7 @@
 
 import type { ToolResult } from "./types";
 import { apiKeyVault } from "@/lib/api-key-vault";
-import { fetchUrl, classifyNetworkError, searchWeb } from "@/lib/web";
+import { fetchUrl, searchWeb } from "@/lib/web";
 import { useSession } from "@/store/session";
 
 // ---------------------------------------------------------------------------

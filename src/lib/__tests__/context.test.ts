@@ -7,7 +7,7 @@ import {
   estimateTokens,
   truncateConversation,
 } from "../context";
-import type { ChatMessage, ToolCall } from "./ai-client";
+import type { ChatMessage, ToolCall } from "../ai-client";
 
 // context.ts 顶层 import 了 wasm/tokenizer（浏览器 Worker 桥接层）。
 // Node 测试里 mock 掉，避免任何 Worker 副作用；token 计数一律显式传 counter。
@@ -182,6 +182,6 @@ describe("truncateConversation", () => {
     expect(out.messages[0]).toBe(systemMsg);
     expect(out.messages[1]).toBe(workspaceMsg);
     expect(out.messages.slice(-2)).toEqual(recent);
-    expect(rest.some((m) => m.role === "user" && m.content.startsWith("filler 19"))).toBe(true);
+    expect(rest.some((m) => m.role === "user" && (m.content as string).startsWith("filler 19"))).toBe(true);
   });
 });

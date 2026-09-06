@@ -12,7 +12,7 @@
  *   await esbuildWasm.checkSyntax("function ( {", "ts");       // → 错误
  */
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+ 
 type EsbuildApi = typeof import("esbuild-wasm");
 
 let esb: EsbuildApi | null = null;

@@ -105,6 +105,8 @@ export function FileTypeIcon({
   path: string;
   className?: string;
 }) {
+  // getFileIcon 返回的是无状态 lucide 图标组件引用，非渲染期新建组件
   const Icon = getFileIcon(path);
+  // eslint-disable-next-line react-hooks/static-components
   return <Icon className={className} />;
 }
