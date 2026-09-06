@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { useSession } from "@/store/session";
 import { fetchModels, fetchBalance, type BalanceResult } from "@/lib/ai-client";
 import { apiKeyVault } from "@/lib/api-key-vault";
+import { confirmDialog } from "@/components/ui/confirm";
 import { listDeepSeekFiles, deleteDeepSeekFile, type DeepSeekFileInfo } from "@/lib/files-api";
 import {
   loadAllSessions,
@@ -312,7 +313,7 @@ export function SettingsDialog({
 
   const clearAllFiles = async () => {
     if (!files || files.length === 0) return;
-    if (!confirm(`确定要删除全部 ${files.length} 个已上传文件吗？此操作不可撤销。`)) return;
+    if (!(await confirmDialog({ title: "删除全部已上传文件", description: `共 ${files.length} 个文件，此操作不可撤销。`, confirmText: "删除", destructive: true }))) return;
     const key = apiKeyVault.getKey();
     if (!key) return;
     setFilesError(null);
@@ -432,9 +433,12 @@ export function SettingsDialog({
           return;
         }
         const sessions: PersistedSession[] = Array.isArray(parsed.sessions) ? parsed.sessions : [];
-        const confirmed = window.confirm(
-          `导入将覆盖本地全部 ${sessions.length ? `${sessions.length} 个` : ""}历史会话（全量覆盖，不可撤销）。继续？`,
-        );
+        const confirmed = await confirmDialog({
+          title: "导入会话（全量覆盖）",
+          description: `将覆盖本地全部 ${sessions.length ? `${sessions.length} 个` : ""}历史会话，不可撤销。继续？`,
+          confirmText: "覆盖导入",
+          destructive: true,
+        });
         if (!confirmed) return;
         // 全量覆盖：清空旧会话，写入导入的会话。
         await wipeAllSessions();

@@ -72,6 +72,7 @@ import { downloadBlob } from "@/lib/download";
 import { groupToolEvents, groupAssistantTurns, groupRounds, RoundBlock, StepCard, ThinkingStep, SubagentCard } from "./terminal/rounds";
 import { UserRow, AssistantRow, ErrorRow, SystemRow, PlanHeaderBadge } from "./terminal/rows";
 import { QuestionModal } from "./terminal/question";
+import { promptDialog } from "@/components/ui/confirm";
 
 /** DeepSeek 官方模型兜底：即使 /models 尚未拉取，也保证模型菜单能看到这几个。 */
 const DEEPSEEK_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-flash-vision-exp"];
@@ -869,9 +870,9 @@ export function Terminal() {
             {moreMenuOpen && (
               <div className="absolute left-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-xl border border-[#DEDEDE] bg-white shadow-xl shadow-black/10 dark:border-[#333333] glass-surface dark:shadow-black/40">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setMoreMenuOpen(false);
-                    const t = window.prompt("重命名会话", title || "新会话");
+                    const t = await promptDialog({ title: "重命名会话", input: { initial: title || "新会话", maxLength: 60 } });
                     if (t?.trim()) void renameSession(sessionId, t.trim());
                   }}
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-[length:var(--font-size-ui-sm)] text-[#383838] transition-colors hover:bg-[#F5F5F5] dark:text-zinc-300 dark:hover:bg-[#262626]"
@@ -1523,6 +1524,10 @@ export function Terminal() {
       {pendingQuestions && (
         <QuestionModal
           panel={pendingQuestions}
+          onCancel={() => {
+            setPendingQuestions(null);
+            void send("[用户跳过了这些提问，未作答。请基于已有信息继续，或换一种方式推进。]");
+          }}
           onSubmit={(answers) => {
             const answersText =
               `[用户回答 (${pendingQuestions.request_id})]:\n` +

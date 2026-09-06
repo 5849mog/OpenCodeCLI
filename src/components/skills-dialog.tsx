@@ -48,6 +48,7 @@ import { importSkillsFromZip, importSkillsFromDirectory, exportSkillZip } from "
 import { FileTypeIcon } from "@/lib/file-icon";
 import { MarkdownRenderer } from "./terminal/markdown";
 import { toast } from "sonner";
+import { confirmDialog } from "@/components/ui/confirm";
 import { cn } from "@/lib/utils";
 
 const SOURCE_LABEL: Record<Skill["source"], string> = {
@@ -347,7 +348,7 @@ export function SkillsDialog({
     refresh();
   };
   const handleDeleteFile = async (skill: string, path: string) => {
-    if (!window.confirm(`删除支撑文件「${path}」？此操作不可撤销。`)) return;
+    if (!(await confirmDialog({ title: `删除支撑文件「${path}」`, description: "此操作不可撤销。", confirmText: "删除", destructive: true }))) return;
     const res = await deleteSkillFile(skill, path);
     if (!res.ok) {
       toast.error(`删除失败：${res.error ?? ""}`);
@@ -381,7 +382,12 @@ export function SkillsDialog({
   const handleDelete = async (m: SkillMeta) => {
     const what = m.source === "builtin" ? `隐藏内置 skill「${m.name}」` : `删除自定义 skill「${m.name}」`;
     const depWarn = m.dependents.length > 0 ? `注意：${m.dependents.join("、")} 声明依赖它，删除后这些 skill 将缺依赖。` : "";
-    if (!window.confirm(`确定要${what}吗？${m.source === "builtin" ? "内置 skill 不可物理删除，将被隐藏。" : "整个文件夹（含支撑文件）将被移除，此操作不可撤销。"}${depWarn}`)) return;
+    if (!(await confirmDialog({
+      title: `确定要${what}吗？`,
+      description: `${m.source === "builtin" ? "内置 skill 不可物理删除，将被隐藏。" : "整个文件夹（含支撑文件）将被移除，此操作不可撤销。"}${depWarn}`,
+      confirmText: m.source === "builtin" ? "隐藏" : "删除",
+      destructive: true,
+    }))) return;
     await removeSkill(m.name);
     toast.success(m.source === "builtin" ? `已隐藏内置 skill「${m.name}」` : `已删除自定义 skill「${m.name}」`);
     reloadAll();
@@ -390,7 +396,17 @@ export function SkillsDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Skills 管理"
+      tabIndex={-1}
+      // 手写弹窗此前无 Escape 关闭（焦点陷阱需整体迁移 Radix Dialog，见后续）
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+    >
       <input
         ref={fileInputRef}
         type="file"

@@ -50,6 +50,19 @@ export const metadata: Metadata = {
   },
   applicationName: "Open Code Web",
   formatDetection: { telephone: false },
+  // 社交分享卡片：此前完全没有 OG/Twitter meta，链接分享无预览
+  openGraph: {
+    title: "Open Code Web — Browser-based AI Coding Agent",
+    description:
+      "浏览器里的 AI 编程 Agent：文件袋虚拟工作区 + 自有 API Key + 沙箱终端，开箱即用。",
+    type: "website",
+    images: ["./banner.svg"],
+  },
+  twitter: {
+    card: "summary",
+    title: "Open Code Web — Browser-based AI Coding Agent",
+    description: "浏览器里的 AI 编程 Agent。",
+  },
 };
 
 export const viewport: Viewport = {
@@ -66,7 +79,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="zh-CN" className="dark" suppressHydrationWarning>
       <body
         className={`${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable} antialiased bg-background text-foreground`}
       >

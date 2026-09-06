@@ -1,24 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { QuestionPanelData } from "@/store/session";
 
 // ---------------------------------------------------------------------------
 // QuestionModal — modal overlay that wraps QuestionPanel
 // Appears as a centered card with backdrop when AI calls ask_user_input.
+// 支持 Esc/点击遮罩取消（此前弹出后只能提交，用户被锁死在表单里）。
+// 取消时 AI 会收到一条「用户未作答」提示并自行决定下一步。
 // ---------------------------------------------------------------------------
 
 export function QuestionModal({
   panel,
   onSubmit,
+  onCancel,
 }: {
   panel: QuestionPanelData;
   onSubmit: (answers: Record<string, string | string[]>) => void;
+  onCancel?: () => void;
 }) {
+  useEffect(() => {
+    if (!onCancel) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="AI 提问"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && onCancel) onCancel();
+      }}
+    >
       <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-[#DEDEDE] bg-[#FFFFFF] shadow-2xl dark:border-[#333333] glass-surface">
-        <QuestionPanel panel={panel} onSubmit={onSubmit} />
+        <QuestionPanel panel={panel} onSubmit={onSubmit} onCancel={onCancel} />
       </div>
     </div>
   );
@@ -31,9 +52,11 @@ export function QuestionModal({
 export function QuestionPanel({
   panel,
   onSubmit,
+  onCancel,
 }: {
   panel: QuestionPanelData;
   onSubmit: (answers: Record<string, string | string[]>) => void;
+  onCancel?: () => void;
 }) {
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [otherInputs, setOtherInputs] = useState<Record<string, string>>({});
@@ -247,13 +270,21 @@ export function QuestionPanel({
       </div>
 
       {/* Submit */}
-      <div className="border-t border-[#DEDEDE] px-5 py-3 dark:border-[#333333]">
+      <div className="flex items-center gap-3 border-t border-[#DEDEDE] px-5 py-3 dark:border-[#333333]">
         <button
           onClick={handleSubmit}
           className="rounded-lg bg-[#E58F67] px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#C66B4A]"
         >
           {panel.submit_label}
         </button>
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="rounded-lg px-3 py-2 text-sm text-[#8C8C8C] transition-colors hover:text-[#262626] dark:text-zinc-500 dark:hover:text-zinc-300"
+          >
+            跳过（不回答）
+          </button>
+        )}
       </div>
     </div>
   );

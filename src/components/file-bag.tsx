@@ -43,6 +43,7 @@ import { SubagentPanel, buildRuns } from "@/components/subagent-panel";
 import { AuditPanel } from "@/components/audit-panel";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { confirmDialog } from "@/components/ui/confirm";
 import { motion } from "framer-motion";
 import {
   AlertDialog,
@@ -188,7 +189,7 @@ function FileBagInner() {
   };
 
   const handleClear = async () => {
-    if (!confirm("Clear the entire 文件袋? This cannot be undone.")) return;
+    if (!(await confirmDialog({ title: "清空文件袋", description: "全部文件将被删除，不可撤销。", confirmText: "清空", destructive: true }))) return;
     await vfs.clear();
     bump();
     setActiveTab(null);
@@ -823,7 +824,7 @@ function TabbedEditor() {
   };
 
   const remove = async (path: string) => {
-    if (!confirm(`Delete ${path}?`)) return;
+    if (!(await confirmDialog({ title: `删除 ${path}?`, confirmText: "删除", destructive: true }))) return;
     await vfs.delete(path);
     bump();
     closeTab(path);
@@ -876,10 +877,11 @@ function TabbedEditor() {
                 />
               ) : null}
               <button
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
                   if (isDirty) {
-                    if (!confirm(`${path} has unsaved changes. Close anyway?`)) return;
+                    const ok = await confirmDialog({ title: `关闭未保存的 ${path}?`, description: "有未保存更改，关闭将丢失。", confirmText: "关闭" });
+                    if (!ok) return;
                   }
                   closeTab(path);
                 }}

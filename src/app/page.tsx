@@ -6,6 +6,7 @@ import { MotionConfig } from "framer-motion";
 import { Terminal } from "@/components/terminal";
 import { FileBag } from "@/components/file-bag";
 import { HelpDialog } from "@/components/help-dialog";
+import { DialogHost } from "@/components/ui/confirm";
 // 重型弹窗懒加载：设置/技能对话框各 1000+ 行且非首屏必需，
 // 静态导出下 next/dynamic 自动拆 chunk，首屏 JS 显著减小。
 const SettingsDialog = dynamic(() => import("@/components/settings-dialog").then((m) => m.SettingsDialog));
@@ -329,6 +330,8 @@ export default function Home() {
 
   return (
     <MotionConfig reducedMotion="user">
+      {/* confirm/prompt 弹窗宿主（Promise 风格 API 的全局挂载点） */}
+      <DialogHost />
       <div
         className="flex min-h-dvh h-screen flex-col bg-background"
         style={{ height: "var(--app-vh, 100dvh)" }}
