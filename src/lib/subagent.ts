@@ -19,6 +19,7 @@ import {
   type ChatMessage,
 } from "./ai-client";
 import { vfs } from "./vfs";
+import { anySignal } from "./utils";
 import {
   TOOL_DEFINITIONS,
   dispatchTool,
@@ -153,9 +154,7 @@ ${opts.task}
     // 每请求超时：组合用户 signal 与 300s 超时（与主循环一致）
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(() => timeoutController.abort(), PER_REQUEST_TIMEOUT_MS);
-    const reqSignal = opts.signal
-      ? AbortSignal.any([opts.signal, timeoutController.signal])
-      : timeoutController.signal;
+    const reqSignal = anySignal(opts.signal, timeoutController.signal);
     let result: Awaited<ReturnType<typeof streamChatCompletionWithRetry>>;
     try {
       result = await streamChatCompletionWithRetry(

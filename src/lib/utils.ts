@@ -14,6 +14,21 @@ export function cn(...inputs: ClassValue[]) {
  * generates many ids in one tick). Always string-based and short-enough for
  * file paths / storage keys.
  */
+/** AbortSignal.any 的手动降级实现（Safari <17.4 无 AbortSignal.any）。
+ *  组合多个 signal：任一 abort → 返回的 signal 立即 abort。 */
+export function anySignal(...signals: Array<AbortSignal | undefined | null>): AbortSignal {
+  const controller = new AbortController();
+  for (const s of signals) {
+    if (!s) continue;
+    if (s.aborted) {
+      controller.abort(s.reason);
+      break;
+    }
+    s.addEventListener("abort", () => controller.abort(s.reason), { once: true });
+  }
+  return controller.signal;
+}
+
 export function uuid(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();

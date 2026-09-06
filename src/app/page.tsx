@@ -85,14 +85,15 @@ function SessionRow({
     touchStartX.current = e.touches[0].clientX;
   };
   const onTouchMove = (e: TouchEvent<HTMLDivElement>) => {
+    // React 的 touch 监听是 passive 的，preventDefault 在这里不生效（只报
+    // console 警告）——真正防止横向滚动的是 style 上的 touchAction: "pan-y"。
+    // 状态翻转靠 8px 阈值即可。
     if (touchStartX.current === null) return;
     const dx = e.touches[0].clientX - touchStartX.current;
     if (!revealed && dx < -8) {
-      e.preventDefault();
       setRevealed(true);
       touchStartX.current = e.touches[0].clientX;
     } else if (revealed && dx > 8) {
-      e.preventDefault();
       setRevealed(false);
       touchStartX.current = e.touches[0].clientX;
     }
@@ -117,7 +118,11 @@ function SessionRow({
         <Trash2 className="h-4 w-4" />
       </button>
       <div
-        onClick={onSwitch}
+        onClick={() => {
+          // 已露出删除区时，点击行内容先收起而不是切会话（iOS 惯例）
+          if (revealed) { setRevealed(false); return; }
+          onSwitch();
+        }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -274,14 +279,23 @@ export default function Home() {
   // iOS Safari: 软键盘弹起时 layout viewport 不变、100dvh 不会缩小，
   // 命令框会被键盘盖住。改用 visualViewport 实时高度驱动根容器
   // （--app-vh，桌面/无 var 时回落 100dvh）。
+  // 同时监听 scroll 并叠加 offsetTop：键盘弹出导致页面被平移时（iOS 上
+  // visualViewport.offsetTop > 0），视口相对 layout viewport 下移——只用
+  // height 的话命令框仍可能停在平移后的盲区。
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const onResize = () =>
-      document.documentElement.style.setProperty("--app-vh", `${vv.height}px`);
-    onResize();
-    vv.addEventListener("resize", onResize);
-    return () => vv.removeEventListener("resize", onResize);
+    const update = () => {
+      const h = vv.height + vv.offsetTop;
+      document.documentElement.style.setProperty("--app-vh", `${h}px`);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
   }, []);
 
   // Responsive: sidebar collapses by default below desktop breakpoint

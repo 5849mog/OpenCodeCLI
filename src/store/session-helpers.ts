@@ -48,9 +48,14 @@ export function bashCommandMutates(command: string): boolean {
   // Output redirection writes the file, EXCEPT fd-redirects `N>` / `N>>` like
   // `2>/dev/null` / `2>&1` (those are not file writes). A standalone `>` / `>>`
   // with a filename target writes.
-  // Match `>` or `>>` not preceded by a digit (excluding `2>`/`1>` fd-redirects)
-  // and not immediately `&` (i.e. not `2>&1`).
-  return /(?<![0-9])>>?(?!&)/.test(command);
+  // 用 indexOf 循环替代 lookbehind 正则（旧 Safari 解析 (?<![0-9]) 即抛错）。
+  for (let i = command.indexOf(">"); i >= 0; i = command.indexOf(">", i + 1)) {
+    const prev = command[i - 1];
+    if (prev >= "0" && prev <= "9") continue; // 数字 fd 重定向（2> / 1>>）
+    if (command[i + 1] === "&") continue;      // >& 合并 fd（2>&1）
+    return true;                               // > 或 >> 文件重定向写
+  }
+  return false;
 }
 
 /* ────────────────────────── auto-compact ────────────────────────── */

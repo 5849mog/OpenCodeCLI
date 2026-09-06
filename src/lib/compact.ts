@@ -19,6 +19,7 @@
  *      still has a real effect.
  */
 
+import { anySignal } from "./utils";
 import {
   streamChatCompletionWithRetry,
   type AiClientConfig,
@@ -131,7 +132,7 @@ async function summarizeWithLLM(
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), SUMMARY_TIMEOUT_MS);
-  const reqSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+  const reqSignal = anySignal(signal, controller.signal);
 
   try {
     const result = await streamChatCompletionWithRetry(

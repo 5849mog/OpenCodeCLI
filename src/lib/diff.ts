@@ -3,9 +3,19 @@ export type DiffRow =
   | { type: "add"; text: string; leftNum: null; rightNum: number }
   | { type: "del"; text: string; leftNum: number; rightNum: null };
 
+/** LCS DP 是 O(n·m) 内存/时间——3000 行 diff 就是 900 万格。超过阈值直接
+ *  退化为"全删+全增"（无对齐上下文），避免大文件写入时卡死渲染路径。 */
+const DIFF_MAX_CELLS = 2_000_000;
+
 export function lineDiff(a: string[], b: string[]): DiffRow[] {
   const n = a.length;
   const m = b.length;
+  if (n * m > DIFF_MAX_CELLS) {
+    const rows: DiffRow[] = [];
+    for (let i = 0; i < n; i++) rows.push({ type: "del", text: a[i], leftNum: i + 1, rightNum: null });
+    for (let j = 0; j < m; j++) rows.push({ type: "add", text: b[j], leftNum: null, rightNum: j + 1 });
+    return rows;
+  }
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {

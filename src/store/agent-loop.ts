@@ -375,6 +375,8 @@ export async function executeToolCall(
   signal?: AbortSignal,
   skipSnapshot = false,
 ) {
+  // Stop 后不再发起新工具工作——防止残留工具与用户新一轮 agent 循环并发写同一 store
+  if (signal?.aborted) return;
   // H3: ensure tool_call_id is non-empty (some providers don't return it)
   const toolCallId = tc.id || `tc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   if (!tc.id) tc.id = toolCallId;
@@ -607,6 +609,23 @@ export async function executeToolCall(
         if (result.mutated) useVfsView.getState().bump();
       }
     }
+  }
+
+  // 工具已在 Stop 前开始执行 → 等它跑完，但中止后只补 API 契约所需的 tool
+  // 消息（标记为已中止），跳过 tool-result 事件/持久化——防残留写入与新循环交错
+  if (signal?.aborted) {
+    set((s) => ({
+      messages: [
+        ...s.messages,
+        {
+          role: "tool" as const,
+          content: "(tool execution aborted by user)",
+          tool_call_id: toolCallId,
+          name: tc.function.name,
+        },
+      ],
+    }));
+    return;
   }
 
   set((s) => ({
