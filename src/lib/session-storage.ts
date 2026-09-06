@@ -277,7 +277,8 @@ export async function renameSession(id: string, title: string): Promise<void> {
   try {
     const meta = (await db.get(META_STORE, id)) as SessionMeta | undefined;
     if (!meta) return;
-    await db.put(META_STORE, { ...meta, title, updatedAt: Date.now() });
+    // 改名不动排序：updatedAt 只由聊天内容更新驱动，改名不该让旧会话浮顶。
+    await db.put(META_STORE, { ...meta, title });
   } catch {
     /* ignore */
   }

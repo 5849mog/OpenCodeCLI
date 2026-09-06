@@ -2,10 +2,6 @@
 "use client";
 
 import {
-} from "@/lib/ai-client";
-import {
-} from "@/lib/tools/index";
-import {
   saveSession,
   getActiveSessionId,
   type PersistedSession
@@ -41,20 +37,23 @@ function notifyPersistFailure(e: unknown): void {
 /** Debounced session persistence — avoids writing to IndexedDB on every token. */
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
+/**
+ * 脏标记：只有真正发生过改动的会话才允许落盘。
+ * 此前的去重是"全局最后一次保存签名"——用户仅查看一个会话再切走时，
+ * switchSession 的离开 flush 签名必然不符 → 全量重存 → updatedAt 被刷成
+ * 当前时间 → 会话在列表里凭空浮到顶部。改为脏标记后，查看不再是修改。
+ */
+let persistDirty = false;
+
 /** Immediately persist the current session, bypassing the debounce. */
-let lastPersistedSig = "";
 export async function flushPersist(get: () => SessionState): Promise<void> {
   if (saveTimer) {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
+  if (!persistDirty) return;
   const s = get();
   if (s.messages.length === 0) return;
-  // 内容签名去重：schedulePersist 500ms 节流后仍可能连续触发全量序列化
-  // （含 base64 附件时单次数 MB）——无新事件/消息时直接跳过。
-  const sig = `${s.sessionId}:${s.messages.length}:${s.events.length}:${s.events[s.events.length - 1]?.id ?? ""}:${s.totalTokens}`;
-  if (sig === lastPersistedSig) return;
-  lastPersistedSig = sig;
   const session: PersistedSession = {
     id: s.sessionId || getActiveSessionId(),
     title: s.title || "新会话",
@@ -71,9 +70,13 @@ export async function flushPersist(get: () => SessionState): Promise<void> {
     updatedAt: Date.now(),
   };
   await saveSession(session).catch((e: unknown) => notifyPersistFailure(e));
+  persistDirty = false;
+  // 保存成功后同步侧栏列表（时间/消息数）——列表不再只在切换会话时跳变。
+  void get().refreshSessionList();
 }
 
 export function schedulePersist(get: () => SessionState) {
+  persistDirty = true;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     flushPersist(get).catch((e: unknown) => notifyPersistFailure(e));

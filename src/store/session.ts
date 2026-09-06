@@ -384,6 +384,27 @@ export interface SessionState {
   setPendingZipRequest: (r: { requestId: string } | null) => void;
 }
 
+// ---------------------------------------------------------------------------
+// 回合身份守卫 —— 流式回合进行中用户可能切走会话（switch/new/clear 都会
+// abort 后整体替换 store 内容），而取消是协作式的：await 空窗里迟到的写回
+// 若不校验身份，会把旧回合的半截输出/错误注记落进新会话，尾声的
+// schedulePersist 还会把新会话误存一次。回合开始时捕获 sessionId，
+// 之后所有写回都走"会话未变才生效"的 turnSet。
+// ---------------------------------------------------------------------------
+type TurnSet = (
+  partial: Partial<SessionState> | ((s: SessionState) => Partial<SessionState>),
+) => void;
+function makeTurnSet(set: TurnSet, get: () => SessionState, turnSessionId: string): TurnSet {
+  return (partial) => {
+    if (get().sessionId !== turnSessionId) return;
+    set(partial);
+  };
+}
+
+// 快速连点两个会话的竞态守卫：两次 switchSession 交错 await loadSession，
+// 后完成者会覆盖先完成者、高亮与内容错位——序号不一致时放弃本次切换。
+let switchSessionSeq = 0;
+
 export const useSession = create<SessionState>((set, get) => ({
   events: [],
   messages: [],
@@ -560,11 +581,14 @@ export const useSession = create<SessionState>((set, get) => ({
 
   switchSession: async (id: string) => {
     if (id === get().sessionId) return;
+    const seq = ++switchSessionSeq;
     get().abort();
     setCwd(""); // 重置 bash 沙箱会话 cwd
     await flushPersist(get);
+    if (seq !== switchSessionSeq) return; // 更晚的切换已接管，放弃本次
     setActiveSessionId(id);
     const rec = await loadSession(id);
+    if (seq !== switchSessionSeq) return; // loadSession 期间有更晚的切换
     const events = rec?.events?.length ? rec.events : [];
     set({
       sessionId: id,
@@ -596,7 +620,7 @@ export const useSession = create<SessionState>((set, get) => ({
 
   setAgentPreset: (preset: AgentPreset) => {
     set({ agentPreset: preset });
-    void flushPersist(get);
+    schedulePersist(get);
   },
 
   deleteSession: async (id: string) => {
@@ -670,6 +694,8 @@ export const useSession = create<SessionState>((set, get) => ({
     // 而 UI 侧已清空附件，导致附件被静默丢弃。
     if (!trimmed && (!attachments || attachments.length === 0)) return;
     if (get().isStreaming) return;
+    const turnSessionId = get().sessionId;
+    const turnSet = makeTurnSet(set, get, turnSessionId);
 
     const config = get().config;
     if (!apiKeyVault.hasKey()) {
@@ -723,7 +749,7 @@ export const useSession = create<SessionState>((set, get) => ({
       ts: Date.now(),
     };
     const ac = new AbortController();
-    set((s) => {
+    turnSet((s) => {
       const newMessages = [...s.messages, userMsg];
       // Auto-title from the first user message (empty/new sessions only).
       const title = !s.title ? deriveTitle(trimmed) : s.title;
@@ -742,7 +768,7 @@ export const useSession = create<SessionState>((set, get) => ({
     });
 
     try {
-      await runAgentLoop(set, get, ac.signal);
+      await runAgentLoop(turnSet, get, ac.signal);
     } catch (e) {
       const isAbort = e instanceof Error && e.name === "AbortError";
       const errEvent: SessionEvent = {
@@ -755,7 +781,7 @@ export const useSession = create<SessionState>((set, get) => ({
             : String(e),
         ts: Date.now(),
       };
-      set((s) => ({
+      turnSet((s) => ({
         events: [...s.events, errEvent],
         isStreaming: false,
         abortController: null,
@@ -765,22 +791,24 @@ export const useSession = create<SessionState>((set, get) => ({
         agentIteration: 0,
       }));
     } finally {
-      set({
+      turnSet({
         isStreaming: false,
         abortController: null,
         agentStatus: "",
-  streamingText: null,
-      streamingReasoning: null,
+        streamingText: null,
+        streamingReasoning: null,
         agentIteration: 0,
       });
-      // Persist the final state of this turn.
-      schedulePersist(get);
+      // Persist the final state of this turn. 会话已切走时不得误存新会话。
+      if (get().sessionId === turnSessionId) schedulePersist(get);
     }
   },
 
   /** 重改：找到最后一轮 user 提问，丢弃其后全部消息/事件，用同一提问重跑。 */
   regenerate: async () => {
     if (get().isStreaming) return;
+    const turnSessionId = get().sessionId;
+    const turnSet = makeTurnSet(set, get, turnSessionId);
     const s = get();
     let lastUserMsgIdx = -1;
     for (let i = s.messages.length - 1; i >= 0; i--) {
@@ -816,7 +844,7 @@ export const useSession = create<SessionState>((set, get) => ({
       streamingReasoning: null,
     });
     try {
-      await runAgentLoop(set, get, ac.signal);
+      await runAgentLoop(turnSet, get, ac.signal);
     } catch (e) {
       const isAbort = e instanceof Error && e.name === "AbortError";
       const errEvent: SessionEvent = {
@@ -825,7 +853,7 @@ export const useSession = create<SessionState>((set, get) => ({
         text: isAbort ? "Stopped by user." : e instanceof Error ? classifyApiError(e) : String(e),
         ts: Date.now(),
       };
-      set((st) => ({
+      turnSet((st) => ({
         events: [...st.events, errEvent],
         isStreaming: false,
         abortController: null,
@@ -835,7 +863,7 @@ export const useSession = create<SessionState>((set, get) => ({
         agentIteration: 0,
       }));
     } finally {
-      set({
+      turnSet({
         isStreaming: false,
         abortController: null,
         agentStatus: "",
@@ -843,7 +871,7 @@ export const useSession = create<SessionState>((set, get) => ({
         streamingReasoning: null,
         agentIteration: 0,
       });
-      schedulePersist(get);
+      if (get().sessionId === turnSessionId) schedulePersist(get);
     }
   },
 
@@ -852,6 +880,8 @@ export const useSession = create<SessionState>((set, get) => ({
     if (get().isStreaming) return;
     const trimmed = newText.trim();
     if (!trimmed) return;
+    const turnSessionId = get().sessionId;
+    const turnSet = makeTurnSet(set, get, turnSessionId);
     const s = get();
     let userEventIdx = -1;
     for (let i = s.events.length - 1; i >= 0; i--) {
@@ -907,7 +937,7 @@ export const useSession = create<SessionState>((set, get) => ({
       streamingReasoning: null,
     });
     try {
-      await runAgentLoop(set, get, ac.signal);
+      await runAgentLoop(turnSet, get, ac.signal);
     } catch (e) {
       const isAbort = e instanceof Error && e.name === "AbortError";
       const errEvent: SessionEvent = {
@@ -916,7 +946,7 @@ export const useSession = create<SessionState>((set, get) => ({
         text: isAbort ? "Stopped by user." : e instanceof Error ? classifyApiError(e) : String(e),
         ts: Date.now(),
       };
-      set((st) => ({
+      turnSet((st) => ({
         events: [...st.events, errEvent],
         isStreaming: false,
         abortController: null,

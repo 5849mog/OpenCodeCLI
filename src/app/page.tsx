@@ -318,6 +318,11 @@ export default function Home() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
+  // 手机端（<桌面断点）点完会话/新建后收起抽屉；桌面常驻列不受影响
+  const closeSidebarIfNarrow = () => {
+    if (window.matchMedia("(max-width: 80rem)").matches) setSidebarCollapsed(true);
+  };
+
   // Body scroll lock when the session drawer is open.
   // Mobile: must lock — drawer is overlay and we don't want body to scroll behind.
   // Desktop: harmless — drawer is just a static column and body has no overflow.
@@ -464,8 +469,11 @@ export default function Home() {
             {/* 顶部导航：新建任务 ⌘N / 搜索 ⌘K / 插件市场（ZCode 式，带快捷键提示） */}
             <div className="flex flex-col gap-0.5 px-2 pb-2">
               <button
-                onClick={() => void newSession()}
-                className="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[#6B6B6B] transition-colors hover:bg-white hover:text-[#262626] dark:text-zinc-400 dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
+                onClick={() => {
+                  void newSession();
+                  closeSidebarIfNarrow();
+                }}
+                className="group flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[#6B6B6B] transition-colors hover:bg-white hover:text-[#262626] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-200"
               >
                 <CirclePlus className="h-4 w-4 shrink-0" />
                 新建任务
@@ -543,21 +551,24 @@ export default function Home() {
             <div className="flex-1 overflow-y-auto px-2 py-2">
               {(() => {
                 const q = searchQuery.trim().toLowerCase();
-                // 当前会话可能还没写入 sessions 列表（首条消息前）——兜底一个伪 meta，保证它始终显示
+                // 严格按更新时间排序（listSessions 已按 updatedAt 降序返回），
+                // 当前会话不置顶——只有真正聊天落盘才会浮到顶部。
+                // 首条消息前会话未持久化、不在列表里——补一个伪条目（时间取
+                // 当前值，自然排最前），保证新会话始终可见。
                 const fromList = sessions.find((s) => s.id === sessionId);
-                const current: SessionMeta =
-                  fromList ?? {
-                    id: sessionId,
-                    title: title || "新会话",
-                    createdAt: Date.now(),
-                    updatedAt: Date.now(),
-                    totalTokens: 0,
-                    messageCount: 0,
-                  };
-                const rest = sessions
-                  .filter((s) => s.id !== sessionId)
-                  .sort((a, b) => b.updatedAt - a.updatedAt);
-                const ordered = [current, ...rest];
+                const ordered: SessionMeta[] = fromList
+                  ? sessions
+                  : [
+                      {
+                        id: sessionId,
+                        title: title || "新会话",
+                        createdAt: Date.now(),
+                        updatedAt: Date.now(),
+                        totalTokens: 0,
+                        messageCount: 0,
+                      },
+                      ...sessions,
+                    ];
                 const list = q
                   ? ordered.filter((s) => (s.title || "新会话").toLowerCase().includes(q))
                   : ordered;
@@ -575,7 +586,10 @@ export default function Home() {
                         key={s.id}
                         session={s}
                         active={s.id === sessionId}
-                        onSwitch={() => void switchSession(s.id)}
+                        onSwitch={() => {
+                          void switchSession(s.id);
+                          closeSidebarIfNarrow();
+                        }}
                         onRename={(t) => void renameSession(s.id, t)}
                         onDelete={() => void deleteSession(s.id)}
                       />
