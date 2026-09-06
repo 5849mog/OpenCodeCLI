@@ -79,7 +79,8 @@ export function compressToolResult(msg: ChatMessage): ChatMessage {
   if (msg.role !== "tool" || typeof msg.content !== "string") return msg;
   const content = msg.content;
   if (content.length <= 200) return msg;
-  const firstLine = content.split("\n")[0];
+  // 首行封顶 120 字符：单行超长输出（如 base64/长 JSON）此前会"压缩后反而更长"
+  const firstLine = content.split("\n")[0].slice(0, 120);
   const lineCount = content.split("\n").length;
   const name = msg.name ? ` (${msg.name})` : "";
   return {

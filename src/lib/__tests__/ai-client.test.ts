@@ -40,4 +40,13 @@ describe("classifyApiError", () => {
     const out = classifyApiError(new Error("something exploded"));
     expect(out).toBe("something exploded");
   });
+
+  it("状态码按词边界解析——'API error 5000' 不误判为可重试的 500", () => {
+    // 5000 无独立词边界码 500 → 走透传而非 Bad request
+    expect(classifyApiError(new Error("API error 5000 details"))).toBe("API error 5000 details");
+  });
+
+  it("'模型 4001 不存在' 不误判为 400 Bad request", () => {
+    expect(classifyApiError(new Error("模型 4001 不存在"))).toBe("模型 4001 不存在");
+  });
 });

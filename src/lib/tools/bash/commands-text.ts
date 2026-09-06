@@ -82,12 +82,21 @@ export async function runTextCommands(ctx: BashCaseCtx): Promise<CaseResult> {
         return isSingleFile ? `${idx + 1}${sep} ` : `${fileArg}:${idx + 1}${sep} `;
       };
 
-      /** Find all matching line indices. */
+      /** Find all matching line indices. Cap at 100（与 workspace grep 的 max:100
+       *  对齐——此前单文件/stdin 路径无上限，大文件会把数万行灌进 AI 上下文）。 */
+      let hitsTruncated = false;
       const findHits = function (lines: string[]): number[] {
         const h: number[] = [];
-        for (let i = 0; i < lines.length; i++) { if (matchLine(lines[i])) h.push(i); }
+        for (let i = 0; i < lines.length; i++) {
+          if (matchLine(lines[i])) {
+            if (h.length >= 100) { hitsTruncated = true; break; }
+            h.push(i);
+          }
+        }
         return h;
       };
+      const hitsTruncNote = () =>
+        hitsTruncated ? "\n⚠️ grep: results TRUNCATED at 100 — there are MORE matches. Narrow the search." : "";
 
       /** Parse context value from rest (supports -C3 and -C 3). */
       const getCtxVal = function (flag: string): number {
@@ -160,8 +169,8 @@ export async function runTextCommands(ctx: BashCaseCtx): Promise<CaseResult> {
 
       if (stdin !== undefined) {
         const lines = splitLines(stdin);
-        const out = formatMatches(lines, true);
-        return { ok: true, output: withHint(out.join("\n") || "") };
+        const out = formatMatches(lines, true) as string[]; const outAll = hitsTruncated ? [...out, hitsTruncNote()] : out;
+        return { ok: true, output: withHint(outAll.join("\n") || "") };
       }
       if (fileArg) {
         const content = vfs.readFileSync(fileArg);
@@ -180,8 +189,8 @@ export async function runTextCommands(ctx: BashCaseCtx): Promise<CaseResult> {
           return { ok: false, output: `grep: ${fileArg}: not found` };
         }
         const lines = splitLines(content);
-        const out = formatMatches(lines, false);
-        return { ok: true, output: withHint(out.join("\n") || "") };
+        const out = formatMatches(lines, false) as string[]; const outAll = hitsTruncated ? [...out, hitsTruncNote()] : out;
+        return { ok: true, output: withHint(outAll.join("\n") || "") };
       }
       // Workspace-wide search (no file arg)
       const matches = grepSync(syncPattern, { regex: true, caseSensitive, max: 100 });

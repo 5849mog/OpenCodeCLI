@@ -146,10 +146,10 @@ describe("truncateConversation", () => {
     for (let i = 0; i < 10; i++) recent.push(userMsg(`recent ${i} ${"z".repeat(50)}`));
     const msgs = [systemMsg, workspaceMsg, ...fillers, ...recent];
 
-    const out = await truncateConversation(msgs, counter(msgs) / 2, 10, counter);
+    const out = await truncateConversation(msgs, counter(msgs) / 20, 10, counter);
     expect(out.dropped).toBeGreaterThan(0);
     expect(out.compressed).toBeGreaterThan(0);
-    expect(out.tokensAfter).toBeLessThanOrEqual(counter(msgs) / 2);
+    expect(out.tokensAfter).toBeLessThanOrEqual(counter(msgs) / 20);
     // 头两条受保护
     expect(out.messages[0]).toBe(systemMsg);
     expect(out.messages[1]).toBe(workspaceMsg);

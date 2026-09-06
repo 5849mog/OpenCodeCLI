@@ -37,6 +37,7 @@ import {
 } from "@/lib/session-storage";
 import {  apiKeyVault  } from "@/lib/api-key-vault";
 import {  nextId,  flushPersist,  schedulePersist  } from "./session-persist";
+import {  setCwd  } from "@/lib/tools/bash/context";
 import {  doCompact  } from "./session-compact";
 import {  runAgentLoop } from "./agent-loop";
 import {  MODE_SWITCH_PREFIX, isModeSwitchMessage  } from "./session-helpers";
@@ -524,6 +525,7 @@ export const useSession = create<SessionState>((set, get) => ({
 
   newSession: async () => {
     get().abort();
+    setCwd(""); // 重置 bash 沙箱会话 cwd（跨会话残留会让相对路径解析错乱）
     await flushPersist(get);
     const preset = get().config.defaultPreset ?? "full";
     const session = await createSession(undefined, preset);
@@ -559,6 +561,7 @@ export const useSession = create<SessionState>((set, get) => ({
   switchSession: async (id: string) => {
     if (id === get().sessionId) return;
     get().abort();
+    setCwd(""); // 重置 bash 沙箱会话 cwd
     await flushPersist(get);
     setActiveSessionId(id);
     const rec = await loadSession(id);

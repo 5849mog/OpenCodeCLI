@@ -310,22 +310,22 @@ export async function streamChatCompletionWithRetry(
       if (attempt >= maxRetries) break;
       // Classify the error
       const msg = lastError.message;
+      // Classify the error（按词边界解析状态码——"4001"/"5000" 不会误判为 400/500）
+      const code = statusCodeOf(msg);
       const isRetryable =
-        msg.includes("429") ||
-        msg.includes("503") ||
-        msg.includes("500") ||
-        msg.includes("502") ||
-        msg.includes("504") ||
-        msg.includes("Network error") ||
-        msg.includes("Failed to fetch") ||
-        msg.includes("network");
+        code === 429 ||
+        code === 500 ||
+        code === 502 ||
+        code === 503 ||
+        code === 504 ||
+        /network/i.test(msg) ||
+        msg.includes("Failed to fetch");
       // 401/403/400 are not retryable
       const isFatal =
-        msg.includes("401") ||
-        msg.includes("403") ||
-        msg.includes("400") ||
-        msg.includes("Invalid API key") ||
-        msg.includes("invalid_api_key");
+        code === 401 ||
+        code === 403 ||
+        code === 400 ||
+        /invalid_api_key|Invalid API key/i.test(msg);
       if (isFatal || !isRetryable) break;
       // Exponential backoff: 1s, 2s, 4s
       const delayMs = Math.pow(2, attempt) * 1000;
@@ -340,22 +340,29 @@ export async function streamChatCompletionWithRetry(
   throw lastError ?? new Error("Unknown error after retries");
 }
 
+/** 从错误消息中按词边界解析 HTTP 状态码——避免 "4001"/"5000" 被 includes("400")/includes("500") 误判。 */
+function statusCodeOf(msg: string): number | null {
+  const m = /\b([345]\d{2})\b/.exec(msg);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 /** Classify an API error into a user-friendly message. */
 export function classifyApiError(err: Error): string {
   const msg = err.message;
-  if (msg.includes("401") || msg.includes("Invalid API key") || msg.includes("invalid_api_key")) {
+  const code = statusCodeOf(msg);
+  if (code === 401 || msg.includes("Invalid API key") || msg.includes("invalid_api_key")) {
     return "API key is invalid or unauthorized. Open Settings and check your key.";
   }
-  if (msg.includes("403")) {
+  if (code === 403) {
     return "API key does not have permission for this model. Check your provider dashboard.";
   }
-  if (msg.includes("429")) {
+  if (code === 429) {
     return "Rate limited by the provider. Wait a moment and try again, or switch to a different model/key.";
   }
-  if (msg.includes("400") && msg.includes("context_length")) {
+  if (code === 400 && msg.includes("context_length")) {
     return "Conversation exceeds the model's context window. Start a new session with /clear, or switch to a model with a larger context window.";
   }
-  if (msg.includes("400")) {
+  if (code === 400) {
     return `Bad request: ${msg.slice(0, 200)}`;
   }
   if (msg.includes("Network error") || msg.includes("Failed to fetch")) {

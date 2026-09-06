@@ -24,16 +24,20 @@ mermaid.initialize({
 let mermaidId = 0;
 export function MermaidBlock({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const done = useRef(false);
+  const attemptedCode = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isComplete = code.trim().length > 10 && code.includes('\n');
   useEffect(() => {
-    if (done.current || !ref.current || !isComplete) return;
-    done.current = true;
+    if (!ref.current || !isComplete) return;
+    // 每个 code 版本只尝试一次；流式期间代码增长 → 新版本自动重试，
+    // 修复此前"半截代码渲染失败后被一次性锁死在错误态"的问题。
+    if (attemptedCode.current === code) return;
+    attemptedCode.current = code;
     const id = ++mermaidId;
     (async () => {
       try {
         const { svg } = await mermaid.render('mermaid-' + id, code);
+        setError(null);
         if (ref.current) ref.current.innerHTML = svg;
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -65,12 +69,13 @@ async function getGraphviz() {
  *  diagrams where mermaid's flowchart layout falls short. */
 export function GraphvizBlock({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const done = useRef(false);
+  const attemptedCode = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isComplete = code.trim().length > 5;
   useEffect(() => {
-    if (done.current || !ref.current || !isComplete) return;
-    done.current = true;
+    if (!ref.current || !isComplete) return;
+    if (attemptedCode.current === code) return;
+    attemptedCode.current = code;
     (async () => {
       try {
         const graphviz = await getGraphviz();
@@ -88,6 +93,7 @@ export function GraphvizBlock({ code }: { code: string }) {
           .replace(/\s(href|xlink:href)="[^"]*"/g, "")
           .replace(/<script[\s\S]*?<\/script>/gi, "")
           .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "");
+        setError(null);
         if (ref.current) ref.current.innerHTML = svg;
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
@@ -108,12 +114,19 @@ export function GraphvizBlock({ code }: { code: string }) {
  *  line/bar/pie/scatter chart from data (e.g. parsed by parse_csv/query_json). */
 export function ChartBlock({ code }: { code: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const done = useRef(false);
+  const attemptedCode = useRef<string | null>(null);
+  const chartRef = useRef<{ destroy: () => void } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isComplete = code.trim().length > 5;
+  // 卸载时销毁实例——Chart.js 持有 canvas/ResizeObserver，不 destroy 会泄漏
+  useEffect(() => () => {
+    chartRef.current?.destroy();
+    chartRef.current = null;
+  }, []);
   useEffect(() => {
-    if (done.current || !canvasRef.current || !isComplete) return;
-    done.current = true;
+    if (!canvasRef.current || !isComplete) return;
+    if (attemptedCode.current === code) return;
+    attemptedCode.current = code;
     (async () => {
       try {
         const config = JSON.parse(code);
@@ -123,7 +136,9 @@ export function ChartBlock({ code }: { code: string }) {
         const { Chart } = await import("chart.js/auto");
         const canvas = canvasRef.current;
         if (!canvas) return;
-        new Chart(canvas, {
+        // 同一块 canvas 重复创建会报 "Canvas is already in use"——先销毁旧实例
+        chartRef.current?.destroy();
+        chartRef.current = new Chart(canvas, {
           ...config,
           options: {
             responsive: true,
@@ -136,7 +151,8 @@ export function ChartBlock({ code }: { code: string }) {
             },
             ...(config.options ?? {}),
           },
-        });
+        }) as unknown as { destroy: () => void };
+        setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       }
