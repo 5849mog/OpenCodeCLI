@@ -137,14 +137,19 @@
   }
   html {
     /* Full-height: body scroll lives inside layout panels; the root never
-       rubber-bands. Combined with min-h-dvh on the app shell, iOS keyboard
-       pushes content up instead of covering it. */
+       rubber-bands. Keyboard sizing is handled by --app-vh (visualViewport). */
     height: 100%;
+    /* App 壳布局：所有滚动都发生在内部面板（对话流/侧栏/文件袋），
+       文档级滚动必须禁止——否则 iOS 上任何瞬时溢出都会把顶栏和输入框
+       整体滚出可视区。 */
+    overflow: hidden;
   }
   html,
   body {
-    /* Rubber-band: keep page-level scroll but suppress edge bounce on pull. */
-    overscroll-behavior-y: contain;
+    height: 100%;
+    overflow: hidden;
+    /* Suppress edge bounce on pull（壳固定后页面本无可滚动余量）。 */
+    overscroll-behavior: none;
     /* Faster taps + avoid gesture conflict (pinch/double-tap zoom). */
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;

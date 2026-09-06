@@ -283,14 +283,18 @@ export default function Home() {
   // iOS Safari: 软键盘弹起时 layout viewport 不变、100dvh 不会缩小，
   // 命令框会被键盘盖住。改用 visualViewport 实时高度驱动根容器
   // （--app-vh，桌面/无 var 时回落 100dvh）。
-  // 同时监听 scroll 并叠加 offsetTop：键盘弹出导致页面被平移时（iOS 上
-  // visualViewport.offsetTop > 0），视口相对 layout viewport 下移——只用
-  // height 的话命令框仍可能停在平移后的盲区。
+  // 注意：这里只能用 vv.height，不能加 offsetTop——加了之后任何瞬时的
+  // 页面平移（键盘收起、弹性回弹、缩放）都会把根容器撑得比可视区更高，
+  // body 随之可滚，整个 App 壳（顶栏+输入框）会被一起滚走且越滚越糟。
+  // 缩放（scale>1）时跳过更新，避免双指缩放期间壳高度乱跳。
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
     const update = () => {
-      const h = vv.height + vv.offsetTop;
+      if (vv.scale > 1) return;
+      // 钳到 layout viewport 高度：保证根容器永不超出文档可视高度，
+      // body 始终无可滚动溢出，顶栏/输入框固定不动。
+      const h = Math.min(vv.height, window.innerHeight);
       document.documentElement.style.setProperty("--app-vh", `${h}px`);
     };
     update();
@@ -333,7 +337,7 @@ export default function Home() {
       {/* confirm/prompt 弹窗宿主（Promise 风格 API 的全局挂载点） */}
       <DialogHost />
       <div
-        className="flex min-h-dvh h-screen flex-col bg-background"
+        className="flex h-screen flex-col bg-background"
         style={{ height: "var(--app-vh, 100dvh)" }}
       >
       {/* 手机页级顶栏（ZCode「← 任务会话」式）：手机隐藏左侧轨道，会话列表走抽屉 */}
