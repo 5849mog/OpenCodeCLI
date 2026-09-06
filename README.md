@@ -266,12 +266,29 @@ npm run build:pages    # 或：根路径（username.github.io）一键构建 + .
 
 ```bash
 npm run dev            # 开发服务器（Turbopack）
-npm run lint           # ESLint
-npm run build          # 生产构建（静态导出）
+npm run lint           # ESLint（no-unused-vars 等门禁已收紧）
+npm run build          # 生产构建（静态导出 + TS 类型检查门禁）
+npm test               # Vitest 单测（102 项）
 
 # 测试套件
+npm test                      # bash 沙箱/VFS/上下文压缩/错误分类/Skills 解析/diff
 node scripts/e2e-preset.mjs   # 24 项：prompt 前缀稳定性、工具白名单等
 node scripts/e2e-vision.mjs   # 5 项：视觉消息 token 计数
+
+# 维护脚本
+node scripts/find-unused-deps.cjs   # 扫描未引用依赖（卸载前核实用）
+node scripts/find-unused-ui.cjs     # shadcn ui 传递闭包孤儿分析
+```
+
+### 模块结构（三大核心文件已按职责拆分）
+
+```
+src/components/terminal.tsx      # 终端编排壳 + EventRow 分发表
+src/components/terminal/         # markdown / charts / rounds / rows / question / diff-view
+src/lib/tools/bash/              # bash 沙箱：index（解析分发）+ context + 三族命令文件
+src/store/session.ts             # store 定义 + 类型（编排层）
+src/store/agent-loop.ts          # agent 主循环 + executeToolCall
+src/store/session-{persist,compact,helpers}.ts
 ```
 
 ---
