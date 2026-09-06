@@ -24,6 +24,15 @@ export function formatToolArgsPreview(args: Record<string, unknown>): string {
   return "";
 }
 
+/** toggleMode 注入的 AI 可见模式提示前缀。该消息不产生对应 event、不是真实
+ *  用户输入——在 user 事件↔消息序号映射（rewriteFromMessage/regenerate）里
+ *  必须跳过，否则会把真实用户消息顶掉（错位改写/内容丢失）。 */
+export const MODE_SWITCH_PREFIX = "[Mode Switch]";
+
+export function isModeSwitchMessage(msg: { role: string; content: unknown }): boolean {
+  return msg.role === "user" && typeof msg.content === "string" && msg.content.startsWith(MODE_SWITCH_PREFIX);
+}
+
 /**
  * Heuristic: does this bash command likely WRITE to the VFS? Undo snapshots are
  * only worthwhile before a mutation — we don't want every read-only `cat`/`ls`

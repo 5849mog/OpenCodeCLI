@@ -5,6 +5,34 @@ import { bashPrintf } from "../printf";
 import { vfs, resolvePath, getCwd, setCwd } from "./context";
 import type { BashCaseCtx, CaseResult } from "./context";
 
+/** test / [ 共用的文件谓词判定。返回 { ok }，ok 即退出码。 */
+function runTestPredicate(rest: string[]): { ok: boolean; output: string } {
+  const fFlag = rest.indexOf("-f");
+  const dFlag = rest.indexOf("-d");
+  const sFlag = rest.indexOf("-s");
+  const eFlag = rest.indexOf("-e");
+  const notFlag = rest.indexOf("!");
+  const isNot = notFlag >= 0;
+  if (fFlag >= 0) {
+    const path = resolvePath(rest[fFlag + 1] ?? "");
+    const stat = vfs.readFileSync(path) !== null;
+    return { ok: isNot ? !stat : stat, output: "" };
+  }
+  if (dFlag >= 0) {
+    const path = resolvePath(rest[dFlag + 1] ?? "");
+    const stat = vfs.statSync(path);
+    const ok = stat !== null && stat.type === "dir";
+    return { ok: isNot ? !ok : ok, output: "" };
+  }
+  if (sFlag >= 0 || eFlag >= 0) {
+    const path = resolvePath(rest[(sFlag >= 0 ? sFlag : eFlag) + 1] ?? "");
+    const stat = vfs.readFileSync(path) !== null;
+    return { ok: isNot ? !stat : stat, output: "" };
+  }
+  if (rest.length === 1 && rest[0] === "!") return { ok: false, output: "" };
+  return { ok: true, output: "" };
+}
+
 export async function runMiscCommands(ctx: BashCaseCtx): Promise<CaseResult> {
   const { program, rest, stdin } = ctx;
   switch (program) {
@@ -138,6 +166,15 @@ export async function runMiscCommands(ctx: BashCaseCtx): Promise<CaseResult> {
       if (nums.length === 1) { end = nums[0]; }
       else if (nums.length === 2) { start = nums[0]; end = nums[1]; }
       else if (nums.length === 3) { start = nums[0]; step = nums[1]; end = nums[2]; }
+      // step=0 会无限循环（真实 seq 报错）；输出行数预计算设上限，防 AI 生成
+      // 天文级 range 冻结标签页 / OOM。
+      if (step === 0) return { ok: false, output: "seq: step cannot be 0" };
+      const SEQ_MAX_LINES = 1_000_000;
+      const span = step > 0 ? end - start : start - end;
+      const count = span >= 0 ? Math.floor(span / Math.abs(step)) + 1 : 0;
+      if (count > SEQ_MAX_LINES) {
+        return { ok: false, output: `seq: output would exceed ${SEQ_MAX_LINES} lines — browser sandbox limit` };
+      }
       const out: number[] = [];
       if (step > 0) for (let i = start; i <= end; i += step) out.push(i);
       else for (let i = start; i >= end; i += step) out.push(i);
@@ -217,34 +254,14 @@ export async function runMiscCommands(ctx: BashCaseCtx): Promise<CaseResult> {
       return { ok: false, output: "" };
 
     case "test": {
-      const fFlag = rest.indexOf("-f");
-      const dFlag = rest.indexOf("-d");
-      const sFlag = rest.indexOf("-s");
-      const eFlag = rest.indexOf("-e");
-      const notFlag = rest.indexOf("!");
-      const isNot = notFlag >= 0;
-      if (fFlag >= 0) {
-        const path = resolvePath(rest[fFlag + 1] ?? "");
-        const stat = vfs.readFileSync(path) !== null;
-        return { ok: isNot ? !stat : stat, output: "" };
-      }
-      if (dFlag >= 0) {
-        const path = resolvePath(rest[dFlag + 1] ?? "");
-        const stat = vfs.statSync(path);
-        const ok = stat !== null && stat.type === "dir";
-        return { ok: isNot ? !ok : ok, output: "" };
-      }
-      if (sFlag >= 0 || eFlag >= 0) {
-        const path = resolvePath(rest[(sFlag >= 0 ? sFlag : eFlag) + 1] ?? "");
-        const stat = vfs.readFileSync(path) !== null;
-        return { ok: isNot ? !stat : stat, output: "" };
-      }
-      if (rest.length === 1 && rest[0] === "!") return { ok: false, output: "" };
-      return { ok: true, output: "" };
+      return runTestPredicate(rest);
     }
 
     case "[": {
-      return { ok: true, output: "" };
+      // 与 test 共用语义；[ 的最后一个参数必须是 ]（宽松处理：剥掉再判）。
+      // 此前这里是恒真空壳，导致 AI 生成的 `[ -f x ] && ...` 条件逻辑静默走错分支。
+      const inner = rest[rest.length - 1] === "]" ? rest.slice(0, -1) : rest;
+      return runTestPredicate(inner);
     }
     default:
       return null;

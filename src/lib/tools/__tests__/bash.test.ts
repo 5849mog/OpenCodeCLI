@@ -139,10 +139,15 @@ describe("test / [ 条件测试", () => {
     expect(r.ok).toBe(false);
   });
 
-  // 已知 bug（bash.ts:1887）：`[` 是空壳恒真。阶段 3 修复为复用 test 语义，
-  // 修复时此断言改为 expect(r.ok).toBe(false)。
-  it("[ 当前恒真（已知 bug，特征化锁定）", async () => {
+  // 已修复：`[` 此前是恒真空壳（bash.ts 旧 1887 行），现复用 test 语义
+  it("[ -f 缺失的文件为假（复用 test 语义，剥离尾 ]）", async () => {
     const r = await run("[ -f missing.txt ]");
+    expect(r.ok).toBe(false);
+  });
+
+  it("[ -f 存在的文件为真", async () => {
+    await run("touch f.txt");
+    const r = await run("[ -f f.txt ]");
     expect(r.ok).toBe(true);
   });
 });
@@ -169,8 +174,27 @@ describe("seq", () => {
     expect(r.output).toBe("(command completed with no output)");
   });
 
-  // 已知 bug（bash.ts:1563-1573）：step=0 落入 else 分支无限循环，无法安全特征化，
-  // 阶段 3 修复时补 seq 1 0 5 → ok:false 的用例。
+  // 已修复：step=0 此前落入无限循环分支，现按真实 seq 语义报错
+  it("step=0 报错（不无限循环）", async () => {
+    const r = await run("seq 1 0 5");
+    expect(r.ok).toBe(false);
+    expect(r.output).toContain("step cannot be 0");
+  });
+
+  it("超天文行数直接报错（预计算，不实际生成）", async () => {
+    const r = await run("seq 1 999999999999");
+    expect(r.ok).toBe(false);
+    expect(r.output).toContain("sandbox limit");
+  });
+
+  it("单级输出超过 1MB 截断并提示（cat 路径）", async () => {
+    await run("seq 1 900000 > big.txt");
+    const r = await run("cat big.txt");
+    expect(r.ok).toBe(true);
+    expect(r.output.length).toBeGreaterThan(900_000);
+    expect(r.output.length).toBeLessThan(1_100_000);
+    expect(r.output).toContain("truncated at 1000000");
+  });
 });
 
 describe("grep 截断上限", () => {

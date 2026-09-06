@@ -277,7 +277,13 @@ async function runPipeline(cmdLine: string, readOnly = false): Promise<{
     if (!result.ok) {
       return { ok: false, output: result.output, mutated };
     }
-    lastOutput = result.output;
+    // 单级输出上限：防 AI 生成天文级输出（如 seq/cat 大文件）冻结 UI / OOM。
+    // 对 stdin（下一级管道输入）与重定向写盘一并生效。
+    const MAX_STAGE_OUTPUT = 1_000_000;
+    const stageOutput = result.output.length > MAX_STAGE_OUTPUT
+      ? result.output.slice(0, MAX_STAGE_OUTPUT) + `\n⚠️ output truncated at ${MAX_STAGE_OUTPUT} chars (browser sandbox limit)`
+      : result.output;
+    lastOutput = stageOutput;
     if (stage.outputRedirect) {
       if (readOnly) {
         return {
@@ -287,12 +293,12 @@ async function runPipeline(cmdLine: string, readOnly = false): Promise<{
       }
       const { file, append } = stage.outputRedirect;
       const existing = append ? (vfs.readFileSync(file) ?? "") : "";
-      const newContent = existing + result.output + (result.output.endsWith("\n") ? "" : "\n");
+      const newContent = existing + stageOutput + (stageOutput.endsWith("\n") ? "" : "\n");
       vfs.writeFileSync(file, newContent);
       lastOutput = "";
       mutated = true;
     }
-    stdin = result.output;
+    stdin = stageOutput;
   }
   return { ok: true, output: lastOutput, mutated };
 }

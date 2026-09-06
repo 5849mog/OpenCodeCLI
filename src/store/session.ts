@@ -39,6 +39,7 @@ import {  apiKeyVault  } from "@/lib/api-key-vault";
 import {  nextId,  flushPersist,  schedulePersist  } from "./session-persist";
 import {  doCompact  } from "./session-compact";
 import {  runAgentLoop } from "./agent-loop";
+import {  MODE_SWITCH_PREFIX, isModeSwitchMessage  } from "./session-helpers";
 
 // ---------------------------------------------------------------------------
 // Idle auto-lock — wipes API keys from memory after N minutes of inactivity.
@@ -644,7 +645,7 @@ export const useSession = create<SessionState>((set, get) => ({
         ...s.messages,
         {
           role: "user" as const,
-          content: `[Mode Switch] I've switched to ${next.toUpperCase()} mode. ${next === "plan" ? "You can ONLY read and analyze files. All write tools are BLOCKED. Propose a plan and wait for approval." : "You can read, write, edit, and delete files freely. Execute your plan directly."}`,
+          content: `${MODE_SWITCH_PREFIX} I've switched to ${next.toUpperCase()} mode. ${next === "plan" ? "You can ONLY read and analyze files. All write tools are BLOCKED. Propose a plan and wait for approval." : "You can read, write, edit, and delete files freely. Execute your plan directly."}`,
         },
       ],
     }));
@@ -662,7 +663,9 @@ export const useSession = create<SessionState>((set, get) => ({
 
   send: async (text: string, attachments?: UploadedAttachment[]) => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    // 空文本但有附件（纯图片发送）是合法输入——此前这里直接 return，
+    // 而 UI 侧已清空附件，导致附件被静默丢弃。
+    if (!trimmed && (!attachments || attachments.length === 0)) return;
     if (get().isStreaming) return;
 
     const config = get().config;
@@ -696,7 +699,8 @@ export const useSession = create<SessionState>((set, get) => ({
       note = `当前模型不支持视觉输入，已跳过 ${imgs.length} 张图片。`;
     } else if (hasImages) {
       const parts: ContentPart[] = [
-        { type: "text", text: trimmed },
+        // 纯图片发送时 trimmed 为空——给 text part 一个占位，避免空字符串部分被部分 API 拒绝
+        { type: "text", text: trimmed || "（见图片）" },
         ...imgs.map((a): ContentPart =>
           a.fileId
             ? { type: "file", file_id: a.fileId }
@@ -711,7 +715,7 @@ export const useSession = create<SessionState>((set, get) => ({
     const userEvent: SessionEvent = {
       id: nextId(),
       kind: "user",
-      text: trimmed,
+      text: trimmed || (hasImages ? "[图片]" : ""),
       attachments: (attachments ?? []).length > 0 ? attachments : undefined,
       ts: Date.now(),
     };
@@ -777,7 +781,8 @@ export const useSession = create<SessionState>((set, get) => ({
     const s = get();
     let lastUserMsgIdx = -1;
     for (let i = s.messages.length - 1; i >= 0; i--) {
-      if (s.messages[i].role === "user") {
+      // 跳过 toggleMode 注入的幽灵消息——它不是真实用户输入
+      if (s.messages[i].role === "user" && !isModeSwitchMessage(s.messages[i])) {
         lastUserMsgIdx = i;
         break;
       }
@@ -860,7 +865,8 @@ export const useSession = create<SessionState>((set, get) => ({
     let userMsgIdx = -1;
     let seen = 0;
     for (let i = 0; i < s.messages.length && userMsgIdx < 0; i++) {
-      if (s.messages[i].role === "user") {
+      // 跳过 toggleMode 注入的幽灵消息——否则序号映射错位，真实用户消息被顶掉
+      if (s.messages[i].role === "user" && !isModeSwitchMessage(s.messages[i])) {
         seen++;
         if (seen === userCount) userMsgIdx = i;
       }
