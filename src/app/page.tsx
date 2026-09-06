@@ -624,7 +624,7 @@ export default function Home() {
       )}
 
       {/* Main area — terminal + file bag */}
-      <main className="min-w-0 flex-1">
+      <main className="min-h-0 min-w-0 flex-1">
         <div className="flex h-full min-w-0">
           <div className="min-w-0 flex-1">
             <Terminal />

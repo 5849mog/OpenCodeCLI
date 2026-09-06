@@ -1013,7 +1013,7 @@ export function Terminal() {
         className={cn(
           isEmpty
             ? "pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 overflow-x-hidden overflow-y-auto px-4 py-4 md:justify-start md:gap-0 md:px-0 md:py-0"
-            : "mx-auto w-full max-w-3xl px-4 py-3",
+            : "mx-auto w-full max-w-3xl shrink-0 px-4 py-3",
         )}
       >
         {isEmpty && (
