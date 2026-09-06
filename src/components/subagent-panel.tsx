@@ -21,7 +21,7 @@ import { useSession, type SessionEvent } from "@/store/session";
 import { useVfsView } from "@/store/vfs-view";
 import { cn } from "@/lib/utils";
 import { CollapsibleText } from "./collapsible-text";
-import { MarkdownRenderer } from "./terminal";
+import { MarkdownRenderer } from "./terminal/markdown";
 
 interface SubagentRun {
   /** tool-call event id — also the focus key. */

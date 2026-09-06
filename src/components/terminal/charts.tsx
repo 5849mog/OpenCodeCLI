@@ -1,0 +1,156 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+// mermaid 为静态 import（阶段 4 改动态加载）；initialize 必须在首次 render 前执行一次。
+import mermaid from "mermaid";
+
+// 项目强制深色模式（<html className="dark">），用 dark 主题否则浅色线条
+// 在深色背景上看不清。themeVariables 微调让文字/线条对比更清晰。
+mermaid.initialize({
+  startOnLoad: false,
+  theme: "dark",
+  // 显式声明 securityLevel（mermaid 默认即 strict）——图表源码中的 HTML
+  // 标签会被编码，防止 label 注入；防止未来误改为 loose/antiscript。
+  securityLevel: "strict",
+  themeVariables: {
+    // 与整体 #E58F67 主色呼应的强调色；其余用 dark 主题默认值。
+    primaryColor: "#2A2A2A",
+    primaryTextColor: "#e4e4e7",
+    lineColor: "#a1a1aa",
+  },
+});
+
+let mermaidId = 0;
+export function MermaidBlock({ code }: { code: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const done = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+  const isComplete = code.trim().length > 10 && code.includes('\n');
+  useEffect(() => {
+    if (done.current || !ref.current || !isComplete) return;
+    done.current = true;
+    const id = ++mermaidId;
+    (async () => {
+      try {
+        const { svg } = await mermaid.render('mermaid-' + id, code);
+        if (ref.current) ref.current.innerHTML = svg;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    })();
+  }, [code, isComplete]);
+  if (error) {
+    return <pre className="my-2 rounded border border-red-300/40 bg-red-50/50 px-3 py-2 text-xs text-red-600 dark:border-red-500/30 dark:bg-red-950/20 dark:text-red-400">[mermaid 渲染失败] {error}</pre>;
+  }
+  if (!isComplete) {
+    return <pre className="text-xs text-[#8C8C8C] italic">[diagram]</pre>;
+  }
+  return <div ref={ref} className="my-2 flex justify-center" />;
+}
+
+// Graphviz.load() 返回的实例类型签名复杂（Format 枚举等），动态 import +
+// 已 Node 冒烟验证 dot() 用法，此处用 any 保持轻量。
+let graphvizPromise: Promise<any> | null = null;
+async function getGraphviz() {
+  if (!graphvizPromise) {
+    graphvizPromise = import("@hpcc-js/wasm-graphviz").then(({ Graphviz }) => Graphviz.load());
+  }
+  return graphvizPromise;
+}
+
+/** Graphviz / DOT — fenced code block with language "dot".
+ *  Renders DOT source (digraph G { a -> b }) as an SVG via the official
+ *  Graphviz WASM. Handles complex DAGs / dependency graphs / architecture
+ *  diagrams where mermaid's flowchart layout falls short. */
+export function GraphvizBlock({ code }: { code: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const done = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+  const isComplete = code.trim().length > 5;
+  useEffect(() => {
+    if (done.current || !ref.current || !isComplete) return;
+    done.current = true;
+    (async () => {
+      try {
+        const graphviz = await getGraphviz();
+        let svg = graphviz.dot(code);
+        // 深色模式适配：Graphviz 默认 fill/stroke 为纯黑，在深色背景看不清。
+        // 只替换显式纯黑（用户自定义颜色不受影响）；保留用户指定的其他颜色。
+        svg = svg
+          .replace(/fill="black"/g, 'fill="#e4e4e7"')
+          .replace(/stroke="black"/g, 'stroke="#a1a1aa"')
+          .replace(/fontcolor="black"/g, 'fontcolor="#e4e4e7"');
+        // XSS 面：DOT 源码完全由 AI 控制，输出 SVG 直接 innerHTML——剥掉
+        // 可点击链接（href/xlink:href，来自 DOT 的 URL= 属性）与
+        // <script>/<foreignObject> 标签，防注入可执行内容。
+        svg = svg
+          .replace(/\s(href|xlink:href)="[^"]*"/g, "")
+          .replace(/<script[\s\S]*?<\/script>/gi, "")
+          .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "");
+        if (ref.current) ref.current.innerHTML = svg;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    })();
+  }, [code, isComplete]);
+  if (error) {
+    return <pre className="my-2 rounded border border-red-300/40 bg-red-50/50 px-3 py-2 text-xs text-red-600 dark:border-red-500/30 dark:bg-red-950/20 dark:text-red-400">[dot 渲染失败] {error}</pre>;
+  }
+  if (!isComplete) {
+    return <pre className="text-xs text-[#8C8C8C] italic">[graph]</pre>;
+  }
+  return <div ref={ref} className="my-2 flex justify-center" />;
+}
+
+/** Chart.js — fenced code block with language "chart".
+ *  Body is a JSON config: { type, data, options }. Renders a responsive
+ *  line/bar/pie/scatter chart from data (e.g. parsed by parse_csv/query_json). */
+export function ChartBlock({ code }: { code: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const done = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+  const isComplete = code.trim().length > 5;
+  useEffect(() => {
+    if (done.current || !canvasRef.current || !isComplete) return;
+    done.current = true;
+    (async () => {
+      try {
+        const config = JSON.parse(code);
+        if (!config || typeof config !== "object" || !config.type || !config.data) {
+          throw new Error('chart 配置需为 {type, data, options?}，如 {"type":"bar","data":{"labels":["a","b"],"datasets":[{...}]}}');
+        }
+        const { Chart } = await import("chart.js/auto");
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        new Chart(canvas, {
+          ...config,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            // 深色模式默认配色：浅色文字 + 半透明网格，用户 options 可覆盖
+            color: "#e4e4e7",
+            scales: {
+              x: { ticks: { color: "#e4e4e7" }, grid: { color: "rgba(255,255,255,0.08)" } },
+              y: { ticks: { color: "#e4e4e7" }, grid: { color: "rgba(255,255,255,0.08)" } },
+            },
+            ...(config.options ?? {}),
+          },
+        });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    })();
+  }, [code, isComplete]);
+  if (error) {
+    return <pre className="my-2 rounded border border-red-300/40 bg-red-50/50 px-3 py-2 text-xs text-red-600 dark:border-red-500/30 dark:bg-red-950/20 dark:text-red-400">[chart 渲染失败] {error}</pre>;
+  }
+  if (!isComplete) {
+    return <pre className="text-xs text-[#8C8C8C] italic">[chart]</pre>;
+  }
+  return (
+    <div className="my-2 flex h-64 items-center justify-center rounded border border-[#DEDEDE] bg-[#FFFFFF] p-3 dark:border-[#333333] dark:bg-[#0f0e0b]">
+      <canvas ref={canvasRef} className="max-h-full max-w-full" />
+    </div>
+  );
+}

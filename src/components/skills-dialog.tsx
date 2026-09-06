@@ -46,7 +46,7 @@ import {
 } from "@/lib/skills";
 import { importSkillsFromZip, importSkillsFromDirectory, exportSkillZip } from "@/lib/skills/transfer";
 import { FileTypeIcon } from "@/lib/file-icon";
-import { MarkdownRenderer } from "./terminal";
+import { MarkdownRenderer } from "./terminal/markdown";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
