@@ -101,6 +101,9 @@ const HOME_CARDS = [
   { icon: PenLine, title: "自定义", desc: "跳过模板，直接告诉它你想做什么。", prompt: "" },
 ];
 
+/** 事件尾部窗口大小：默认只渲染最近 N 组（更早的按需展开）。 */
+const RENDER_WINDOW = 200;
+
 export function Terminal() {
   const isMobile = useIsMobile();
   const events = useSession((s) => s.events);
@@ -821,10 +824,15 @@ export function Terminal() {
     !streamingText &&
     !streamingReasoning;
   // 提升到组件体：Hero 条件渲染后 JSX 内的 useMemo 会导致 hook 数量不稳定
-  const turnGroups = useMemo(
+  const turnGroupsAll = useMemo(
     () => groupRounds(groupAssistantTurns(groupToolEvents(events))),
     [events],
   );
+  // 尾部窗口：长会话（数千事件）全量渲染会积累巨量 DOM 节点。
+  // 默认只渲染最近 RENDER_WINDOW 条，更早的按需展开。
+  const [windowSize, setWindowSize] = useState(RENDER_WINDOW);
+  const hiddenCount = Math.max(0, turnGroupsAll.length - windowSize);
+  const turnGroups = hiddenCount > 0 ? turnGroupsAll.slice(hiddenCount) : turnGroupsAll;
   const hour = new Date().getHours();
   const greeting = hour < 6 ? "夜深了" : hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好";
 
@@ -956,6 +964,14 @@ export function Terminal() {
       >
         {/* 居中限宽列：对话内容与输入框同宽对齐（ZCode 式） */}
         <div className="mx-auto w-full max-w-3xl space-y-4">
+          {hiddenCount > 0 && (
+            <button
+              onClick={() => setWindowSize((w) => w + RENDER_WINDOW)}
+              className="mx-auto block rounded-md border border-[#E0E0E0] px-3 py-1 text-xs text-[#8C8C8C] transition-colors hover:bg-[#F5F5F5] dark:border-[#333333] dark:text-zinc-500 dark:hover:bg-[#1F1F1F]"
+            >
+              ↑ 展开更早的 {hiddenCount} 条消息
+            </button>
+          )}
           {turnGroups.map((ev) =>
             ev.kind === "round" ? (
               <RoundBlock

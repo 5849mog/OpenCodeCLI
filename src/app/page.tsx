@@ -1,12 +1,15 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState, type TouchEvent } from "react";
 import { MotionConfig } from "framer-motion";
 import { Terminal } from "@/components/terminal";
 import { FileBag } from "@/components/file-bag";
-import { SettingsDialog } from "@/components/settings-dialog";
 import { HelpDialog } from "@/components/help-dialog";
-import { SkillsDialog } from "@/components/skills-dialog";
+// 重型弹窗懒加载：设置/技能对话框各 1000+ 行且非首屏必需，
+// 静态导出下 next/dynamic 自动拆 chunk，首屏 JS 显著减小。
+const SettingsDialog = dynamic(() => import("@/components/settings-dialog").then((m) => m.SettingsDialog));
+const SkillsDialog = dynamic(() => import("@/components/skills-dialog").then((m) => m.SkillsDialog));
 import {
   Settings,
   CirclePlus,

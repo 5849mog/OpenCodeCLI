@@ -151,6 +151,10 @@ export async function runAgentLoop(
     let firstReasoningMs: number | null = null;
     const streamStartMs = Date.now();
     const streamEventId = nextId();
+    // 流式 set 节流状态（33ms 合帧）
+    let lastStreamSetAt = 0;
+    let pendingStreamText: string | null = null;
+    let streamFlushTimer: ReturnType<typeof setTimeout> | null = null;
     // Don't push to events yet — use streamingText for live updates.
     // The final event is pushed once when streaming completes.
     set({ streamingText: { id: streamEventId, text: "" } });
@@ -182,6 +186,23 @@ export async function runAgentLoop(
               set({ agentStatus: "Generating response…" });
             }
             streamedText += delta;
+            // 节流：每 token 全量 set 会让 3692 行 Terminal 按最高频率重渲染
+            // （Markdown 全文重解析 O(n²)）。33ms 合帧 ≈ 30fps，肉眼无差。
+            const now = Date.now();
+            if (now - lastStreamSetAt < 33) {
+              pendingStreamText = streamedText;
+              if (!streamFlushTimer) {
+                streamFlushTimer = setTimeout(() => {
+                  streamFlushTimer = null;
+                  if (pendingStreamText !== null) {
+                    set({ streamingText: { id: streamEventId, text: pendingStreamText } });
+                    pendingStreamText = null;
+                  }
+                }, 33);
+              }
+              return;
+            }
+            lastStreamSetAt = now;
             set({ streamingText: { id: streamEventId, text: streamedText } });
           },
           onReasoning: (delta) => {
@@ -241,6 +262,12 @@ export async function runAgentLoop(
     }
 
     // Clear streaming text and push the final event to events ONCE.
+    // 冲掉未落地的节流帧（避免完成态被迟到的 timer 覆盖）
+    if (streamFlushTimer) {
+      clearTimeout(streamFlushTimer);
+      streamFlushTimer = null;
+      pendingStreamText = null;
+    }
     set({ streamingText: null, streamingReasoning: null });
     const hasText = streamedText.trim().length > 0;
     const hasReasoning = reasoning.trim().length > 0;

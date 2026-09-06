@@ -2,24 +2,30 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// mermaid 为静态 import（阶段 4 改动态加载）；initialize 必须在首次 render 前执行一次。
-import mermaid from "mermaid";
-
-// 项目强制深色模式（<html className="dark">），用 dark 主题否则浅色线条
-// 在深色背景上看不清。themeVariables 微调让文字/线条对比更清晰。
-mermaid.initialize({
-  startOnLoad: false,
-  theme: "dark",
-  // 显式声明 securityLevel（mermaid 默认即 strict）——图表源码中的 HTML
-  // 标签会被编码，防止 label 注入；防止未来误改为 loose/antiscript。
-  securityLevel: "strict",
-  themeVariables: {
-    // 与整体 #E58F67 主色呼应的强调色；其余用 dark 主题默认值。
-    primaryColor: "#2A2A2A",
-    primaryTextColor: "#e4e4e7",
-    lineColor: "#a1a1aa",
-  },
-});
+// mermaid 体积巨大（~1.5MB）——动态加载，只在首次渲染 mermaid 围栏块时拉取。
+// initialize 移入加载器：首次 import 成功后立即配置（时序仍早于任何 render 调用）。
+let mermaidPromise: Promise<typeof import("mermaid")["default"]> | null = null;
+function getMermaid() {
+  if (!mermaidPromise) {
+    mermaidPromise = import("mermaid").then((m) => {
+      m.default.initialize({
+        startOnLoad: false,
+        theme: "dark",
+        // 显式声明 securityLevel（mermaid 默认即 strict）——图表源码中的 HTML
+        // 标签会被编码，防止 label 注入；防止未来误改为 loose/antiscript。
+        securityLevel: "strict",
+        themeVariables: {
+          // 与整体 #E58F67 主色呼应的强调色；其余用 dark 主题默认值。
+          primaryColor: "#2A2A2A",
+          primaryTextColor: "#e4e4e7",
+          lineColor: "#a1a1aa",
+        },
+      });
+      return m.default;
+    });
+  }
+  return mermaidPromise;
+}
 
 let mermaidId = 0;
 export function MermaidBlock({ code }: { code: string }) {
@@ -36,6 +42,7 @@ export function MermaidBlock({ code }: { code: string }) {
     const id = ++mermaidId;
     (async () => {
       try {
+        const mermaid = await getMermaid();
         const { svg } = await mermaid.render('mermaid-' + id, code);
         setError(null);
         if (ref.current) ref.current.innerHTML = svg;

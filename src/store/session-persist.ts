@@ -42,6 +42,7 @@ function notifyPersistFailure(e: unknown): void {
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Immediately persist the current session, bypassing the debounce. */
+let lastPersistedSig = "";
 export async function flushPersist(get: () => SessionState): Promise<void> {
   if (saveTimer) {
     clearTimeout(saveTimer);
@@ -49,6 +50,11 @@ export async function flushPersist(get: () => SessionState): Promise<void> {
   }
   const s = get();
   if (s.messages.length === 0) return;
+  // 内容签名去重：schedulePersist 500ms 节流后仍可能连续触发全量序列化
+  // （含 base64 附件时单次数 MB）——无新事件/消息时直接跳过。
+  const sig = `${s.sessionId}:${s.messages.length}:${s.events.length}:${s.events[s.events.length - 1]?.id ?? ""}:${s.totalTokens}`;
+  if (sig === lastPersistedSig) return;
+  lastPersistedSig = sig;
   const session: PersistedSession = {
     id: s.sessionId || getActiveSessionId(),
     title: s.title || "新会话",
