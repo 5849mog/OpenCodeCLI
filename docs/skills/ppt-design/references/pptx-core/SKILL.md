@@ -6,10 +6,9 @@ metadata:
 description: "Create and edit pptx file via pptxgenjs/python-pptx"
 license: Proprietary. LICENSE.txt has complete terms
 ---
-> **本文件是官方 `document-skills:pptx`（Z.AI）的副本，经 ppt-design 轻度修改后随技能内嵌分发。**
-> 版权与许可见同目录 `LICENSE.txt`（仅授权个人 / 教育 / 非商业用途）。
-> 修改点见文末「ppt-design 修改说明」与 `SOURCE.md`。
-> **与 ppt-design 冲突时，一律以 ppt-design 为准**：规格书 → `references/styles.md` → `references/pitfalls.md`。
+> **本文件是 ppt-design 自带的 pptx 生成与编辑参考，是本技能的唯一参考来源。**
+> 内容整合自一份外部资料（Z.AI `document-skills:pptx` v1.1），已由本技能按自身规则改写对齐；版权与许可见同目录 `LICENSE.txt`，来源与改动记录见 `PROVENANCE.md`。
+> **如仍有出入，以本技能规格书 → `references/styles.md` → `references/pitfalls.md` 为准。**
 
 # Part 1 · Slide Design Best Practices
 
@@ -146,7 +145,7 @@ Build the palette on the **BACKGROUND → PRIMARY → ACCENT** model, and reuse 
 - ❌ **Don't use low contrast** — text and graphics both need strong contrast against the background; avoid light-on-light or dark-on-dark
 - 🚫 **Never add a decorative underline under titles** — a classic AI-slide tell; use whitespace or background color instead
 - 🚫 **Never add decorative color bars / accent stripes** — including full-width header/footer bands, vertical sidebar strips, thin colored strips along a card edge, and "single-side borders" on rectangles. To set a card apart, use a **subtle background tint or shadow**, not an edge stripe. In particular, never run the same edge-bar treatment on several consecutive slides
-  （pptx-design 修改：**例外** —— 若该色带是所声明风格来源的**结构组件且承载内容**，则不算装饰，见 ppt-design `pitfalls #17`。）
+  （本技能修改：**例外** —— 若该色带是所声明风格来源的**结构组件且承载内容**，则不算装饰，见 ppt-design `pitfalls #17`。）
 - ❌ **Don't default to cream/beige backgrounds** — when unspecified, use white `FFFFFF` or your brand color; avoid warm-neutral defaults like `F5F5DC`, `FAF0E6`, `FAEBD7`, `FFF8E1`
 - ❌ **Don't let text overflow its shape** — if it doesn't fit, reduce the font, split across slides, or enlarge the container; never leave content cut off or spilling out
 - ❌ **Don't extra postprocess the east asia font if not needed**
@@ -156,7 +155,7 @@ Build the palette on the **BACKGROUND → PRIMARY → ACCENT** model, and reuse 
 
 **Code QA:** run a short `python-pptx` script over the finished deck to flag text overflow (estimated text height/width vs. the shape box, plus boxes outside the slide) and overlap (bounding-box intersection between two text-bearing shapes), then fix the real hits and re-run.
 
-> **pptx-design 修改 · 优先用自带工具**：不必另写估算脚本——`python scripts/qa.py deck.pptx` 用**真实字体度量**检查溢出 / 超宽 / 中文禁则 / 对比度 / 表格外框 / 图片 PPI / 字体可移植性，比估算更准；退出码 0/1/2，报告分硬伤·告警·检查降级三类。视觉验收按 `references/judge-prompt.md` 派 judge（无子代理通道则降级自检）。上面那段 python-pptx 估算脚本仅作没有 qa.py 时的兜底。
+> **本技能修改 · 优先用自带工具**：不必另写估算脚本——`python scripts/qa.py deck.pptx` 用**真实字体度量**检查溢出 / 超宽 / 中文禁则 / 对比度 / 表格外框 / 图片 PPI / 字体可移植性，比估算更准；退出码 0/1/2，报告分硬伤·告警·检查降级三类。视觉验收按 `references/judge-prompt.md` 派 judge（无子代理通道则降级自检）。上面那段 python-pptx 估算脚本仅作没有 qa.py 时的兜底。
 
 **Visual QA** once only: use pdftoppm to convert pptx2image and use judge subagent(if not exist,check it yourself) to check when neccesary. Do not call external vlm to check slides for visual QA
 
@@ -647,7 +646,7 @@ Skip `word_wrap = False`: it makes text overflow the box invisibly in PowerPoint
 
 Required dependencies (should already be installed):
 
-> **pptx-design 修改**：随 ppt-design 使用时只需 **pptxgenjs**（node）、**python-pptx**、**matplotlib/numpy**（公式与插图）、**Pillow**；下面的 playwright / sharp / markitdown / LibreOffice / Poppler 是官方语境下的可选工具，ppt-design 的渲染与检查链不依赖它们（渲染见 `scripts/render.py`，检查见 `scripts/qa.py`）。
+> **本技能修改**：随 ppt-design 使用时只需 **pptxgenjs**（node）、**python-pptx**、**matplotlib/numpy**（公式与插图）、**Pillow**；下面的 playwright / sharp / markitdown / LibreOffice / Poppler 是官方语境下的可选工具，ppt-design 的渲染与检查链不依赖它们（渲染见 `scripts/render.py`，检查见 `scripts/qa.py`）。
 
 - **markitdown**: `pip install "markitdown[pptx]"` (text extraction)
 - **pptxgenjs**: `npm install -g pptxgenjs` (creating presentations)
@@ -661,9 +660,9 @@ Required dependencies (should already be installed):
 
 ---
 
-## ppt-design 修改说明（第三方副本，非官方原文）
+## 本参考的改动说明
 
-本副本随 `ppt-design` 内嵌分发，为对齐 ppt-design 已修正的规则做了以下**轻度修改**（其余保持官方原文；版权与许可见 `LICENSE.txt`，出处与完整冲突清单见 `SOURCE.md`）：
+本参考源自 Z.AI `document-skills:pptx` v1.1，为对齐本技能规则做了以下修改（其余基本保持原文；版权与许可见 `LICENSE.txt`，来源与改动记录见 `PROVENANCE.md`）：
 
 1. **文首**：加来源/优先级声明（冲突时以 ppt-design 为准）。
 2. **§Tables**：示例补 `rowH: 1`，并加注 `addTable` 不按 Σ rowH 回填外框高、`h` 必须 = `rowH × 行数`（官方原示例不给 `rowH`，会被真 PowerPoint 裁剪；见 ppt-design `pitfalls #30`）。
@@ -671,4 +670,4 @@ Required dependencies (should already be installed):
 4. **§10 QA**：指向自带的 `scripts/qa.py` 与 `references/judge-prompt.md`，原 python-pptx 估算脚本降为兜底。
 5. **Dependencies**：注明随 ppt-design 使用时只需 pptxgenjs + python-pptx + matplotlib/numpy + Pillow。
 
-修改日期：2026-09-12。除上述外，正文与官方 `document-skills:pptx` v1.1 逐字一致。
+修改日期：2026-09-12。除上述外，正文与原始来源 v1.1 逐字一致。

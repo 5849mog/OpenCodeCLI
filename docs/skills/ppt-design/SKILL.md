@@ -3,21 +3,21 @@ name: ppt-design
 description: >
   做 PPT / 幻灯片 / 演示文稿 / pptx / deck 时的设计风格层。流程是：先一轮问清需求，输出风格规格书待用户确认，再按确认的风格施工，最后过两道闸门（程序化检查 + 渲染视觉验收）确保不静默翻车。
   只要用户要做 PPT、幻灯片、演示文稿、slides、deck、汇报页、封面页、章节页、单页介绍页、路演 / 答辩 / 提案材料，或提到「好看 / 有设计感 / 某种风格 / 别太模板化 / 别一眼看出是 AI 做的」，就使用本技能——即使用户没提「设计」二字；要把现有 PPT 整体重设计或换风格，也归本技能。
-  本技能只管风格与流程，不含 pptxgenjs API。API 与代码写法在自带的 `references/pptx-official/SKILL.md`（官方 document-skills:pptx 的内嵌副本，已轻度修改对齐本技能规则，随技能分发，出处与许可见同目录 SOURCE.md / LICENSE.txt）；若宿主已装官方 document-skills:pptx，直接读宿主那份即可，两者取一。
-  例外：用户提供了自己的 .pptx 模板要往里填内容，或只是改现有 PPT 的错字/数据，走 `references/pptx-official/SKILL.md` 里的模板填充 / 编辑现有 pptx 流程，本技能不覆盖那两条流程。
+  本技能只管风格与流程，不含 pptxgenjs API。API 与代码写法在自带的 `references/pptx-core/SKILL.md`（本技能唯一的 pptx 参考，不依赖任何外部技能；来源与改动记录见同目录 PROVENANCE.md）。
+  例外：用户提供了自己的 .pptx 模板要往里填内容，或只是改现有 PPT 的错字/数据，走 `references/pptx-core/SKILL.md` 里的模板填充 / 编辑现有 pptx 流程，本技能不覆盖那两条流程。
 ---
 
 # PPT 设计风格层
 
 ## 定位
 
-自带的 `references/pptx-official/SKILL.md`（官方 `document-skills:pptx` 的内嵌副本，已轻度修改对齐本技能规则）告诉你**怎么用 pptxgenjs 画出一个 pptx**。本技能补它没有的三件事：
+自带的 `references/pptx-core/SKILL.md`（本技能唯一的 pptx 参考）告诉你**怎么用 pptxgenjs 画出一个 pptx**。本技能补它没有的三件事：
 
 1. **风格库** —— 可直接执行的完整预设（精确色值、字体配对、字号体系、母题、专属禁忌），而不是「选个模板」。
 2. **沟通协议** —— 问清需求、出规格书、拿到确认再动手，避免做完十页才发现方向错。
 3. **静默翻车清单** —— 一批不会报错、文件正常生成、但成品已经坏掉的坑（库级 bug、字体被替换、中文断错词）。
 
-**开工前先读 `references/pptx-official/SKILL.md`**（若宿主已装官方 `document-skills:pptx`，读宿主那份即可，两者取一），API、坐标、图表、模板继承那些写法都在它那儿，本技能不重复。**两者冲突时以本技能为准**：默认值看规格书，设计看 `references/styles.md`，坑看 `references/pitfalls.md`——内嵌副本的修改点与剩余冲突（设计默认值）列在 `references/pptx-official/SOURCE.md`。
+**开工前先读 `references/pptx-core/SKILL.md`**（本技能唯一的 pptx 参考，无需任何外部技能），API、坐标、图表、模板继承那些写法都在它那儿，本技能不重复。**它已按本技能规则对齐**；如仍有出入，以本技能为准：默认值看规格书，设计看 `references/styles.md`，坑看 `references/pitfalls.md`——来源与改动记录见 `references/pptx-core/PROVENANCE.md`。
 
 **动画与切换**：pptxgenjs 画不了动画，本技能用后处理注入补上（`scripts/inject_anim.py`，菜单制——你写中文动画脚本，工具编译成 PowerPoint 权威格式并自动验证，你不碰 XML）。**动画决策必须摆到台面上**：每份规格书都有一行「动画」，投屏演讲/发布/路演场合在这里给克制档推荐（切换 + 入场 + 全 deck 点击预算），自读/打印场合写明「不加」（负资产）；写「无」也要写出来，不许静默略过这一项。
 
