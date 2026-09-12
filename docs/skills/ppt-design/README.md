@@ -20,7 +20,7 @@
 | `references/styles.md` | 559 | 风格库：12 个有名有姓的设计运动预设（精确色值字号）、按效果选风格、页级编排规则、反 AI 审美清单 |
 | `references/pitfalls.md` | 463 | 31 条静默翻车清单（症状 / 原因 / 做法 / 怎么验证）——专收「不报错、文件正常、成品已坏」那类 |
 | `references/judge-prompt.md` | 82 | 闸门二视觉验收的 judge 填空模板（输出机器可读 JSON verdict） |
-| `references/pptx-official/` | 645 | **第三方**：官方 `document-skills:pptx`（Z.AI）的完整内嵌副本——pptxgenjs API、图表/表格/模板编辑写法。仅授权个人/教育/非商业使用，出处、许可与「与 ppt-design 的已知冲突」见同目录 `SOURCE.md` 与 `LICENSE.txt` |
+| `references/pptx-official/` | 675 | **第三方**：官方 `document-skills:pptx`（Z.AI）的内嵌副本——pptxgenjs API、图表/表格/模板编辑写法。经 ppt-design 轻度修改（修正表格示例等，645→675 行）。仅授权个人/教育/非商业使用，出处、许可与修改点见同目录 `SOURCE.md` 与 `LICENSE.txt` |
 | `scripts/qa.py` | 1055 | 闸门一：几何 / 中文排版 / 对比度 / 交付合法性 / 表格外框裁剪 / 字体可移植性 / deck 级骨架 |
 | `scripts/render.py` | 302 | 渲染 PNG（PowerPoint COM 优先，LibreOffice 兜底），支持 `--pages` 单页重渲与 `--contact` 拼图 |
 | `scripts/skeleton.js` | 115 | pptxgenjs 起手模板：栅格常量、调色板、绕开库 bug 的辅助函数（如 `addTableSafe`） |
@@ -44,7 +44,7 @@
 
 本目录设计为**自包含**：技能文档、可执行脚本、图标字体全部内置，不依赖任何外部技能或联网资源，可整体放进支持 SKILL.md 约定的任意 Agent 产品。
 
-唯一例外是 `references/pptx-official/` —— 官方 `document-skills:pptx` 的完整副本，为的是在没有官方技能的宿主里也能取到 pptxgenjs 写法。它是**第三方内容（Copyright © 2026 Z.ai，仅授权个人/教育/非商业使用）**，不是本项目原创；请保留其 `LICENSE.txt`。若宿主已装官方技能，读宿主那份即可，两者取一。它与 ppt-design 自身规则的冲突（如官方表格示例不给 `rowH`）列在 `references/pptx-official/SOURCE.md`，**一律以 ppt-design 为准**。
+唯一例外是 `references/pptx-official/` —— 官方 `document-skills:pptx` 的副本（经 ppt-design 轻度修改，对齐本技能的修正规则），为的是在没有官方技能的宿主里也能取到 pptxgenjs 写法。它是**第三方内容（Copyright © 2026 Z.ai，仅授权个人/教育/非商业使用）**，不是本项目原创；请保留其 `LICENSE.txt`。若宿主已装官方技能，读宿主那份即可，两者取一。修改点与剩余冲突列在 `references/pptx-official/SOURCE.md`，**一律以 ppt-design 为准**。
 
 ## 依赖
 

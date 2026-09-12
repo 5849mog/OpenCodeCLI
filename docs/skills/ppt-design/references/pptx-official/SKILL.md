@@ -6,6 +6,11 @@ metadata:
 description: "Create and edit pptx file via pptxgenjs/python-pptx"
 license: Proprietary. LICENSE.txt has complete terms
 ---
+> **本文件是官方 `document-skills:pptx`（Z.AI）的副本，经 ppt-design 轻度修改后随技能内嵌分发。**
+> 版权与许可见同目录 `LICENSE.txt`（仅授权个人 / 教育 / 非商业用途）。
+> 修改点见文末「ppt-design 修改说明」与 `SOURCE.md`。
+> **与 ppt-design 冲突时，一律以 ppt-design 为准**：规格书 → `references/styles.md` → `references/pitfalls.md`。
+
 # Part 1 · Slide Design Best Practices
 
 In one sentence: **don't make boring slides.** Bullet points on a white background are forgettable.
@@ -141,6 +146,7 @@ Build the palette on the **BACKGROUND → PRIMARY → ACCENT** model, and reuse 
 - ❌ **Don't use low contrast** — text and graphics both need strong contrast against the background; avoid light-on-light or dark-on-dark
 - 🚫 **Never add a decorative underline under titles** — a classic AI-slide tell; use whitespace or background color instead
 - 🚫 **Never add decorative color bars / accent stripes** — including full-width header/footer bands, vertical sidebar strips, thin colored strips along a card edge, and "single-side borders" on rectangles. To set a card apart, use a **subtle background tint or shadow**, not an edge stripe. In particular, never run the same edge-bar treatment on several consecutive slides
+  （pptx-design 修改：**例外** —— 若该色带是所声明风格来源的**结构组件且承载内容**，则不算装饰，见 ppt-design `pitfalls #17`。）
 - ❌ **Don't default to cream/beige backgrounds** — when unspecified, use white `FFFFFF` or your brand color; avoid warm-neutral defaults like `F5F5DC`, `FAF0E6`, `FAEBD7`, `FFF8E1`
 - ❌ **Don't let text overflow its shape** — if it doesn't fit, reduce the font, split across slides, or enlarge the container; never leave content cut off or spilling out
 - ❌ **Don't extra postprocess the east asia font if not needed**
@@ -149,6 +155,8 @@ Build the palette on the **BACKGROUND → PRIMARY → ACCENT** model, and reuse 
 **Content QA:** check for missing content, typos, wrong order; when using a template, grep for leftover placeholders (`xxx`, `lorem`, `TODO`, `[insert`, etc.).
 
 **Code QA:** run a short `python-pptx` script over the finished deck to flag text overflow (estimated text height/width vs. the shape box, plus boxes outside the slide) and overlap (bounding-box intersection between two text-bearing shapes), then fix the real hits and re-run.
+
+> **pptx-design 修改 · 优先用自带工具**：不必另写估算脚本——`python scripts/qa.py deck.pptx` 用**真实字体度量**检查溢出 / 超宽 / 中文禁则 / 对比度 / 表格外框 / 图片 PPI / 字体可移植性，比估算更准；退出码 0/1/2，报告分硬伤·告警·检查降级三类。视觉验收按 `references/judge-prompt.md` 派 judge（无子代理通道则降级自检）。上面那段 python-pptx 估算脚本仅作没有 qa.py 时的兜底。
 
 **Visual QA** once only: use pdftoppm to convert pptx2image and use judge subagent(if not exist,check it yourself) to check when neccesary. Do not call external vlm to check slides for visual QA
 
@@ -382,7 +390,12 @@ slide.background = { data: "image/png;base64,iVBORw0KGgo..." };// image base64
 slide.addTable([
   ["Header 1", "Header 2"],
   ["Cell 1", "Cell 2"]
-], { x: 1, y: 1, w: 8, h: 2, border: { pt: 1, color: "999999" }, fill: { color: "F1F1F1" } });
+], { x: 1, y: 1, w: 8, h: 2, rowH: 1, border: { pt: 1, color: "999999" }, fill: { color: "F1F1F1" } });
+
+// ⚠️ ppt-design 修改：`addTable` 的外框高 `a:ext@cy` 取自 `h`，**不会**按 Σ `rowH` 回填。
+// 必须显式给 `rowH`，且 `h = rowH × 行数`；否则真 PowerPoint 会裁掉下半截，
+// 而 WPS / LibreOffice 会自动撑开、渲染预览 100% 看不见（pitfalls #30）。
+// 直接用 scripts/skeleton.js 的 addTableSafe 更省心（参数不自洽直接抛错）。
 
 // Merged cells
 let tableData = [
@@ -634,6 +647,8 @@ Skip `word_wrap = False`: it makes text overflow the box invisibly in PowerPoint
 
 Required dependencies (should already be installed):
 
+> **pptx-design 修改**：随 ppt-design 使用时只需 **pptxgenjs**（node）、**python-pptx**、**matplotlib/numpy**（公式与插图）、**Pillow**；下面的 playwright / sharp / markitdown / LibreOffice / Poppler 是官方语境下的可选工具，ppt-design 的渲染与检查链不依赖它们（渲染见 `scripts/render.py`，检查见 `scripts/qa.py`）。
+
 - **markitdown**: `pip install "markitdown[pptx]"` (text extraction)
 - **pptxgenjs**: `npm install -g pptxgenjs` (creating presentations)
 - **playwright**: `npm install -g playwright@1.50.0` (HTML rendering)
@@ -643,3 +658,17 @@ Required dependencies (should already be installed):
 - **defusedxml**: `pip install defusedxml` (secure XML parsing)
 
 ---
+
+---
+
+## ppt-design 修改说明（第三方副本，非官方原文）
+
+本副本随 `ppt-design` 内嵌分发，为对齐 ppt-design 已修正的规则做了以下**轻度修改**（其余保持官方原文；版权与许可见 `LICENSE.txt`，出处与完整冲突清单见 `SOURCE.md`）：
+
+1. **文首**：加来源/优先级声明（冲突时以 ppt-design 为准）。
+2. **§Tables**：示例补 `rowH: 1`，并加注 `addTable` 不按 Σ rowH 回填外框高、`h` 必须 = `rowH × 行数`（官方原示例不给 `rowH`，会被真 PowerPoint 裁剪；见 ppt-design `pitfalls #30`）。
+3. **§9 Avoid list**：给「禁装饰性色带」补「结构组件且承载内容」的例外（`pitfalls #17`）。
+4. **§10 QA**：指向自带的 `scripts/qa.py` 与 `references/judge-prompt.md`，原 python-pptx 估算脚本降为兜底。
+5. **Dependencies**：注明随 ppt-design 使用时只需 pptxgenjs + python-pptx + matplotlib/numpy + Pillow。
+
+修改日期：2026-09-12。除上述外，正文与官方 `document-skills:pptx` v1.1 逐字一致。
