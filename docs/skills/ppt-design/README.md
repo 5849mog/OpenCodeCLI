@@ -20,6 +20,7 @@
 | `references/styles.md` | 559 | 风格库：12 个有名有姓的设计运动预设（精确色值字号）、按效果选风格、页级编排规则、反 AI 审美清单 |
 | `references/pitfalls.md` | 463 | 31 条静默翻车清单（症状 / 原因 / 做法 / 怎么验证）——专收「不报错、文件正常、成品已坏」那类 |
 | `references/judge-prompt.md` | 82 | 闸门二视觉验收的 judge 填空模板（输出机器可读 JSON verdict） |
+| `references/pptx-core/` | 675 | 本技能**唯一**的 pptx 生成/编辑参考：pptxgenjs API、图表/表格/模板编辑、脚手架写法，已按本技能规则对齐。含 `SKILL.md` + `PROVENANCE.md`（来源与改动记录）+ `LICENSE.txt` |
 | `scripts/qa.py` | 1055 | 闸门一：几何 / 中文排版 / 对比度 / 交付合法性 / 表格外框裁剪 / 字体可移植性 / deck 级骨架 |
 | `scripts/render.py` | 302 | 渲染 PNG（PowerPoint COM 优先，LibreOffice 兜底），支持 `--pages` 单页重渲与 `--contact` 拼图 |
 | `scripts/skeleton.js` | 115 | pptxgenjs 起手模板：栅格常量、调色板、绕开库 bug 的辅助函数（如 `addTableSafe`） |
@@ -38,6 +39,12 @@
 - **两道闸门抓的是完全不同的两类错。** 闸门一（`qa.py`）读结构抓「断没断」：库级 bug、表格外框裁剪、字体被静默替换，这些渲染预览看不出来；闸门二（judge 子代理看渲染图）抓「好不好看」：断错词、层次、焦点、留白。「程序化检查干净只证明没断，不证明能看。」
 - **声明式规格 → 编译器。** 公式 / 图标 / 插图 / 动画都走「AI 写中文键 JSON 意图 → 脚本编译注入并自验」这一条路：机械层收归脚本，表达层留给 AI；词表之外还留逃生舱（如插图的 `自定义代码`），不把 AI 封死。
 - **静默翻车清单是这套 skill 存在的一半理由。** 字体被替换、`breakLine` 漏写、表格外框高度 ≠ 行高合计……31 条，每条都写清症状、根因、做法和验证方式。
+
+## 自包含
+
+本目录**完全自包含**：技能文档、脚本、图标字体、pptx 生成/编辑参考全部内置，不依赖任何外部技能或联网资源，可整体放进支持 SKILL.md 约定的任意 Agent 产品。
+
+其中 `references/pptx-core/` 是唯一的 pptx 参考（pptxgenjs API 与模板编辑写法），已按本技能规则对齐，取代了原先「必须另装官方 pptx 技能」的依赖。它的内容整合自一份外部资料，版权与许可保留在 `references/pptx-core/LICENSE.txt`，来源与改动记录见 `PROVENANCE.md`；本技能对外不主张其为原创。
 
 ## 依赖
 
