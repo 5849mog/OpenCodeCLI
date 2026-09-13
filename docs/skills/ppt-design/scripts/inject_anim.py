@@ -48,9 +48,10 @@ AI 永远不直接写 XML，所以结构错不了。
 
 验证（有 PowerPoint COM 时自动执行，这是动画的两道闸门）：
   第 1 层  文件能被 PowerPoint 真打开（坏 XML 会在这一层炸出来）；
-  第 2 层  逐条断言声明的每条动画被 PowerPoint 完整解析：效果类型、目标形状名、
-           触发方式、时长全部与脚本一致——PowerPoint 对坏 timing 树会静默丢弃，
-           只有数得出、对得上才算存在。
+  第 2 层  逐条断言声明的每条动画与切换被 PowerPoint 完整解析：效果类型、目标形状名、
+           触发方式、时长、切换 EntryEffect 全部与脚本一致——PowerPoint 对坏 timing
+           树会静默丢弃，只有数得出、对得上才算存在。只配切换（无对象动画）的页也会
+           被验到，不因为「没效果」而跳过。
 
 退出码：0 注入且验证通过；1 验证不一致；2 注入成功但本机无法验证，
         或含原始 XML 动画（逐条断言整类关闭，属检查降级）。
@@ -460,7 +461,7 @@ def inject(src, sc, replace=False, allow_raw=False):
         print("⚠ 原始XML 逃生舱：S%s 用的是手写 XML——逐条效果断言整类关闭（[降级]），"
               "交付说明必须声明这部分动画未经逐条验证"
               % "、".join(str(s) for s in sorted(raw_used)))
-    return sorted(stats), sorted(raw_used)
+    return sorted(replaced), sorted(raw_used)
 
 # ================================================================ COM 验证
 
@@ -606,6 +607,8 @@ def verify(src, sc, pages, probe=False):
                 elif exp_ee is not None and ee is not None and ee != exp_ee:
                     ok = False
                     tag.append("切换 %s 读回 %s ≠ 期望 %s" % (tname, ee, exp_ee))
+                elif exp_ee is not None and ee is not None:
+                    print("  ✓ S%d 切换 %s 读回一致（EntryEffect %s）" % (si, tname, ee))
             if tag:
                 for t in tag:
                     print("  ✗ S%d %s" % (si, t))
@@ -690,7 +693,7 @@ def main():
                                        allow_raw="--raw" in flags)
     except ValueError as e:
         sys.exit(str(e))
-    pages = sorted(set(menu_pages) | set(raw_pages))
+    pages = sorted(set(menu_pages) | set(raw_pages))   # 只配切换的页也要验（含 EntryEffect）
     if "--no-verify" in flags:
         print("⚠ 已注入但跳过验证（--no-verify）——动画未经 PowerPoint 确认")
         return 2

@@ -489,6 +489,10 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
             if ra.returncode == 0 and "⚠" not in a_out:
                 checks.append(("COM 三层验证全绿（逐条一致+往返一致）",
                                "逐条一致" in a_out and "往返校验一致" in a_out))
+                # 只配切换、没有对象动画的页（本例 S2 的 morph）也必须进验证，
+                # 否则切换读回错值会静默漏过（曾是 pages 只含对象动画页的旧行为）
+                checks.append(("仅配切换的页也逐条验证切换（S2 平滑）",
+                               "S2 切换 平滑 读回一致" in a_out))
             elif "⚠" in a_out:
                 print("  ? 本机无 PowerPoint COM，动画验证断言降级为跳过")
             rg = subprocess.run([sys.executable, str(INJECT), ap, str(sj)],
