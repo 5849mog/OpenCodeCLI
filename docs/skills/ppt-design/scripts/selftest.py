@@ -552,8 +552,36 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
             co_ok, out_ok, _ = raw_case("ok", raw_spec(GOOD), ["--replace", "--raw"])
             checks.append(("原始XML 正路径：注入 + 标 [降级] + 提示逃生舱",
                            "逃生舱" in out_ok and "[降级]" in out_ok
-                           and "逐条断言" in out_ok and "Traceback" not in out_ok))
+                           and "没写「断言」" in out_ok and "Traceback" not in out_ok))
             checks.append(("原始XML 正路径退出码非 0（降级不报全绿）", co_ok == 2))
+
+            # 「断言」清单：结构侧不需要 COM 也跑（这是逃生舱代价的解法）
+            DEF = [{"形状": "标题", "presetID": 10, "起始ms": 0, "时长ms": 500}]   # 种子是「淡入」
+            ca_ok, out_a, _ = raw_case(
+                "assertok", raw_spec(dict(GOOD, **{"断言": DEF})), ["--replace", "--raw"])
+            checks.append(("断言：全对 → 逐条一致且不再算降级",
+                           "逐条断言一致" in out_a and "[降级]" not in out_a
+                           and ca_ok in (0, 2)))
+            ca_bad, out_ab, _ = raw_case(
+                "assertbad", raw_spec(dict(GOOD, **{"断言": [
+                    dict(DEF[0], **{"起始ms": 1200})]})), ["--replace", "--raw"])
+            checks.append(("断言：起始ms 写错 → 报不一致（不需 COM 也能抓）",
+                           ca_bad == 1 and "≠ 声明 1200ms" in out_ab))
+            ca_cov, out_ac, _ = raw_case(
+                "assertcov", raw_spec(dict(GOOD, **{"断言": DEF + DEF})), ["--replace", "--raw"])
+            checks.append(("断言：覆盖不全（效果数对不上）→ 报错",
+                           ca_cov == 1 and "效果数 1 ≠ 声明 2" in out_ac))
+            ca_unk, out_au, _ = raw_case(
+                "assertunk", raw_spec(dict(GOOD, **{"断言": [
+                    dict(DEF[0], **{"起始": 0})]})), ["--replace", "--raw"])
+            checks.append(("断言：未知字段被拒（挡笔误）",
+                           ca_unk != 0 and "未知字段 起始" in out_au))
+            cm_a, out_ma, _ = raw_case("assertmenu", {
+                "原始XML": {"2": GOOD},
+                "pages": {"1": [{"形状": "标题", "效果": "淡入", "触发": "自动", "断言": []}]}},
+                ["--replace", "--raw"])
+            checks.append(("断言：写到菜单页上被拒（只给原始XML 用）",
+                           cm_a != 0 and "未知字段 断言" in out_ma))
 
             co_no, out_no, same_no = raw_case("noraw", raw_spec(GOOD), ["--replace"])
             checks.append(("原始XML 无 --raw 被拒且文件未动",

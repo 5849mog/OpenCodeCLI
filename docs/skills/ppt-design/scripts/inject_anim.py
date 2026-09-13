@@ -51,10 +51,27 @@ AI 永远不直接写 XML，所以结构错不了。
       "4": {"XML": "<p:timing>…</p:timing>",
             "原因": "用户要求做菜单外的路径动画", "用户已同意": true}
     }
-  **手写的部分没有逐条断言可做**：菜单路线能断言「第几条是什么效果、打在哪个形状、
-  什么触发、多长」；原始 XML 只有脚本自己知道要什么，工具无法核对。因此这类页只验证
-  「文件能被 PowerPoint 打开 + 读回条数」，逐条验证整类关闭——报告里标 [降级]，
-  退出码 2，交付说明里必须如实声明，不得声称这些动画已逐条验证过。
+  「断言」（可选，强烈建议写）——手写页默认只验「文件能打开 + 读回条数」（标 [降级]、
+  退出码 2）。附上「断言」清单就把逐条核对补回来：逐条核对 形状 / presetID /
+  presetSubtype / 起始ms / 时长ms / 重复 / 参数，并与 COM 读回的
+  Timing.TriggerDelayTime 与 Duration 交叉核对。**必须覆盖该页全部效果**（只声明一部分
+  等于没查），书写顺序**按页内出现顺序**（同一形状有多个效果时靠顺序配对）：
+    "原始XML": {
+      "4": {"XML": "<p:timing>…</p:timing>", "原因": "…", "用户已同意": true,
+            "断言": [
+              {"形状": "光子", "效果": "匀速位移", "presetID": 2,
+               "起始ms": 0, "时长ms": 3000,
+               "参数": {"tav": ["#ppt_x", "#ppt_x+0.8687", "#ppt_y", "#ppt_y"]}},
+              {"形状": "轴端", "presetID": 8, "起始ms": 3000, "时长ms": 600,
+               "参数": {"animRot": "21600000"}},
+              {"形状": "斜带", "presetID": 6, "起始ms": 3000, "时长ms": 500, "重复": 2000}
+            ]}
+    }
+  字段：形状（必填）／效果（只用于报告可读）／presetID／presetSubtype／起始ms／时长ms／
+  重复（repeatCount）／参数（animRot、animScale、tav、滤镜）；容差 30ms。未知字段直接报错。
+  「起始ms」是**组内相对**起始（与 COM 的 TriggerDelayTime 同口径）。**不要去累加往返后
+  文件里的 XML 延迟来比**——PowerPoint 会重写节拍的嵌套编码（实测把 800ms 写成
+  「包装节点 1000 + 效果 800」），只有 COM 的 TriggerDelayTime 是权威口径。
 
 验证（有 PowerPoint COM 时自动执行，这是动画的两道闸门）：
   第 1 层  文件能被 PowerPoint 真打开（坏 XML 会在这一层炸出来）；
@@ -273,6 +290,11 @@ def compile_page(items, name2id):
     ids = [2]  # id 计数器（1 给 tmRoot，2 给 mainSeq，效果从 3 起）
     groups = []   # 每组: {"auto": bool, "items": [...]}
     for it in items:
+        unknown = [k for k in it if k not in ITEM_FIELDS]
+        if unknown:
+            raise ValueError("效果声明里有未知字段 %s；可用：%s"
+                             "（「断言」只给原始XML 逃生舱页用——菜单路线自带逐条验证）"
+                             % ("、".join(unknown), "、".join(ITEM_FIELDS)))
         trg = it.get("触发", "点击")
         if trg not in ("点击", "同时", "之后", "自动"):
             raise ValueError("触发只能是 点击/同时/之后/自动，收到：%r" % trg)
@@ -447,6 +469,193 @@ def validate_raw(si, entry, ids):
                  "这类动画，先改对 spid 再跑" % (si, sorted(dangling)))
     return xml_text
 
+# ---- 原始XML 的「断言」清单：给逃生舱页补回逐条核对 ----
+# 手写页默认只验「文件能打开 + 读回条数」（标 [降级]）。附上「断言」就把这一类补回来：
+# 逐条核对 形状 / presetID / presetSubtype / 起始ms / 时长ms / 重复次数 / 参数，再从 COM
+# 侧核一次形状、起始延迟（Timing.TriggerDelayTime）与时长。断言必须覆盖该页**全部**效果。
+_MOTION_TAGS = ("animEffect", "anim", "animScale", "animRot", "animMotion")
+ITEM_FIELDS = ("形状", "效果", "触发", "方向", "时长", "缓动", "幅度")
+ASSERT_FIELDS = ("形状", "效果", "presetID", "presetSubtype", "起始ms", "时长ms", "重复", "参数")
+ASSERT_PARAMS = ("animRot", "animScale", "tav", "滤镜")
+
+
+def validate_asserts(si, entry):
+    """校验「断言」清单的结构。任一不合格都在写入前退出，文件保持原样。"""
+    raw = entry.get("断言")
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or not raw:
+        sys.exit("S%d 原始XML 的「断言」要是非空数组（每条一个效果）" % si)
+    for i, a in enumerate(raw, 1):
+        if not isinstance(a, dict):
+            sys.exit("S%d 断言第 %d 条要是对象" % (si, i))
+        unknown = [k for k in a if k not in ASSERT_FIELDS]
+        if unknown:
+            sys.exit("S%d 断言第 %d 条有未知字段 %s；可用：%s"
+                     % (si, i, "、".join(unknown), "、".join(ASSERT_FIELDS)))
+        if not isinstance(a.get("形状"), str) or not a["形状"].strip():
+            sys.exit("S%d 断言第 %d 条必须写「形状」（与施工时的 objectName 一致）" % (si, i))
+        for k in ("presetID", "presetSubtype", "起始ms", "时长ms", "重复"):
+            if k in a and not isinstance(a[k], (int, float)):
+                sys.exit("S%d 断言第 %d 条的「%s」要是数字，收到 %r" % (si, i, k, a[k]))
+        params = a.get("参数")
+        if params is not None:
+            if not isinstance(params, dict):
+                sys.exit("S%d 断言第 %d 条的「参数」要是对象" % (si, i))
+            bad = [k for k in params if k not in ASSERT_PARAMS]
+            if bad:
+                sys.exit("S%d 断言第 %d 条「参数」有未知键 %s；可用：%s"
+                         % (si, i, "、".join(bad), "、".join(ASSERT_PARAMS)))
+    return raw
+
+
+def _walk_records(node, base, out, id2name):
+    """沿 childTnLst 递归，把每个效果级 cTn 收成一条现场记录。"""
+    for par in node:
+        if par.tag != "{%s}par" % P_NS:
+            continue
+        ctn = par.find("{%s}cTn" % P_NS)
+        if ctn is None:
+            continue
+        delay = 0
+        for cond in ctn.findall("{%s}stCondLst/{%s}cond" % (P_NS, P_NS)):
+            d = (cond.get("delay") or "").strip()
+            if d.isdigit():
+                delay += int(d)
+        start = base + delay
+        if ctn.get("nodeType") in ("clickEffect", "withEffect", "afterEffect"):
+            durs, params = [], {}
+            for beh in ctn.iter():
+                tag = beh.tag.rsplit("}", 1)[-1]
+                if tag == "animRot":
+                    params["animRot"] = beh.get("by")
+                elif tag == "animScale":
+                    by = beh.find("{%s}by" % P_NS)
+                    if by is not None:
+                        params["animScale"] = "%s,%s" % (by.get("x"), by.get("y"))
+                elif tag == "anim":
+                    params.setdefault("tav", []).extend(
+                        v.get("val") for v in beh.iter("{%s}strVal" % P_NS))
+                elif tag == "animEffect":
+                    params.setdefault("滤镜", []).append(beh.get("filter"))
+                if tag in _MOTION_TAGS:
+                    durs += [int(x.get("dur")) for x in beh.iter("{%s}cTn" % P_NS)
+                             if (x.get("dur") or "").isdigit()]
+            spid = next((t.get("spid") for t in ctn.iter("{%s}spTgt" % P_NS)), None)
+            out.append({"形状": id2name.get(int(spid)) if (spid or "").isdigit() else None,
+                        "spid": spid, "presetID": ctn.get("presetID"),
+                        "presetSubtype": ctn.get("presetSubtype"),
+                        "起始ms": start, "时长ms": max(durs) if durs else 0,
+                        "重复": ctn.get("repeatCount"), "参数": params})
+        inner = ctn.find("{%s}childTnLst" % P_NS)
+        if inner is not None:
+            _walk_records(inner, start, out, id2name)
+    return out
+
+
+def slide_records(slide_xml_bytes):
+    """注入后的一页 -> (按文档顺序的效果记录, spid->形状名)。
+
+    「起始ms」沿路径累加 delay 求**组内相对**值——与 COM 的 TriggerDelayTime 同口径。
+    （不要拿往返后的文件累加 XML 延迟做断言：PowerPoint 会重写节拍嵌套编码。）
+    """
+    root = _xml_parse(slide_xml_bytes)
+    id2name = {int(e.get("id")): e.get("name")
+                  for e in root.iter("{%s}cNvPr" % P_NS)
+                  if (e.get("id") or "").isdigit()}
+    out = []
+    seq = root.find(".//{%s}cTn[@nodeType='mainSeq']" % P_NS)
+    ctl = seq.find("{%s}childTnLst" % P_NS) if seq is not None else None
+    if ctl is None:
+        return out, id2name
+    for gpar in ctl:
+        if gpar.tag != "{%s}par" % P_NS:
+            continue
+        gctn = gpar.find("{%s}cTn" % P_NS)
+        inner = gctn.find("{%s}childTnLst" % P_NS) if gctn is not None else None
+        if inner is not None:
+            _walk_records(inner, 0, out, id2name)
+    return out, id2name
+
+
+def check_asserts(si, declared, records):
+    """声明的断言 vs 注入文件的现场记录 -> 问题列表（空 = 全对）。"""
+    problems = []
+    by_shape = {}
+    for rec in records:
+        by_shape.setdefault(rec["形状"], []).append(rec)
+    used = set()
+    for want in declared:
+        shape = want["形状"]
+        label = want.get("效果") or shape
+        cands = [r for r in by_shape.get(shape, []) if id(r) not in used]
+        if not cands:
+            problems.append("S%d 断言：形状「%s」上没有效果（本页有 %s）"
+                            % (si, shape, "、".join(sorted(str(k) for k in by_shape))))
+            continue
+        rec = cands[0]
+        used.add(id(rec))
+        for key, disp in (("presetID", "presetID"), ("presetSubtype", "presetSubtype"),
+                          ("重复", "重复次数")):
+            if key in want and str(want[key]) != str(rec[key]):
+                problems.append("S%d 断言：%s「%s」%s 现场是 %s ≠ 声明 %s"
+                                % (si, label, shape, disp, rec[key], want[key]))
+        if "起始ms" in want and abs(int(want["起始ms"]) - rec["起始ms"]) > 30:
+            problems.append("S%d 断言：%s「%s」起始 %dms ≠ 声明 %dms"
+                            % (si, label, shape, rec["起始ms"], int(want["起始ms"])))
+        if "时长ms" in want and abs(int(want["时长ms"]) - rec["时长ms"]) > 30:
+            problems.append("S%d 断言：%s「%s」时长 %dms ≠ 声明 %dms"
+                            % (si, label, shape, rec["时长ms"], int(want["时长ms"])))
+        for k, v in (want.get("参数") or {}).items():
+            got = rec["参数"].get(k)
+            if isinstance(v, list):
+                if list(v) != list(got or []):
+                    problems.append("S%d 断言：%s「%s」参数 %s 现场是 %s ≠ 声明 %s"
+                                    % (si, label, shape, k, got or [], v))
+            elif str(v) != str(got):
+                problems.append("S%d 断言：%s「%s」参数 %s 现场是 %s ≠ 声明 %s"
+                                % (si, label, shape, k, got, v))
+    return problems
+
+
+def raw_assert_report(src, sc):
+    """原始XML 页的**结构侧**逐条断言（不需要 COM）：打印现场读回表，返回问题列表。
+
+    放在 COM 之外是有意的：没装 PowerPoint 的机器也该能做这类核对，COM 只负责在其上
+    再加一层交叉核对（形状 / TriggerDelayTime / Duration）。
+    """
+    raw_spec = sc.get("原始XML", {})
+    if not isinstance(raw_spec, dict):
+        return []
+    problems = []
+    for key in sorted(raw_spec, key=lambda k: int(k) if str(k).isdigit() else 0):
+        entry = raw_spec[key] or {}
+        declared = validate_asserts(int(key), entry)
+        if not declared:
+            continue
+        si = int(key)
+        recs, _id2n = slide_records(_slide_xml(src, si))
+        probs = check_asserts(si, declared, recs)
+        if len(recs) != len(declared):
+            probs.append("S%d 断言：效果数 %d ≠ 声明 %d"
+                         "——断言必须覆盖该页全部效果，只声明一部分等于没查" % (si, len(recs), len(declared)))
+        print("  S%d 原始XML 断言清单（%d 条，现场读回）：" % (si, len(declared)))
+        for r in recs:
+            print("      %-6s presetID=%-4s 起始 %5dms 时长 %5dms 参数 %s"
+                  % (r["形状"], r["presetID"], r["起始ms"], r["时长ms"], r["参数"] or ""))
+        if probs:
+            problems += probs
+        else:
+            print("  ✓ S%d 原始XML 逐条断言一致（%d 条：形状/presetID/起始ms/时长ms/参数）"
+                  % (si, len(declared)))
+    return problems
+
+
+def _slide_xml(src, si):
+    with zipfile.ZipFile(src) as zf:
+        return zf.read("ppt/slides/slide%d.xml" % si)
+
+
 def inject(src, sc, replace=False, allow_raw=False):
     trans_spec = sc.get("transitions", {})
     pages_spec = sc.get("pages", {})
@@ -491,6 +700,7 @@ def inject(src, sc, replace=False, allow_raw=False):
             frag += timing or ""
             stats[si] = st
         if str(si) in raw_spec:
+            validate_asserts(si, raw_spec[str(si)])
             frag += validate_raw(si, raw_spec[str(si)], slide_ids(xml.encode("utf-8")))
             raw_used.append(si)
         if frag:
@@ -532,9 +742,17 @@ def inject(src, sc, replace=False, allow_raw=False):
         if si not in stats and si not in raw_used:
             print("  S%d：切换效果" % si)
     if raw_used:
-        print("⚠ 原始XML 逃生舱：S%s 用的是手写 XML——逐条效果断言整类关闭（[降级]），"
-              "交付说明必须声明这部分动画未经逐条验证"
-              % "、".join(str(s) for s in sorted(raw_used)))
+        no_assert = [s for s in sorted(raw_used)
+                     if not (raw_spec.get(str(s)) or {}).get("断言")]
+        yes_assert = [s for s in sorted(raw_used) if s not in no_assert]
+        if yes_assert:
+            print("原始XML 逃生舱：S%s 用的是手写 XML，已按「断言」清单逐条核对（见下方验证输出）"
+                  % "、".join(str(s) for s in yes_assert))
+        if no_assert:
+            print("⚠ 原始XML 逃生舱：S%s 用的是手写 XML 且没写「断言」——逐条核对整类关闭"
+                  "（标 [降级]、退出码 2），交付说明必须声明这部分动画未经逐条验证；"
+                  "给这条原始XML 补一份「断言」清单就能把这一类核对加回来"
+                  % "、".join(str(s) for s in no_assert))
     return sorted(replaced), sorted(raw_used), stats
 
 # ================================================================ COM 验证
@@ -607,10 +825,46 @@ def verify(src, sc, pages, stats=None, probe=False):
             sl = pres.Slides(si)
             seq = sl.TimeLine.MainSequence
             if str(si) in raw_spec:
-                # 手写 XML 没有声明清单可比对：只报读回条数，逐条断言整类关闭（[降级]）
-                degraded.append(si)
-                print("  [降级] S%d 原始XML：读回 %d 条动画，无逐条断言可比对"
-                      "（菜单路线才有）——不得声称这些动画已逐条验证" % (si, seq.Count))
+                declared = validate_asserts(si, raw_spec[str(si)])
+                if not declared:
+                    # 没写「断言」：逐条核对整类关闭，如实标降级（不得声称已逐条验证）
+                    degraded.append(si)
+                    print("  [降级] S%d 原始XML：读回 %d 条动画，没写「断言」——逐条核对整类关闭"
+                          "（要补回来就给这条原始XML 加「断言」清单）" % (si, seq.Count))
+                    continue
+                problems = []
+                # COM 侧交叉核对（结构侧已在 raw_assert_report 里核过，不需要 COM 也跑）
+                for k in range(1, min(seq.Count, len(declared)) + 1):
+                    eff = seq(k)
+                    want = declared[k - 1]
+                    try:
+                        nm = eff.Shape.Name
+                    except Exception:
+                        nm = "?"
+                    if nm != want["形状"]:
+                        problems.append("S%d 断言：#%d 打在「%s」上，声明是「%s」"
+                                        % (si, k, nm, want["形状"]))
+                    for field, reader, disp in (
+                            ("起始ms", lambda e: round(float(e.Timing.TriggerDelayTime) * 1000),
+                             "起始延迟"),
+                            ("时长ms", lambda e: round(float(e.Timing.Duration) * 1000), "时长")):
+                        if field not in want:
+                            continue
+                        try:
+                            got = reader(eff)
+                        except Exception:
+                            got = None
+                        if got is not None and abs(got - int(want[field])) > 30:
+                            problems.append("S%d 断言：%s「%s」%s 读回 %dms ≠ 声明 %dms"
+                                            % (si, want.get("效果") or want["形状"],
+                                               want["形状"], disp, got, int(want[field])))
+                if problems:
+                    ok = False
+                    for pb in problems:
+                        print("  ✗ " + pb)
+                else:
+                    print("  ✓ S%d 原始XML 与 COM 读回交叉核对一致（形状/起始延迟/时长）"
+                          % si)
                 continue
             items = sc.get("pages", {}).get(str(si), [])
             # 声明里每条效果在**本组内的相对起始延迟**（ms），顺序与 XML 一致
@@ -807,6 +1061,14 @@ def main():
     if "--no-verify" in flags:
         print("⚠ 已注入但跳过验证（--no-verify）——动画未经 PowerPoint 确认")
         return 2
+    # 原始XML 的结构侧断言（不需要 COM，任何机器都能跑）；COM 侧在 verify 里再交叉核对一次
+    problems = raw_assert_report(src, sc)
+    if problems:
+        for pb in problems:
+            print("  ✗ " + pb)
+        print("原始XML 的「断言」对不上（文件已按声明注入；问题在声明或手写 XML 里）"
+              "——按实测值修正后重跑")
+        return 1
     try:
         import win32com.client  # noqa: F401
         have_com = sys.platform == "win32"

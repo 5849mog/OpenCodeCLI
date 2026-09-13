@@ -28,9 +28,9 @@
 | `scripts/inject_math.py` | 234 | 公式：声明式规格 → matplotlib 渲染 → 注入，含重开/COM 验证 |
 | `scripts/inject_icons.py` | 294 | 图标：内嵌 Tabler 线性图标库注入，单一颜色角色 |
 | `scripts/inject_figure.py` | 975 | 插图：函数图像 / 平面几何题图；声明式规格 + 几何约束验算（超差不写文件）+ 自定义代码逃生舱 |
-| `scripts/inject_anim.py` | 824 | 动画：中文脚本 → OOXML timing 注入，PowerPoint COM 三层校验；菜单外效果走 `--raw` 手写 XML 逃生舱（须用户同意，逐条断言关闭＝降级） |
+| `scripts/inject_anim.py` | 1086 | 动画：中文脚本 → OOXML timing 注入，PowerPoint COM 三层校验；菜单外效果走 `--raw` 手写 XML 逃生舱（须用户同意；默认标降级，**附「断言」清单即逐条核对**） |
 | `scripts/prep_assets.py` | 429 | 素材：无损调理（EXIF / sRGB / 裁切 / 300PPI）+ 扫描件清洗（白底 / 去斜 / 裁白边 / 对比） |
-| `scripts/selftest.py` | 1173 | 回归自测：104 条断言，改任一脚本后必跑 |
+| `scripts/selftest.py` | 1201 | 回归自测：109 条断言，改任一脚本后必跑 |
 | `assets/icons/` | — | Tabler Icons 字体 + 字形表 + 许可证（随技能内嵌，无需联网） |
 
 ## 几个关键机制
@@ -61,4 +61,4 @@ python -m pip install matplotlib   # inject_math 渲染公式、inject_figure �
 python -m pip install pillow-heif  # prep_assets.py 读 iPhone 的 HEIC（可选）
 ```
 
-改脚本后跑 `python scripts/selftest.py` 回归（104 条断言；node / pptxgenjs 不在默认 `NODE_PATH` 时会跳过若干链并注明）。
+改脚本后跑 `python scripts/selftest.py` 回归（109 条断言；node / pptxgenjs 不在默认 `NODE_PATH` 时会跳过若干链并注明）。
