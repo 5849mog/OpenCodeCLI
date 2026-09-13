@@ -37,6 +37,7 @@ AI 永远不直接写 XML，所以结构错不了。
   每个效果还可以给「缓动」：线性 / 缓入 / 缓出 / 缓入缓出（默认「缓入缓出」，
   「出现」是瞬时的、固定线性）。缓动不改效果名，只改运动曲线——线性运动是机械/
   廉价观感的主要来源。一般不用写，走默认即好。
+  切换「平滑」还可以给「选项」：按对象（默认，同一个名字的元素自己走过去）／按词／按字（文字逐词或逐字变形）。
   效果与切换的完整菜单、默认时长、缓动刻度见下方 EFFECTS / TRANSITIONS / EASE 三张表。
 
 原始XML（逃生舱，默认关闭——菜单里没有的效果才用，且**必须先经用户同意**）：
@@ -256,6 +257,10 @@ def _ease_key(attrs):
 # ⚠ 已知未闭合项：**中文标签 ↔ 屏幕视觉方向**没有实测过（PNG 看不到切换，本机也无法
 #   逐帧看）。上面记的是「标签 ↔ 枚举名 ↔ dir」这条链，若要确认「标着自左侧的到底是不是
 #   从左边擦入」，需要在 PowerPoint 里把四个方向各放一次、亲眼看一遍并回填结论。
+# 平滑(morph)的「选项」= p159:morph 的 option 属性；探针实测三个值被 PowerPoint 认，
+# 读回 EntryEffect 分别 3954/3955/3956（与类型库 MorphByObject/ByWord/ByChar 一致）。
+MORPH_OPT = {"按对象": "byObject", "按词": "byWord", "按字": "byChar"}
+MORPH_EE = {"byObject": 3954, "byWord": 3955, "byChar": 3956}
 _TRANS_DIR = {"自底部": "u", "自顶部": "d", "自左侧": "r", "自右侧": "l"}
 _WIPE_DIR = {"自底部": "u", "自顶部": "d", "自左侧": "l", "自右侧": "r"}
 TRANSITIONS = {
@@ -382,11 +387,16 @@ def compile_transition(name, spec):
     dur = float(spec.get("时长", def_dur))
     ms = int(round(dur * 1000))
     if builder == "morph":
+        opt = spec.get("选项", "按对象")
+        if opt not in MORPH_OPT:
+            raise ValueError("平滑切换的「选项」只能是 %s，收到：%r"
+                             % ("、".join(MORPH_OPT), opt))
         return ('<mc:AlternateContent xmlns:mc="%s" xmlns:p159="%s">'
                 '<mc:Choice Requires="p159"><p:transition spd="slow" xmlns:p14="%s" '
-                'p14:dur="%d"><p159:morph option="byObject"/></p:transition></mc:Choice>'
+                'p14:dur="%d"><p159:morph option="%s"/></p:transition></mc:Choice>'
                 '<mc:Fallback><p:transition spd="slow"><p:fade/></p:transition>'
-                '</mc:Fallback></mc:AlternateContent>' % (MC, P159, P14, ms))
+                '</mc:Fallback></mc:AlternateContent>'
+                % (MC, P159, P14, ms, MORPH_OPT[opt]))
     if d not in _TRANS_DIR:
         raise ValueError("切换方向只能是 %s，收到：%r" % ("、".join(_TRANS_DIR), d))
     effect = builder(ms, d)
@@ -818,7 +828,11 @@ def _check_transition(si, sl, tspec, probe, tag):
         ee = int(sl.SlideShowTransition.EntryEffect)
     except Exception:
         ee = None
-    exp_ee = EXPECT_TRANS.get((tname, tdir))
+    if tname == "平滑":
+        exp_ee = MORPH_EE.get(MORPH_OPT.get(
+            (tspec.get("选项", "按对象") if isinstance(tspec, dict) else "按对象"), "byObject"))
+    else:
+        exp_ee = EXPECT_TRANS.get((tname, tdir))
     if probe:
         print("  [probe] S%d 切换 %-4s EntryEffect=%s（期望 %s）" % (si, tname, ee, exp_ee))
         return True

@@ -714,6 +714,21 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
             checks.append(("单个节拍超 8s 告警（按绝对起点算，不是各条求和）",
                            "第 1 个节拍要播 8.7s" in out7))
 
+            # 平滑的「选项」：p159:morph 的 option（探针：byObject/byWord/byChar → 3954/3955/3956）
+            _co, o_opt = anim_run(ap3, {
+                "transitions": {"1": {"效果": "平滑", "选项": "按词"}},
+                "pages": {"1": [{"形状": "标题", "效果": "淡入", "触发": "自动"}]}}, "--replace")
+            checks.append(("平滑「选项」按词 → 写 option=byWord", 'option="byWord"' in slide1(ap3)))
+            if "没有 PowerPoint COM" in o_opt:
+                print("  ? 本机无 COM，跳过 平滑选项 读回断言")
+            else:
+                checks.append(("平滑「选项」按词 → COM 读回 EntryEffect 3955",
+                               "EntryEffect 3955" in o_opt))
+            c_bo, o_bo = anim_run(ap3, {
+                "transitions": {"1": {"效果": "平滑", "选项": "按段"}}}, "--replace", "--no-verify")
+            checks.append(("平滑「选项」非法被拒（列出可选项）",
+                           c_bo != 0 and "平滑切换的「选项」只能是" in o_bo))
+
             # ⑦ 自动换片时间（advTm / advClick=0）必须被拦
             anim_run(ap3, {"transitions": {"1": "淡入"}, "pages": {"1": [
                 {"形状": "标题", "效果": "淡入", "触发": "自动"}]}}, "--replace", "--no-verify")

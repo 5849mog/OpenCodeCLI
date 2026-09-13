@@ -20,7 +20,7 @@
 | `references/styles.md` | 559 | 风格库：12 个有名有姓的设计运动预设（精确色值字号）、按效果选风格、页级编排规则、反 AI 审美清单 |
 | `references/pitfalls.md` | 487 | 33 条静默翻车清单（症状 / 原因 / 做法 / 怎么验证）——专收「不报错、文件正常、成品已坏」那类 |
 | `references/judge-prompt.md` | 104 | 闸门二视觉验收的 judge 填空模板（输出机器可读 JSON verdict） |
-| `references/anim-atlas.md` | 131 | **动效手法库（取材用，不是规范）**：菜单内 10 条有权威依据的手法 + 菜单外 2 条（须 `--raw` 与用户同意）+ 依据登记表（哪个数字来自哪次探针） |
+| `references/anim-atlas.md` | 141 | **动效手法库（取材用，不是规范）**：菜单内 10 条有权威依据的手法 + 菜单外 2 条（须 `--raw` 与用户同意）+ 依据登记表（哪个数字来自哪次探针） |
 | `references/pptx-core/` | 675 | 本技能**唯一**的 pptx 生成/编辑参考：pptxgenjs API、图表/表格/模板编辑、脚手架写法，已按本技能规则对齐。含 `SKILL.md` + `PROVENANCE.md`（来源与改动记录）+ `LICENSE.txt` |
 | `scripts/qa.py` | 1259 | 闸门一：几何 / 中文排版 / 对比度 / 交付合法性 / 表格外框裁剪 / 字体可移植性 / deck 级骨架 |
 | `scripts/render.py` | 302 | 渲染 PNG（PowerPoint COM 优先，LibreOffice 兜底），支持 `--pages` 单页重渲与 `--contact` 拼图 |
@@ -28,9 +28,9 @@
 | `scripts/inject_math.py` | 234 | 公式：声明式规格 → matplotlib 渲染 → 注入，含重开/COM 验证 |
 | `scripts/inject_icons.py` | 294 | 图标：内嵌 Tabler 线性图标库注入，单一颜色角色 |
 | `scripts/inject_figure.py` | 975 | 插图：函数图像 / 平面几何题图；声明式规格 + 几何约束验算（超差不写文件）+ 自定义代码逃生舱 |
-| `scripts/inject_anim.py` | 1117 | 动画：中文脚本 → OOXML timing 注入，PowerPoint COM 三层校验；菜单外效果走 `--raw` 手写 XML 逃生舱（须用户同意；默认标降级，**附「断言」清单即逐条核对**） |
+| `scripts/inject_anim.py` | 1131 | 动画：中文脚本 → OOXML timing 注入，PowerPoint COM 三层校验；菜单外效果走 `--raw` 手写 XML 逃生舱（须用户同意；默认标降级，**附「断言」清单即逐条核对**） |
 | `scripts/prep_assets.py` | 429 | 素材：无损调理（EXIF / sRGB / 裁切 / 300PPI）+ 扫描件清洗（白底 / 去斜 / 裁白边 / 对比） |
-| `scripts/selftest.py` | 1239 | 回归自测：113 条断言，改任一脚本后必跑 |
+| `scripts/selftest.py` | 1254 | 回归自测：116 条断言，改任一脚本后必跑 |
 | `assets/icons/` | — | Tabler Icons 字体 + 字形表 + 许可证（随技能内嵌，无需联网） |
 
 ## 几个关键机制
@@ -61,4 +61,4 @@ python -m pip install matplotlib   # inject_math 渲染公式、inject_figure �
 python -m pip install pillow-heif  # prep_assets.py 读 iPhone 的 HEIC（可选）
 ```
 
-改脚本后跑 `python scripts/selftest.py` 回归（113 条断言；node / pptxgenjs 不在默认 `NODE_PATH` 时会跳过若干链并注明）。
+改脚本后跑 `python scripts/selftest.py` 回归（116 条断言；node / pptxgenjs 不在默认 `NODE_PATH` 时会跳过若干链并注明）。
