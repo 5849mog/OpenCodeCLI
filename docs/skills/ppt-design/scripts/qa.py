@@ -583,6 +583,20 @@ def audit_text_frame(si, x, y, w, h, tf, bg_rgb, hard: list, warn: list, faces: 
 
 # ---------------------------------------------------------------- 交付合法性
 
+def _brief_names(names, cap: int = 6) -> str:
+    """把形状名集合缩成一行可读清单（过长则截断并报总数）——morph 配对诊断用。"""
+    ns = sorted(n for n in names if n)
+    if not ns:
+        return "（无）"
+    head = "、".join(ns[:cap])
+    return head + ("…（共 %d 个）" % len(ns) if len(ns) > cap else "")
+
+
+# 真正产生"运动"的行为元素；可见性设置（p:set，注入器固定写 dur=500）不算时长，
+# 否则它会把短动画盖住（实测 0.1s 的淡入被算成 0.5s，过短告警永远不响）。
+_MOTION_TAGS = ("animEffect", "anim", "animScale", "animRot", "animMotion")
+
+
 def check_delivery(path: str) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     try:
@@ -596,6 +610,24 @@ def check_delivery(path: str) -> list[tuple[str, str]]:
         broken = zf.testzip()
         if broken:
             out.append(("硬伤", f"压缩包成员损坏：{broken}"))
+
+        # 放映设置：计时自动翻页 / 展台循环——整份会自己翻，演讲时按不住
+        if "ppt/presentation.xml" in names:
+            try:
+                pxml = zf.read("ppt/presentation.xml").decode("utf-8", errors="replace")
+            except Exception:
+                pxml = ""
+            sp = re.search(r"<p:showPr\b[^>]*>", pxml)
+            if sp:
+                kv = dict(re.findall(r'([\w:]+)="([^"]*)"', sp.group(0)))
+                if kv.get("useTimings") in ("1", "true"):
+                    out.append(("告警", "[deck] 演示文稿开了「使用计时/排练计时」"
+                                        "（p:showPr@useTimings）—— 放映时按计时自动翻页，"
+                                        "讲到一半就跑掉；在「幻灯片放映 → 设置放映方式」里关掉"))
+                if kv.get("showType") == "kiosk":
+                    out.append(("告警", "[deck] 放映方式是「展台(全屏幕)循环」"
+                                        "（p:showPr@showType=\"kiosk\"）—— 会自动循环、无法"
+                                        "人工控制节奏；演讲场合改成「演讲者放映」"))
 
         prev_names: set[str] = set()
         for slide in sorted(n for n in names
@@ -662,22 +694,59 @@ def check_delivery(path: str) -> list[tuple[str, str]]:
                 clicks = sum(1 for g in groups
                              if any(c.get("delay") == "indefinite"
                                     for c in g.iter(f"{{{P_NS}}}cond")))
-                total_ms = sum(int(c.get("dur")) for c in timing.iter(f"{{{P_NS}}}cTn")
-                               if (c.get("dur") or "").isdigit())
-                if clicks > 4:
-                    out.append(("告警", f"{slide} 要观众点 {clicks} 次才放完 —— 演示节奏的硬伤，"
-                                        "点击预算 ≤4 次/页（能合并的同时/之后触发就合并）"))
+                # 每个效果的实际时长 = 它内部"运动"行为 cTn 的最大 dur（与注入器同一口径）；
+                # 「出现」没有运动行为，记 0（它就是瞬时的，不该被当成"过短"）。
+                eff_durs = []
+                for c in timing.iter(f"{{{P_NS}}}cTn"):
+                    if c.get("nodeType") not in ("clickEffect", "withEffect", "afterEffect"):
+                        continue
+                    durs = []
+                    for beh in c.iter():
+                        if beh.tag.rsplit("}", 1)[-1] not in _MOTION_TAGS:
+                            continue
+                        durs += [int(x.get("dur")) for x in beh.iter(f"{{{P_NS}}}cTn")
+                                 if (x.get("dur") or "").isdigit()]
+                    eff_durs.append(max(durs) if durs else 0)
+                total_ms = sum(eff_durs)
+                if clicks:
+                    out.append(("告警", f"{slide} 页内有 {clicks} 处点击 —— 观众/演讲者得手动点"
+                                        "才放得完这一页。默认应整页自动连播（首条「自动」+ 其余"
+                                        "「之后」），断点只在翻页；确需停下（提问/等反应）请在"
+                                        "规格书「动画」行写明理由，交付时声明豁免"))
+                short = [d for d in eff_durs if 0 < d < 200]
+                if short:
+                    out.append(("告警", f"{slide} 有 {len(short)} 条动画短于 0.2s（最短 {min(short)}ms）"
+                                        " —— 一闪而过，观众看不见；入场至少 0.3s"))
                 if len(effects) > 8:
                     out.append(("告警", f"{slide} {len(effects)} 条对象动画 —— 逐条登场会拖垮节奏，"
                                         "每页入场预算 ≤8 条，整组内容用「同时/之后」打包"))
-                if total_ms > 20000:
-                    out.append(("告警", f"{slide} 动画总时长（近似）{total_ms / 1000:.0f}s 超预算"
-                                        " —— 单页揭示节奏建议 ≤10s，时长按行为粗算有放大"))
+                slow = [d for d in eff_durs if d > 3000]
+                if slow:
+                    out.append(("告警", f"{slide} 有 {len(slow)} 条动画长于 3s（最长 "
+                                        f"{max(slow) / 1000:.1f}s）—— 拖沓；单条建议 ≤2s，"
+                                        "要显示得久就让下一条「之后」接上"))
+                if total_ms > 8000:
+                    out.append(("告警", f"{slide} 整页动画粗算 {total_ms / 1000:.1f}s"
+                                        "（同页「同时」触发的会重叠，实际略短）—— 翻页后要等它"
+                                        "播完，单页建议 ≤8s；内容多就拆到下一页"))
+            # ---- 自动换片时间：这页会自己翻过去（讲到一半就跑掉）----
+            for tr in root.iter(f"{{{P_NS}}}transition"):
+                adv_tm = tr.get("advTm")
+                if adv_tm or tr.get("advClick") == "0":
+                    out.append(("告警", f"{slide} 带自动换片时间或禁止点击换页（"
+                                        f"advTm={adv_tm or '—'} / advClick={tr.get('advClick', '—')}）"
+                                        " —— 放映时这页会自己翻过去、演讲按不住。注意 p14:dur 是"
+                                        "切换本身的播放时长，不是换片计时；这项多半来自模板或别的"
+                                        "工具，去掉它"))
+                    break
             if b":morph" in blob:
                 shared = shape_names & prev_names
                 if not shared:
-                    out.append(("告警", f"{slide} 用了平滑(morph)切换，但上一页没有同名形状"
-                                        " —— 会退化为普通淡入，给两页要连续的元素起同一个 objectName"))
+                    out.append(("告警", f"{slide} 用了平滑(morph)切换，但和上一页没有一个同名形状"
+                                        f" —— 会整页退化成普通淡入。本页独有：{_brief_names(shape_names)}；"
+                                        f"上一页独有：{_brief_names(prev_names)}。"
+                                        "要连续变形的元素（同一母题块、同一张图）在相邻两页用同一个 "
+                                        "objectName"))
             prev_names = shape_names
 
         for chart in sorted(n for n in names

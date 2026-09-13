@@ -19,15 +19,25 @@ AI 永远不直接写 XML，所以结构错不了。
     "transitions": {"1": "淡入", "2": {"效果": "推入", "方向": "自底部"}, "3": "平滑"},
     "pages": {
       "2": [
-        {"形状": "标题", "效果": "淡入", "触发": "自动"},
-        {"形状": "论点一", "效果": "出现", "触发": "点击"},
+        {"形状": "标题", "效果": "浮入", "触发": "自动", "方向": "自底部"},
+        {"形状": "论点一", "效果": "浮入", "触发": "之后", "方向": "自底部"},
         {"形状": "论点二", "效果": "浮入", "触发": "之后", "方向": "自底部"},
-        {"形状": "柱状图", "效果": "擦入", "触发": "点击", "方向": "自左侧", "时长": 1.0}
+        {"形状": "柱状图", "效果": "擦入", "触发": "之后", "方向": "自左侧", "时长": 1.0}
       ]
     }
   }
   形状 = 施工时 pptxgenjs 的 objectName；触发 = 点击/同时/之后/自动（翻页后自动播）
-  效果与切换的完整菜单、默认时长见下方 EFFECTS / TRANSITIONS 两张表。
+
+  **默认写法就是上面这样：首条「自动」（翻到这一页即起播）+ 其余「之后」自动接续，
+  页内 0 点击——断点在翻页，不在页内。** 观众/演讲者只需要翻页，一页自己的动画会
+  播完再等人。「点击」是例外：只在必须停下时用（提问、等听众反应），并写进规格书
+  「动画」行的理由里；qa 对页内出现点击告警。切换用「自动」的页配合首条「自动」，
+  翻页即无缝起播。
+
+  每个效果还可以给「缓动」：线性 / 缓入 / 缓出 / 缓入缓出（默认「缓入缓出」，
+  「出现」是瞬时的、固定线性）。缓动不改效果名，只改运动曲线——线性运动是机械/
+  廉价观感的主要来源。一般不用写，走默认即好。
+  效果与切换的完整菜单、默认时长、缓动刻度见下方 EFFECTS / TRANSITIONS / EASE 三张表。
 
 原始XML（逃生舱，默认关闭——菜单里没有的效果才用，且**必须先经用户同意**）：
   默认路线永远是上面的菜单。只有当用户明确要求做菜单外的效果（路径动画、旋转、
@@ -49,9 +59,9 @@ AI 永远不直接写 XML，所以结构错不了。
 验证（有 PowerPoint COM 时自动执行，这是动画的两道闸门）：
   第 1 层  文件能被 PowerPoint 真打开（坏 XML 会在这一层炸出来）；
   第 2 层  逐条断言声明的每条动画与切换被 PowerPoint 完整解析：效果类型、目标形状名、
-           触发方式、时长、切换 EntryEffect 全部与脚本一致——PowerPoint 对坏 timing
-           树会静默丢弃，只有数得出、对得上才算存在。只配切换（无对象动画）的页也会
-           被验到，不因为「没效果」而跳过。
+           触发方式、时长、缓动（Timing.Accelerate/Decelerate）、切换 EntryEffect 全部
+           与脚本一致——PowerPoint 对坏 timing 树会静默丢弃，只有数得出、对得上才算存在。
+           只配切换（无对象动画）的页也会被验到，不因为「没效果」而跳过。
 
 退出码：0 注入且验证通过；1 验证不一致；2 注入成功但本机无法验证，
         或含原始 XML 动画（逐条断言整类关闭，属检查降级）。
@@ -169,6 +179,45 @@ EFFECTS = {
 DEFAULT_DIR = {"擦入": 8, "飞入": 4, "浮入": 4}      # 自左侧 / 自底部
 FLOAT_PID = {4: 42, 1: 47}                            # 自底部=上浮 / 自顶部=下沉
 
+# 缓动：PowerPoint「平滑开始 / 平滑结束」两个刻度，编译成效果级 p:cTn 的 accel/decel。
+# 探针实测（anim_probe/probe_ease.py → probe_ease.pptx，PowerPoint 自己另存的文件）：
+#   COM 属性 Timing.Accelerate / Decelerate 是 0–1 浮点，写进 XML 时 ×100000，
+#   位置在 presetSubtype 之后、fill 之前；取 0 时该属性不写。
+#   SmoothStart/SmoothEnd（MsoTriState）是同一对刻度的开关形态，置真即 50000。
+# 它不改效果名，只改运动曲线——线性运动是"机械/廉价感"的主要来源，这是唯一的动效质量参数。
+EASE = {
+    "线性":     (0, 0),
+    "缓入":     (50000, 0),        # 起步慢（accel）
+    "缓出":     (0, 50000),        # 收尾慢（decel）
+    "缓入缓出": (50000, 50000),     # 默认
+}
+DEFAULT_EASE = {"出现": "线性"}     # 出现是瞬时效果（时长 0），加缓动没有意义
+EASE_FALLBACK = "缓入缓出"
+
+def _ease_of(name, item):
+    """该效果实际用的缓动名与 (accel, decel)。菜单给默认值，声明里的「缓动」可覆盖。"""
+    ename = item.get("缓动", DEFAULT_EASE.get(name, EASE_FALLBACK))
+    if ename not in EASE:
+        raise ValueError("缓动「%s」不在菜单里。可选：%s" % (ename, "、".join(EASE)))
+    if name == "出现" and EASE[ename] != (0, 0):
+        raise ValueError("「出现」是瞬时效果（时长 0），加缓动没有意义——去掉「缓动」或改成「线性」")
+    return ename, EASE[ename]
+
+def _ease_attrs(pair):
+    a, d = pair
+    s = ""
+    if a:
+        s += ' accel="%d"' % a
+    if d:
+        s += ' decel="%d"' % d
+    return s
+
+def _ease_key(attrs):
+    """accel/decel 属性串 -> 可比较的 "accel/decel"（缺项记 0）——往返校验用。"""
+    a = re.search(r'accel="(\d+)"', attrs or "")
+    d = re.search(r'decel="(\d+)"', attrs or "")
+    return "%s/%s" % (a.group(1) if a else "0", d.group(1) if d else "0")
+
 # 切换：全部按 PowerPoint 的 mc:AlternateContent 包裹（p14 Choice + 旧版 Fallback）
 # 探针实测：推入 自底部=dir u、自顶部=d、自左侧=r、自右侧=l（dir=新页移动方向）
 _TRANS_DIR = {"自底部": "u", "自顶部": "d", "自左侧": "r", "自右侧": "l"}
@@ -202,13 +251,15 @@ def _effect_par(ids, spid, name, item):
     real_pid = FLOAT_PID[d] if pid is None else pid
     node = item.pop("_node")
     subtype = _subtype_for(name, d)
+    ename, pair = _ease_of(name, item)
     behaviors = "".join(builder(ids, spid, ms, d if needs_dir else None,
                                 float(item.get("幅度", 1.5))))
     ids[0] += 1
-    return ('<p:par><p:cTn id="%d" presetID="%d" presetClass="%s" presetSubtype="%d" '
+    return ('<p:par><p:cTn id="%d" presetID="%d" presetClass="%s" presetSubtype="%d"%s '
             'fill="hold" nodeType="%s"><p:stCondLst><p:cond delay="%d"/></p:stCondLst>'
             '<p:childTnLst>%s</p:childTnLst></p:cTn></p:par>'
-            % (ids[0], real_pid, cls, subtype, node, item.get("_delay", 0), behaviors)), ms
+            % (ids[0], real_pid, cls, subtype, _ease_attrs(pair), node,
+               item.get("_delay", 0), behaviors)), ms, ename
 
 def compile_page(items, name2id):
     """一组效果声明 -> (timing XML, 统计)。触发分组建组，组内按 同时/之后 排布。"""
@@ -225,7 +276,7 @@ def compile_page(items, name2id):
                 raise ValueError("「%s」之前没有可依附的效果——第一个效果用 点击 或 自动" % trg)
             groups[-1]["items"].append(dict(it, _node="withEffect" if trg == "同时" else "afterEffect"))
 
-    pars, n_effects, n_clicks, total_ms = [], 0, 0, 0
+    pars, n_effects, n_clicks, total_ms, eases = [], 0, 0, 0, {}
     for g in groups:
         inner, cursor, first = [], 0, True
         n_clicks += 0 if g["auto"] else 1
@@ -244,9 +295,10 @@ def compile_page(items, name2id):
                 item["_delay"] = 0            # 与本组第一条同时起
             else:                             # afterEffect：接在前面的时长之后
                 item["_delay"] = cursor
-            par, ms = _effect_par(ids, name2id[shape], name, item)
+            par, ms, ename = _effect_par(ids, name2id[shape], name, item)
             inner.append(par)
             n_effects += 1
+            eases[ename] = eases.get(ename, 0) + 1
             cursor += ms
             total_ms += ms
             first = False
@@ -260,7 +312,7 @@ def compile_page(items, name2id):
                     % (gid, cond, gid + 1, "".join(inner)))
         ids[0] += 1
     if not pars:
-        return None, {"effects": 0, "clicks": 0, "ms": 0}
+        return None, {"effects": 0, "clicks": 0, "ms": 0, "eases": {}}
     timing = ('<p:timing><p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" '
               'nodeType="tmRoot"><p:childTnLst><p:seq concurrent="1" nextAc="seek">'
               '<p:cTn id="2" dur="indefinite" nodeType="mainSeq"><p:childTnLst>%s'
@@ -269,7 +321,7 @@ def compile_page(items, name2id):
               '<p:nextCondLst><p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/>'
               '</p:tgtEl></p:cond></p:nextCondLst></p:seq></p:childTnLst></p:cTn>'
               '</p:par></p:tnLst></p:timing>' % "".join(pars))
-    return timing, {"effects": n_effects, "clicks": n_clicks, "ms": total_ms}
+    return timing, {"effects": n_effects, "clicks": n_clicks, "ms": total_ms, "eases": eases}
 
 def compile_transition(name, spec):
     if name not in TRANSITIONS:
@@ -451,12 +503,21 @@ def inject(src, sc, replace=False, allow_raw=False):
     os.replace(tmp, src)
 
     print("已注入 %d 页动画：" % len(replaced))
+    clicky = []
     for si in sorted(stats):
         st = stats[si]
-        print("  S%d：%d 条效果 · %d 组点击 · 总时长 %.1fs" % (si, st["effects"], st["clicks"], st["ms"] / 1000))
+        ease = "／".join("%s×%d" % (k, v) for k, v in sorted(st.get("eases", {}).items()))
+        print("  S%d：%d 条效果 · %d 组点击 · 总时长 %.1fs · 缓动 %s"
+              % (si, st["effects"], st["clicks"], st["ms"] / 1000, ease or "—"))
+        if st["clicks"]:
+            clicky.append(si)
     for si in sorted(replaced):
         if si not in stats and si not in raw_used:
             print("  S%d：切换效果" % si)
+    if clicky:
+        print("⚠ S%s 页内有点击——默认应是整页自动连播（首条「自动」+ 其余「之后」），"
+              "翻页即播完、断点只在翻页；确需停下（提问/等反应）请在规格书「动画」行写明理由"
+              % "、".join(str(s) for s in clicky))
     if raw_used:
         print("⚠ 原始XML 逃生舱：S%s 用的是手写 XML——逐条效果断言整类关闭（[降级]），"
               "交付说明必须声明这部分动画未经逐条验证"
@@ -494,7 +555,8 @@ def _rt_dump(path):
         if not m:
             continue
         xml = zf.read(n).decode("utf-8")
-        effs = re.findall(r'presetID="(\d+)" presetClass="(\w+)" presetSubtype="(-?\d+)"', xml)
+        effs = re.findall(r'presetID="(\d+)" presetClass="(\w+)" presetSubtype="(-?\d+)"'
+                          r'((?: (?:accel|decel)="\d+")*)', xml)
         filts = re.findall(r'<p:animEffect transition="in" filter="([^"]+)"', xml)
         out[int(m.group(1))] = (effs, filts)
     zf.close()
@@ -572,12 +634,21 @@ def verify(src, sc, pages, probe=False):
                     dirv = int(eff.EffectInformation.Direction)
                 except Exception:
                     dirv = None
+                try:
+                    accel = round(float(eff.Timing.Accelerate), 2)
+                except Exception:
+                    accel = None
+                try:
+                    decel = round(float(eff.Timing.Decelerate), 2)
+                except Exception:
+                    decel = None
                 node = TRG_NODE.get(item.get("触发", "点击"), "clickEffect")
                 exp_trg = EXPECT_TRG.get(node)
                 if probe:
-                    print("  [probe] S%d #%d %-6s ET=%s(期望%s) Trg=%s(期望%s) dur=%s 形状=%s(%s) Dir=%s"
+                    print("  [probe] S%d #%d %-6s ET=%s(期望%s) Trg=%s(期望%s) dur=%s 形状=%s(%s) "
+                          "Dir=%s accel=%s decel=%s"
                           % (si, k, name, et, exp_et, trg, exp_trg, dur,
-                             item.get("形状"), nm, dirv))
+                             item.get("形状"), nm, dirv, accel, decel))
                     continue
                 if et is not None and exp_et is not None and et != exp_et:
                     ok = False
@@ -592,6 +663,15 @@ def verify(src, sc, pages, probe=False):
                 if dur is not None and name != "出现" and abs(dur - declared) > 0.06:
                     ok = False
                     tag.append("#%d 时长读回 %.2fs ≠ 声明 %.2fs" % (k, dur, declared))
+                _en, _ep = _ease_of(name, item)
+                if accel is not None and abs(accel - _ep[0] / 100000.0) > 0.02:
+                    ok = False
+                    tag.append("#%d %s 缓入读回 %.2f ≠ 声明 %.2f（accel=%d）"
+                               % (k, name, accel, _ep[0] / 100000.0, _ep[0]))
+                if decel is not None and abs(decel - _ep[1] / 100000.0) > 0.02:
+                    ok = False
+                    tag.append("#%d %s 缓出读回 %.2f ≠ 声明 %.2f（decel=%d）"
+                               % (k, name, decel, _ep[1] / 100000.0, _ep[1]))
             # 切换
             tspec = trans_spec.get(str(si))
             if tspec:
@@ -642,22 +722,23 @@ def verify(src, sc, pages, probe=False):
                         else DEFAULT_DIR.get(name)
                     real_pid = FLOAT_PID.get(d, 42) if pid is None else pid
                     sub = _subtype_for(name, d)
-                    want_pid.append((str(real_pid), str(sub)))
+                    _en, _ep = _ease_of(name, item)
+                    want_pid.append((str(real_pid), str(sub), _ease_key(_ease_attrs(_ep))))
                     f = "wipe(%s)" % _WIPE_FILT.get(d, "") if name == "擦入" \
                         else ANIM_FILT.get(name)
                     if f:
                         want_filt.append(f)
                 got_pid, got_filt = rt.get(si, ([], []))
-                got_pairs = [(x[0], x[2]) for x in got_pid]
+                got_pairs = [(x[0], x[2], _ease_key(x[3])) for x in got_pid]
                 if got_pairs != want_pid:
                     ok = False
-                    print("  ✗ S%d 往返不一致：PowerPoint 序列化的 (presetID,subtype)=%s "
-                          "≠ 注入 %s（方向编码未被模型按原样保留）" % (si, got_pairs, want_pid))
+                    print("  ✗ S%d 往返不一致：PowerPoint 序列化的 (presetID,subtype,缓动)=%s "
+                          "≠ 注入 %s（方向/缓动编码未被模型按原样保留）" % (si, got_pairs, want_pid))
                 if got_filt != want_filt:
                     ok = False
                     print("  ✗ S%d 往返滤镜不一致：%s ≠ %s" % (si, got_filt, want_filt))
                 elif got_pid and got_pairs == want_pid and got_filt == want_filt:
-                    print("  ✓ S%d 往返校验一致（方向编码被 PowerPoint 原样保留）" % si)
+                    print("  ✓ S%d 往返校验一致（方向与缓动编码被 PowerPoint 原样保留）" % si)
         if not pages:
             print("（脚本没有对象动画，只验证了文件能打开）")
     finally:

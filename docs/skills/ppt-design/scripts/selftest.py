@@ -473,7 +473,7 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
             "transitions": {"2": "平滑"},
             "pages": {"1": [
                 {"形状": "标题", "效果": "淡入", "触发": "自动", "时长": 0.9},
-                {"形状": "论点一", "效果": "出现", "触发": "点击"},
+                {"形状": "论点一", "效果": "出现", "触发": "之后"},
                 {"形状": "hero", "效果": "浮入", "触发": "之后", "方向": "自底部"},
             ]},
         }
@@ -590,6 +590,140 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
         else:
             print("  ? node / pptxgenjs 不可用，跳过原始XML 逃生舱断言")
 
+        # 动效质量规则回归：缓动 / 整页自动连播 / 时长 / 自动换片 / morph 配对点名
+        if build_anim_deck(ap3 := str(Path(td) / "anim_quality.pptx")):
+            def anim_run(deck, spec, *flags):
+                j = Path(deck).with_suffix(".json")
+                j.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf8")
+                r = subprocess.run([sys.executable, str(INJECT), deck, str(j), *flags],
+                                   capture_output=True, text=True, encoding="utf-8",
+                                   errors="replace", timeout=300)
+                return r.returncode, (r.stdout or "") + (r.stderr or "")
+
+            def slide1(deck):
+                with zipfile.ZipFile(deck) as z:
+                    return z.read("ppt/slides/slide1.xml").decode("utf-8")
+
+            # ① 缓动：默认「缓入缓出」写进效果级 cTn；显式「缓出」只写 decel
+            c1, o1 = anim_run(ap3, {"pages": {"1": [
+                {"形状": "标题", "效果": "浮入", "触发": "自动", "方向": "自底部"},
+                {"形状": "论点一", "效果": "淡入", "触发": "之后", "缓动": "缓出"},
+            ]}}, "--no-verify")
+            x1 = slide1(ap3)
+            checks.append(("缓动：默认「缓入缓出」写入效果级 cTn",
+                           c1 in (0, 2) and 'accel="50000" decel="50000"' in x1))
+            checks.append(("缓动：显式「缓出」只写 decel（无 accel）",
+                           c1 in (0, 2) and 'decel="50000" fill="hold"' in x1
+                           and not re.search(r'accel="50000" fill="hold"', x1)))
+            checks.append(("注入报告列出每页缓动", "缓动 缓入缓出×1／缓出×1" in o1))
+
+            # ② 整页自动连播（0 点击）→ qa 不该有点击告警
+            _c, outN = _run_qa(Path(ap3))
+            checks.append(("整页自动连播（页内 0 点击）qa 无点击告警", "处点击" not in outN))
+
+            # ③「出现」是瞬时效果，加缓动必须被拒
+            c3, o3 = anim_run(ap3, {"pages": {"1": [
+                {"形状": "标题", "效果": "出现", "触发": "自动", "缓动": "缓入缓出"}]}},
+                "--replace", "--no-verify")
+            checks.append(("「出现」加缓动被拒（时长 0，加缓动无意义）",
+                           c3 != 0 and "瞬时效果" in o3))
+
+            # ④ 缓动名非法 → 报错并列出可选项
+            c4, o4 = anim_run(ap3, {"pages": {"1": [
+                {"形状": "标题", "效果": "淡入", "触发": "自动", "缓动": "平滑"}]}},
+                "--replace", "--no-verify")
+            checks.append(("缓动名非法报错并列出可选项",
+                           c4 != 0 and "缓动「平滑」不在菜单里" in o4))
+
+            # ⑤ 页内点击 → qa 告警（取向：默认整页自动连播）
+            anim_run(ap3, {"pages": {"1": [
+                {"形状": "标题", "效果": "淡入", "触发": "自动"},
+                {"形状": "论点一", "效果": "淡入", "触发": "点击"}]}},
+                "--replace", "--no-verify")
+            code5, out5 = _run_qa(Path(ap3))
+            checks.append(("页内点击 → qa 告警（默认应 0 点击）",
+                           code5 == 2 and "1 处点击" in out5 and "整页自动连播" in out5))
+
+            # ⑥ 时长：单条过短 / 过长 / 整页粗算超 8s
+            anim_run(ap3, {"pages": {"1": [
+                {"形状": "标题", "效果": "淡入", "触发": "自动", "时长": 0.15},
+                {"形状": "论点一", "效果": "淡入", "触发": "之后", "时长": 3.5}]}},
+                "--replace", "--no-verify")
+            _c6, out6 = _run_qa(Path(ap3))
+            checks.append(("单条过短（0.15s）告警", "短于 0.2s" in out6))
+            checks.append(("单条过长（3.5s）告警", "长于 3s" in out6))
+            anim_run(ap3, {"pages": {"1": [
+                {"形状": n, "效果": "淡入", "触发": ("自动" if i == 0 else "之后"), "时长": 2.9}
+                for i, n in enumerate(["标题", "论点一", "hero"])]}},
+                "--replace", "--no-verify")
+            _c7, out7 = _run_qa(Path(ap3))
+            checks.append(("整页动画粗算超 8s 告警", "整页动画粗算" in out7))
+
+            # ⑦ 自动换片时间（advTm / advClick=0）必须被拦
+            anim_run(ap3, {"transitions": {"1": "淡入"}, "pages": {"1": [
+                {"形状": "标题", "效果": "淡入", "触发": "自动"}]}}, "--replace", "--no-verify")
+            adv = str(Path(td) / "anim_advtm.pptx")
+            with zipfile.ZipFile(ap3) as zin, zipfile.ZipFile(adv, "w", zipfile.ZIP_DEFLATED) as zout:
+                for info in zin.infolist():
+                    d = zin.read(info.filename)
+                    if info.filename == "ppt/slides/slide1.xml":
+                        d = d.replace(b"<p:transition",
+                                      b'<p:transition advTm="3000" advClick="0"', 1)
+                    zout.writestr(info.filename, d)
+            _c8, out8 = _run_qa(Path(adv))
+            checks.append(("自动换片时间（advTm/advClick=0）告警",
+                           "会自己翻过去" in out8 and "advTm=3000" in out8))
+
+            # ⑧ 放映设置：使用计时 / 展台循环
+            kio = str(Path(td) / "anim_kiosk.pptx")
+            with zipfile.ZipFile(ap3) as zin, zipfile.ZipFile(kio, "w", zipfile.ZIP_DEFLATED) as zout:
+                for info in zin.infolist():
+                    d = zin.read(info.filename)
+                    if info.filename == "ppt/presentation.xml":
+                        s = d.decode("utf-8")
+                        if "<p:showPr" in s:
+                            s = re.sub(r"<p:showPr\b",
+                                       '<p:showPr useTimings="1" showType="kiosk"', s, count=1)
+                        else:
+                            s = s.replace("</p:presentation>",
+                                          '<p:showPr useTimings="1" showType="kiosk"/>'
+                                          "</p:presentation>")
+                        d = s.encode("utf-8")
+                    zout.writestr(info.filename, d)
+            _c9, out9 = _run_qa(Path(kio))
+            checks.append(("放映设置「使用计时 / 展台循环」告警",
+                           "使用计时" in out9 and "展台" in out9))
+        else:
+            print("  ? node / pptxgenjs 不可用，跳过动效质量规则断言")
+
+        # morph 未配对：告警必须点名两页各自独有的形状（不然一轮改不对）
+        MORPH_JS = r"""
+const pptxgen = require("pptxgenjs");
+const p = new pptxgen();
+p.layout = "LAYOUT_WIDE";
+const s1 = p.addSlide();
+s1.addText("封面", { objectName: "封面标题", x: 1, y: 1, w: 8, h: 1, fontSize: 36 });
+s1.addShape("rect", { objectName: "装饰块", x: 1, y: 3, w: 3, h: 2, fill: { color: "2E5BFF" } });
+const s2 = p.addSlide();
+s2.addText("正文", { objectName: "正文标题", x: 1, y: 1, w: 8, h: 1, fontSize: 32 });
+s2.addShape("rect", { objectName: "hero", x: 8, y: 2, w: 3, h: 3, fill: { color: "2E5BFF" } });
+p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
+"""
+        if node_build(MORPH_JS, mp2 := str(Path(td) / "anim_morph.pptx")):
+            mj = Path(td) / "anim_morph.json"
+            mj.write_text(json.dumps({"transitions": {"2": "平滑"}, "pages": {"2": [
+                {"形状": "正文标题", "效果": "淡入", "触发": "自动"}]}}, ensure_ascii=False),
+                encoding="utf8")
+            subprocess.run([sys.executable, str(INJECT), mp2, str(mj), "--no-verify"],
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=300)
+            _cm, outm = _run_qa(Path(mp2))
+            checks.append(("morph 未配对点名两页独有形状",
+                           "退化成普通淡入" in outm and "封面标题" in outm
+                           and "正文标题" in outm and "hero" in outm))
+        else:
+            print("  ? node / pptxgenjs 不可用，跳过 morph 点名断言")
+
         # 动画纪律预算：6 连击 → qa 告警
         if build_anim_deck(ap2 := str(Path(td) / "anim_over.pptx")):
             oj = Path(td) / "anim_over.json"
@@ -605,7 +739,7 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
                            capture_output=True, text=True, encoding="utf-8",
                            errors="replace", timeout=300)
             codeO, outO = _run_qa(Path(ap2))
-            checks.append(("动画点击预算告警（6 连击）", codeO == 2 and "点 6 次" in outO))
+            checks.append(("动画点击预算告警（6 连击）", codeO == 2 and "6 处点击" in outO))
         else:
             print("  ? node / pptxgenjs 不可用，跳过动画预算断言")
 
@@ -633,7 +767,7 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
             # 管线顺序：python-pptx 重存后再做动画注入，必须仍然全绿
             aj = Path(td) / "math_anim.json"
             aj.write_text(json.dumps({"pages": {"1": [
-                {"形状": "decoy", "效果": "淡入", "触发": "点击"}]}},
+                {"形状": "decoy", "效果": "淡入", "触发": "自动"}]}},
                 ensure_ascii=False), encoding="utf8")
             ra2 = subprocess.run([sys.executable, str(INJECT), mp, str(aj)],
                                  capture_output=True, text=True, encoding="utf-8",
