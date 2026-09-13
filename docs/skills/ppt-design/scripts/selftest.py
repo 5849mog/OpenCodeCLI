@@ -356,7 +356,7 @@ def main() -> int:
             ("缩字后按实际字号判硬伤", "×缩字" in out),
             ("公式残留判硬伤", "公式未转换" in out),
             ("emoji 当图标告警", "emoji" in out),
-            ("旋转提醒", "旋转" in out),
+            ("旋转提醒", "旋转" in out or "净空" in out),
             ("色带（含填充文本框）", "页有全宽页眉/页脚色带" in out),
             ("同页眉骨架", "同一页眉骨架" in out),
             ("载体断档", "视觉载体断档" in out),
@@ -576,6 +576,16 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
                     dict(DEF[0], **{"起始": 0})]})), ["--replace", "--raw"])
             checks.append(("断言：未知字段被拒（挡笔误）",
                            ca_unk != 0 and "未知字段 起始" in out_au))
+            # P0-1 回归：raw 页的切换照常验（原先 raw 分支的 continue 把它一起跳过了）
+            _ct, out_t, _ = raw_case(
+                "rawtrans", raw_spec(dict(GOOD, **{"断言": DEF}),
+                                     extra={"transitions": {"1": "平滑"}}),
+                ["--replace", "--raw"])
+            if "没有 PowerPoint COM" in out_t:
+                print("  ? 本机无 COM，跳过 raw 页切换断言")
+            else:
+                checks.append(("raw 页的切换照常验（P0-1 回归）",
+                               "S1 切换 平滑 读回一致" in out_t))
             cm_a, out_ma, _ = raw_case("assertmenu", {
                 "原始XML": {"2": GOOD},
                 "pages": {"1": [{"形状": "标题", "效果": "淡入", "触发": "自动", "断言": []}]}},
@@ -1090,6 +1100,34 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
                        "约束超差中止且不写入文件",
                        "逃生舱自定义代码可用且标注未受约束验算"):
                 checks.append((nm, False))
+
+        # 旋转净空（qa 的旋转形状 ↔ 文字分离轴检查）：几何直接单元测，不依赖渲染
+        try:
+            import importlib.util as _iluR
+            _spR = _iluR.spec_from_file_location("qa_rot", str(HERE / "qa.py"))
+            _qaR = _iluR.module_from_spec(_spR)
+            _spR.loader.exec_module(_qaR)
+
+            class _Box:
+                def __init__(self, l, t, w, h, rot=0.0):
+                    self.left, self.top = int(l * 914400), int(t * 914400)
+                    self.width, self.height = int(w * 914400), int(h * 914400)
+                    self.rotation = rot
+
+            # 远距：旋转 4° 的宽条与下方 1 英寸外的文字 → 必须判"分离"，不能判相交
+            far = _qaR._poly_relation(_qaR._corners(_Box(0, 0, 4, 1, -4)),
+                                      _qaR._corners(_Box(0, 6, 4, 1)))
+            # 近距：净空 0.05 英寸 → 报正的下界
+            near = _qaR._poly_relation(_qaR._corners(_Box(0, 0, 4, 1)),
+                                       _qaR._corners(_Box(0, 1.05, 4, 1)))
+            # 相交：重叠 → 报负值（深度）
+            hit = _qaR._poly_relation(_qaR._corners(_Box(0, 0, 4, 1)),
+                                      _qaR._corners(_Box(2, 0.2, 4, 1)))
+            checks.append(("旋转净空：远距判分离（分离轴优先，曾满屏误报）", far > 1))
+            checks.append(("旋转净空：近距给出实测下界（≈0.05）", 0.0 < near < 0.1))
+            checks.append(("旋转净空：相交报负值（重叠深度）", hit < 0))
+        except Exception as e:
+            print("  ? 旋转净空单元断言跳过：%s" % str(e)[:60])
 
         # 扫描件清洗（prep_assets.py 的「扫描件」）：白底 + 去斜 + 报告
         try:

@@ -83,6 +83,7 @@ AI 永远不直接写 XML，所以结构错不了。
 退出码：0 注入且验证通过；1 验证不一致；2 注入成功但本机无法验证，
         或含原始 XML 动画（逐条断言整类关闭，属检查降级）。
 """
+import hashlib
 import json
 import os
 import re
@@ -97,6 +98,13 @@ except ImportError:  # pragma: no cover
     def _xml_parse(data):
         return _ET.fromstring(data)
 
+# 脚本自己的内容哈希：技能脚本会被拷进工作目录，副本静默过期没有任何症状
+# （实测发生过：拷的是 591 行的旧版，真源当天已到 795 行，于是 --raw 报「未知参数」、
+# 闸门口径也对不上）。打进报告，交付时能与真源对照。
+try:
+    _SELF_SHA = hashlib.sha1(open(__file__, "rb").read()).hexdigest()[:8]
+except Exception:
+    _SELF_SHA = "?"
 P_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
 P14 = "http://schemas.microsoft.com/office/powerpoint/2010/main"
@@ -236,12 +244,19 @@ def _ease_key(attrs):
     return "%s/%s" % (a.group(1) if a else "0", d.group(1) if d else "0")
 
 # 切换：全部按 PowerPoint 的 mc:AlternateContent 包裹（p14 Choice + 旧版 Fallback）
-# 探针实测：推入 自底部=dir u、自顶部=d、自左侧=r、自右侧=l（dir=新页移动方向）
+#
+# 方向表**两张，不能混用**——`p:push` 与 `p:wipe` 的 dir 约定不同。两张都是探针实测：
+# 把 EntryEffect 设成以下枚举值让 PowerPoint 自己写 XML，再读回 dir。
+#   擦除(p:wipe)：2817 WipeLeft→(省略，即默认 "l")、2818 WipeUp→u、
+#                 2819 WipeRight→r、2820 WipeDown→d
+#   推入(p:push)：3852 PushDown→d、3853 PushLeft→r、3854 PushRight→l、3855 PushUp→u
+# 枚举名与数值取自类型库（`ppEffectWipeLeft=2817 … ppEffectPushUp=3855`，
+# `ppEffectFadeSmoothly=3849`、`ppEffectMorphByObject=3954`），用于核对 EXPECT_TRANS。
+#
+# ⚠ 已知未闭合项：**中文标签 ↔ 屏幕视觉方向**没有实测过（PNG 看不到切换，本机也无法
+#   逐帧看）。上面记的是「标签 ↔ 枚举名 ↔ dir」这条链，若要确认「标着自左侧的到底是不是
+#   从左边擦入」，需要在 PowerPoint 里把四个方向各放一次、亲眼看一遍并回填结论。
 _TRANS_DIR = {"自底部": "u", "自顶部": "d", "自左侧": "r", "自右侧": "l"}
-# 擦除的 dir 语义与推入**相反**，不能复用上面那张表：COM 探针把 EntryEffect 设成
-# 2817/2818/2819/2820 让 PowerPoint 自己写 XML，读回 dir 分别是（省略）/u/r/d，
-# 而 EXPECT_TRANS 里 2817=自左侧、2819=自右侧 —— 即 擦除 自左侧需 dir="l"、
-# 自右侧需 dir="r"。沿用推入表会把左右写反（注入会读回 2819 ≠ 期望 2817）。
 _WIPE_DIR = {"自底部": "u", "自顶部": "d", "自左侧": "l", "自右侧": "r"}
 TRANSITIONS = {
     "淡入": (lambda dur, d: '<p:fade thruBlk="0"/>', 0.7),
@@ -726,7 +741,7 @@ def inject(src, sc, replace=False, allow_raw=False):
             zf.writestr(i.filename, data[i.filename])
     os.replace(tmp, src)
 
-    print("已注入 %d 页动画：" % len(replaced))
+    print("已注入 %d 页动画（inject_anim.py %s）：" % (len(replaced), _SELF_SHA))
     for si in sorted(stats):
         st = stats[si]
         ease = "／".join("%s×%d" % (k, v) for k, v in sorted(st.get("eases", {}).items()))
@@ -794,6 +809,27 @@ def _rt_dump(path):
     return out
 
 
+def _check_transition(si, sl, tspec, probe, tag):
+    """切换断言。**raw 页与菜单页都要跑**——切换由 transitions 编译而来，与手写 XML 无关，
+    原先 raw 分支的 continue 把这条一起跳过了（能验却没验）。返回是否一致。"""
+    tname = tspec if isinstance(tspec, str) else tspec.get("效果", "?")
+    tdir = None if isinstance(tspec, str) else tspec.get("方向")
+    try:
+        ee = int(sl.SlideShowTransition.EntryEffect)
+    except Exception:
+        ee = None
+    exp_ee = EXPECT_TRANS.get((tname, tdir))
+    if probe:
+        print("  [probe] S%d 切换 %-4s EntryEffect=%s（期望 %s）" % (si, tname, ee, exp_ee))
+        return True
+    if exp_ee is not None and ee is not None and ee != exp_ee:
+        tag.append("切换 %s 读回 %s ≠ 期望 %s" % (tname, ee, exp_ee))
+        return False
+    if exp_ee is not None and ee is not None:
+        print("  ✓ S%d 切换 %s 读回一致（EntryEffect %s）" % (si, tname, ee))
+    return True
+
+
 def verify(src, sc, pages, stats=None, probe=False):
     try:
         from win32com.client import gencache
@@ -825,13 +861,14 @@ def verify(src, sc, pages, stats=None, probe=False):
             sl = pres.Slides(si)
             seq = sl.TimeLine.MainSequence
             if str(si) in raw_spec:
+                tag = []
                 declared = validate_asserts(si, raw_spec[str(si)])
                 if not declared:
-                    # 没写「断言」：逐条核对整类关闭，如实标降级（不得声称已逐条验证）
+                    # 没写「断言」：对象动画的逐条核对整类关闭，如实标降级（不得声称已验证）
                     degraded.append(si)
-                    print("  [降级] S%d 原始XML：读回 %d 条动画，没写「断言」——逐条核对整类关闭"
-                          "（要补回来就给这条原始XML 加「断言」清单）" % (si, seq.Count))
-                    continue
+                    print("  [降级] S%d 原始XML：读回 %d 条动画，没写「断言」——对象动画的逐条"
+                          "核对整类关闭（要补回来就给这条原始XML 加「断言」清单）"
+                          % (si, seq.Count))
                 problems = []
                 # COM 侧交叉核对（结构侧已在 raw_assert_report 里核过，不需要 COM 也跑）
                 for k in range(1, min(seq.Count, len(declared)) + 1):
@@ -862,9 +899,16 @@ def verify(src, sc, pages, stats=None, probe=False):
                     ok = False
                     for pb in problems:
                         print("  ✗ " + pb)
-                else:
+                elif declared:
                     print("  ✓ S%d 原始XML 与 COM 读回交叉核对一致（形状/起始延迟/时长）"
                           % si)
+                # 切换由 transitions 编译而来，与手写 XML 无关——raw 页也要验
+                # （原先这里的 continue 把这条一起跳过了：能验却没验）
+                if trans_spec.get(str(si)):
+                    if not _check_transition(si, sl, trans_spec[str(si)], probe, tag):
+                        ok = False
+                    for t in tag:
+                        print("  ✗ S%d %s" % (si, t))
                 continue
             items = sc.get("pages", {}).get(str(si), [])
             # 声明里每条效果在**本组内的相对起始延迟**（ms），顺序与 XML 一致
@@ -957,21 +1001,8 @@ def verify(src, sc, pages, stats=None, probe=False):
                                    % (k, name, tdelay, decl_delay / 1000.0))
             # 切换
             tspec = trans_spec.get(str(si))
-            if tspec:
-                tname = tspec if isinstance(tspec, str) else tspec.get("效果", "?")
-                tdir = None if isinstance(tspec, str) else tspec.get("方向")
-                try:
-                    ee = int(sl.SlideShowTransition.EntryEffect)
-                except Exception:
-                    ee = None
-                exp_ee = EXPECT_TRANS.get((tname, tdir))
-                if probe:
-                    print("  [probe] S%d 切换 %-4s EntryEffect=%s（期望 %s）" % (si, tname, ee, exp_ee))
-                elif exp_ee is not None and ee is not None and ee != exp_ee:
-                    ok = False
-                    tag.append("切换 %s 读回 %s ≠ 期望 %s" % (tname, ee, exp_ee))
-                elif exp_ee is not None and ee is not None:
-                    print("  ✓ S%d 切换 %s 读回一致（EntryEffect %s）" % (si, tname, ee))
+            if tspec and not _check_transition(si, sl, tspec, probe, tag):
+                ok = False
             if tag:
                 for t in tag:
                     print("  ✗ S%d %s" % (si, t))

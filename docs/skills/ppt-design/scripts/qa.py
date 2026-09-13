@@ -46,6 +46,8 @@ from __future__ import annotations
 import re
 import sys
 import unicodedata
+import hashlib
+import math
 import zipfile
 from functools import lru_cache
 from itertools import combinations
@@ -583,6 +585,84 @@ def audit_text_frame(si, x, y, w, h, tf, bg_rgb, hard: list, warn: list, faces: 
 
 # ---------------------------------------------------------------- 交付合法性
 
+def _corners(sh):
+    """形状旋转后的四角（英寸）。屏幕坐标 y 向下，OOXML 的 rot 是顺时针。
+
+    非矩形形状按**外接框旋转**近似——所以这里算的是保守包络，不是精确轮廓。
+    """
+    x, y = sh.left / EMU, sh.top / EMU
+    w, h = sh.width / EMU, sh.height / EMU
+    th = math.radians(float(getattr(sh, "rotation", 0) or 0))
+    cx, cy = x + w / 2, y + h / 2
+    c, sn = math.cos(th), math.sin(th)
+    return [(cx + dx * c - dy * sn, cy + dx * sn + dy * c)
+            for dx, dy in ((-w / 2, -h / 2), (w / 2, -h / 2), (w / 2, h / 2), (-w / 2, h / 2))]
+
+
+def _poly_relation(p, q):
+    """两个凸多边形的分离轴测试。返回 >0 的分离下界（英寸）或 ≤0 的相交（值为负的重叠深度）。
+
+    分离时用的是"沿边法向的最大间隔"，它是两多边形真实距离的**下界**（保守：真距离只会更大）。
+    """
+    axes = []
+    for poly in (p, q):
+        for i in range(len(poly)):
+            x1, y1 = poly[i]
+            x2, y2 = poly[(i + 1) % len(poly)]
+            ax, ay = -(y2 - y1), (x2 - x1)
+            n = math.hypot(ax, ay)
+            if n > 1e-9:
+                axes.append((ax / n, ay / n))
+    overlap, sep = None, -1e9
+    for ax, ay in axes:
+        pj = [x * ax + y * ay for x, y in p]
+        qj = [x * ax + y * ay for x, y in q]
+        g = max(min(qj) - max(pj), min(pj) - max(qj))
+        if g > 0:
+            sep = max(sep, g)
+        else:
+            overlap = g if overlap is None else max(overlap, g)
+    # 分离轴测试：**只要有一条轴把两者分开，就是不相交**——必须先判这条。
+    # （反过来先看「有轴重叠」会把几乎所有对判成相交，实测满屏误报。）
+    if sep > 0:
+        return sep
+    return overlap if overlap is not None else 0.0
+
+
+def check_rotation_clearance(si, shapes, warn):
+    """旋转形状的真实扫过范围 vs 文字框（pitfalls #16 的兜底，原来是整类外包给闸门二）。
+
+    只查「旋转形状 ↔ 文字」这一对：非文字形状互相交叠常常是刻意的（底纹、色块），
+    按交叠判会满屏误报。判据分两档——
+      · 相交且旋转形状**画在文字之后**（更靠上）→ 告警：可能压住文字，报重叠深度；
+      · 未相交但净空 <0.10" → 告警并报出实测值（贴得近，真机字重/字距一变就碰）（这档最容易在真机上被字重/字距顶穿）。
+    """
+    rot = [sh for sh in shapes if abs(float(getattr(sh, "rotation", 0) or 0)) >= 3]
+    if not rot:
+        return
+    txts = [(i, sh) for i, sh in enumerate(shapes)
+            if getattr(sh, "has_text_frame", False) and (sh.text_frame.text or "").strip()]
+    if not txts:
+        return
+    for rsh in rot:
+        rp = _corners(rsh)
+        for ti, tsh in txts:
+            if tsh is rsh:
+                continue
+            d = _poly_relation(rp, _corners(tsh))
+            label = (tsh.text_frame.text or "").strip().replace(chr(10), " ")[:14]
+            rname = (getattr(rsh, "name", "") or "?")[:16]
+            rot_deg = float(getattr(rsh, "rotation", 0) or 0)
+            if d <= 0 and shapes.index(rsh) > ti:
+                warn.append(f"[S{si}] 旋转形状可能压住文字：重叠 ≈{-d:.2f} 英寸 | "
+                            f"{rname}（{rot_deg:.0f}°）↔ {label!r}"
+                            "（按外接框旋转算，非矩形形状是包络近似）")
+            elif 0 < d < 0.10:
+                warn.append(f"[S{si}] 旋转形状与文字净空仅 ≈{d:.2f} 英寸（保守下界）| "
+                            f"{rname}（{rot_deg:.0f}°）↔ {label!r}"
+                            " —— 贴得这么近，真机上字重/字距一变就会碰；拉开一点更稳")
+
+
 def _brief_names(names, cap: int = 6) -> str:
     """把形状名集合缩成一行可读清单（过长则截断并报总数）——morph 配对诊断用。"""
     ns = sorted(n for n in names if n)
@@ -832,6 +912,14 @@ def check_delivery(path: str) -> list[tuple[str, str]]:
 
 # --------------------------------------------- 报告排版（分诊：摘要前置、按页分组）
 
+# 脚本自己的内容哈希：技能脚本会被拷进工作目录，副本静默过期没有任何症状
+# （实测发生过：拷的是 591 行的旧版，真源当天已到 795 行）。把它打进报告，
+# 交付时能与真源对照。
+try:
+    _SELF_SHA = hashlib.sha1(open(__file__, "rb").read()).hexdigest()[:8]
+except Exception:
+    _SELF_SHA = "?"
+
 _PAGE_TAG = re.compile(r"^\[S(\d+)\]")
 
 def _group_key(line: str) -> tuple[int, int]:
@@ -898,7 +986,8 @@ def main() -> int:
     except Exception as e:
         sys.exit(f"打不开 {name}：{e}")
     SW, SH = prs.slide_width / EMU, prs.slide_height / EMU
-    print(f"{name} | canvas {SW:.2f} x {SH:.2f} in | min {MIN_PT:g}pt · max {MAX_CHARS} 字当量/页")
+    print(f"{name} | canvas {SW:.2f} x {SH:.2f} in | min {MIN_PT:g}pt · max {MAX_CHARS} 字当量/页"
+          f" | qa.py {_SELF_SHA}")
 
     hard: list[str] = []
     warn: list[str] = []
@@ -1071,8 +1160,9 @@ def main() -> int:
             texts.append((x, y, w, h, tf.text[:18], si))
 
         if rotated >= 3:
-            warn.append(f"[S{si}] 页内有旋转 {rotated:.0f}° 的形状 —— qa 的框检查不含旋转扫过范围"
-                        "（pitfalls #16），闸门二必须核对渲染图")
+            # pitfalls #16 的兜底：旋转扫过范围不是"查不了"，矩形多边形是能算的——
+            # 与文字框做分离轴测试，报实测净空（非文字形状互相交叠多为刻意，不查）。
+            check_rotation_clearance(si, shapes, warn)
         icon_count = sum(1 for sh in shapes
                          if (getattr(sh, "name", "") or "").startswith("icon:"))
         if icon_count > 3:
