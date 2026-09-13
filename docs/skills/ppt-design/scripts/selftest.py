@@ -512,6 +512,80 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
         else:
             print("  ? node / pptxgenjs 不可用，跳过动画链断言")
 
+        # 原始XML 逃生舱（inject_anim.py --raw）：默认必须关闭，三重闸门必须挡住，
+        # 正路径必须标 [降级] 且退出码非 0——手写 XML 没有逐条断言可做，不能报全绿。
+        RAW_SRC = str(Path(td) / "rawsrc.pptx")
+        if build_anim_deck(RAW_SRC):
+            seed = Path(td) / "rawseed.json"
+            seed.write_text(json.dumps({"pages": {"1": [
+                {"形状": "标题", "效果": "淡入", "触发": "点击"}]}}, ensure_ascii=False), encoding="utf8")
+            subprocess.run([sys.executable, str(INJECT), RAW_SRC, str(seed), "--no-verify"],
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=300)
+            txml = re.search(r"<p:timing>.*?</p:timing>",
+                             zipfile.ZipFile(RAW_SRC).read("ppt/slides/slide1.xml")
+                             .decode("utf-8"), re.S).group(0)
+            GOOD = {"XML": txml, "原因": "回归：菜单外的效果", "用户已同意": True}
+
+            def raw_case(name, spec, flags):
+                p = Path(td) / f"raw_{name}.pptx"
+                p.write_bytes(Path(RAW_SRC).read_bytes())      # 已带动画，靠 --replace 覆盖
+                j = Path(td) / f"raw_{name}.json"
+                j.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf8")
+                before = p.read_bytes()
+                r = subprocess.run([sys.executable, str(INJECT), str(p), str(j), *flags],
+                                   capture_output=True, text=True, encoding="utf-8",
+                                   errors="replace", timeout=300)
+                return (r.returncode, (r.stdout or "") + (r.stderr or ""),
+                        p.read_bytes() == before)
+
+            def raw_spec(entry, extra=None):
+                d = {"原始XML": {"1": entry}}
+                if extra:
+                    d.update(extra)
+                return d
+
+            co_ok, out_ok, _ = raw_case("ok", raw_spec(GOOD), ["--replace", "--raw"])
+            checks.append(("原始XML 正路径：注入 + 标 [降级] + 提示逃生舱",
+                           "逃生舱" in out_ok and "[降级]" in out_ok
+                           and "逐条断言" in out_ok and "Traceback" not in out_ok))
+            checks.append(("原始XML 正路径退出码非 0（降级不报全绿）", co_ok == 2))
+
+            co_no, out_no, same_no = raw_case("noraw", raw_spec(GOOD), ["--replace"])
+            checks.append(("原始XML 无 --raw 被拒且文件未动",
+                           co_no != 0 and "逃生舱" in out_no and same_no))
+
+            co_nc, out_nc, same_nc = raw_case(
+                "noconsent", raw_spec({"XML": txml, "原因": "x"}), ["--replace", "--raw"])
+            checks.append(("原始XML 缺「用户已同意」被拒",
+                           co_nc != 0 and "用户已同意" in out_nc and same_nc))
+
+            co_nr, out_nr, _ = raw_case("noroot", raw_spec(
+                {"XML": '<p:sld xmlns:p="http://schemas.openxmlformats.org/'
+                        'presentationml/2006/main"/>', "原因": "x",
+                 "用户已同意": True}), ["--replace", "--raw"])
+            checks.append(("原始XML 根元素非 timing 被拒",
+                           co_nr != 0 and "只接受 <p:timing>" in out_nr))
+
+            co_dg, out_dg, same_dg = raw_case("dangling", raw_spec(
+                {"XML": txml.replace('spid="2"', 'spid="999"'), "原因": "x",
+                 "用户已同意": True}), ["--replace", "--raw"])
+            checks.append(("原始XML 悬空 spid 被拒（PowerPoint 会静默丢弃）",
+                           co_dg != 0 and "不存在的形状 id" in out_dg and same_dg))
+
+            co_pf, out_pf, _ = raw_case("prefix", raw_spec(
+                {"XML": txml.replace("</p:timing>", "<p159:x/></p:timing>"), "原因": "x",
+                 "用户已同意": True}), ["--replace", "--raw"])
+            checks.append(("原始XML 用 slide 未声明前缀被拒",
+                           co_pf != 0 and "命名空间前缀" in out_pf))
+
+            co_bt, out_bt, _ = raw_case("both", raw_spec(GOOD, extra={"pages": {"1": [
+                {"形状": "标题", "效果": "淡入", "触发": "点击"}]}}), ["--replace", "--raw"])
+            checks.append(("原始XML 与 pages 同页冲突被拒（一页只能一条 timing）",
+                           co_bt != 0 and "二选一" in out_bt))
+        else:
+            print("  ? node / pptxgenjs 不可用，跳过原始XML 逃生舱断言")
+
         # 动画纪律预算：6 连击 → qa 告警
         if build_anim_deck(ap2 := str(Path(td) / "anim_over.pptx")):
             oj = Path(td) / "anim_over.json"

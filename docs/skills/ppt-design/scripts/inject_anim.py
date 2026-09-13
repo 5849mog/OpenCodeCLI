@@ -12,6 +12,7 @@ AI 永远不直接写 XML，所以结构错不了。
   python inject_anim.py deck.pptx script.json --no-verify # 只注入
   python inject_anim.py deck.pptx script.json --replace   # 清掉旧动画再注入（重新注入用）
   python inject_anim.py deck.pptx script.json --probe     # 验证时打印原始读回值（校准用）
+  python inject_anim.py deck.pptx script.json --raw       # 启用「原始XML」逃生舱（须用户同意，见下）
 
 脚本格式（全部中文键值；页码/形状以 JSON 字符串写）：
   {
@@ -28,13 +29,31 @@ AI 永远不直接写 XML，所以结构错不了。
   形状 = 施工时 pptxgenjs 的 objectName；触发 = 点击/同时/之后/自动（翻页后自动播）
   效果与切换的完整菜单、默认时长见下方 EFFECTS / TRANSITIONS 两张表。
 
+原始XML（逃生舱，默认关闭——菜单里没有的效果才用，且**必须先经用户同意**）：
+  默认路线永远是上面的菜单。只有当用户明确要求做菜单外的效果（路径动画、旋转、
+  3D 等），且已经明确同意之后，才可以用 --raw 打开这个口子。三重闸门缺一不可：
+    ① 命令行必须带 --raw；
+    ② 脚本里每条原始 XML 必须写明「用户已同意」: true 与「原因」（非空）；
+    ③ 这段 XML 必须是以 <p:timing> 为根、命名空间正确的片段，且引用的 spid 都要
+       在本页真实存在（悬空引用会在写入前拦下）。
+  格式（页码是字符串键，与 pages 同一套；同一页不许同时出现在 pages 和原始XML 里）：
+    "原始XML": {
+      "4": {"XML": "<p:timing>…</p:timing>",
+            "原因": "用户要求做菜单外的路径动画", "用户已同意": true}
+    }
+  **手写的部分没有逐条断言可做**：菜单路线能断言「第几条是什么效果、打在哪个形状、
+  什么触发、多长」；原始 XML 只有脚本自己知道要什么，工具无法核对。因此这类页只验证
+  「文件能被 PowerPoint 打开 + 读回条数」，逐条验证整类关闭——报告里标 [降级]，
+  退出码 2，交付说明里必须如实声明，不得声称这些动画已逐条验证过。
+
 验证（有 PowerPoint COM 时自动执行，这是动画的两道闸门）：
   第 1 层  文件能被 PowerPoint 真打开（坏 XML 会在这一层炸出来）；
   第 2 层  逐条断言声明的每条动画被 PowerPoint 完整解析：效果类型、目标形状名、
            触发方式、时长全部与脚本一致——PowerPoint 对坏 timing 树会静默丢弃，
            只有数得出、对得上才算存在。
 
-退出码：0 注入且验证通过；1 验证不一致；2 注入成功但本机无法验证。
+退出码：0 注入且验证通过；1 验证不一致；2 注入成功但本机无法验证，
+        或含原始 XML 动画（逐条断言整类关闭，属检查降级）。
 """
 import json
 import os
@@ -152,10 +171,15 @@ FLOAT_PID = {4: 42, 1: 47}                            # 自底部=上浮 / 自�
 # 切换：全部按 PowerPoint 的 mc:AlternateContent 包裹（p14 Choice + 旧版 Fallback）
 # 探针实测：推入 自底部=dir u、自顶部=d、自左侧=r、自右侧=l（dir=新页移动方向）
 _TRANS_DIR = {"自底部": "u", "自顶部": "d", "自左侧": "r", "自右侧": "l"}
+# 擦除的 dir 语义与推入**相反**，不能复用上面那张表：COM 探针把 EntryEffect 设成
+# 2817/2818/2819/2820 让 PowerPoint 自己写 XML，读回 dir 分别是（省略）/u/r/d，
+# 而 EXPECT_TRANS 里 2817=自左侧、2819=自右侧 —— 即 擦除 自左侧需 dir="l"、
+# 自右侧需 dir="r"。沿用推入表会把左右写反（注入会读回 2819 ≠ 期望 2817）。
+_WIPE_DIR = {"自底部": "u", "自顶部": "d", "自左侧": "l", "自右侧": "r"}
 TRANSITIONS = {
     "淡入": (lambda dur, d: '<p:fade thruBlk="0"/>', 0.7),
     "推入": (lambda dur, d: '<p:push dir="%s"/>' % _TRANS_DIR[d], 0.8),
-    "擦除": (lambda dur, d: '<p:wipe dir="%s"/>' % _TRANS_DIR[d], 0.8),
+    "擦除": (lambda dur, d: '<p:wipe dir="%s"/>' % _WIPE_DIR[d], 0.8),
     "平滑": ("morph", 1.0),
 }
 
@@ -289,11 +313,86 @@ def strip_anim(slide_xml):
     slide_xml = re.sub(r"<p:transition[^>]*/>", "", slide_xml)
     return slide_xml
 
-def inject(src, sc, replace=False):
+# ---- 原始XML 逃生舱：默认关闭，三重闸门 + 写入前校验（见文件头说明）----
+
+RAW_ROOT = "{%s}timing" % P_NS
+RAW_MENU_HINT = ("原始 XML 是逃生舱，默认关闭。动画一律走菜单路线（pages 里写"
+                 "「形状/效果/触发」）；确实要做菜单外的效果、且用户已明确同意，"
+                 "才给命令加 --raw，并在脚本里写「用户已同意」: true 与「原因」。")
+# 片段通常不带命名空间声明（声明在 slide 根元素上），解析校验时按需补齐
+NS_DECL = {
+    "p": P_NS,
+    "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+    "mc": MC,
+    "p14": P14,
+    "p159": P159,
+}
+
+def slide_ids(xml_bytes):
+    """slide XML -> 本页全部形状 id（原始 XML 引用的 spid 必须落在其中）。"""
+    root = _xml_parse(xml_bytes)
+    return {int(el.get("id")) for el in root.iter("{%s}cNvPr" % P_NS)
+            if (el.get("id") or "").isdigit()}
+
+def _frag_root(xml_text):
+    """解析片段取根元素；未声明前缀（unbound prefix）时补上标准声明再解析。"""
+    try:
+        return _xml_parse(xml_text.encode("utf-8"))
+    except Exception as e:
+        if "unbound prefix" not in str(e):
+            raise
+        m = re.match(r"\s*<([A-Za-z0-9]+):([A-Za-z0-9._-]+)([^>]*)>", xml_text)
+        if not m:
+            raise
+        head = m.group(0)
+        used = {t for t in re.findall(r"</?([A-Za-z0-9]+):", xml_text) if t}
+        used |= {t for t in re.findall(r"\s([A-Za-z0-9]+):[A-Za-z0-9._-]+=", xml_text) if t}
+        decls = "".join(' xmlns:%s="%s"' % (k, v) for k, v in sorted(NS_DECL.items())
+                        if k in used and ("xmlns:%s=" % k) not in head)
+        return _xml_parse((xml_text[:m.end() - 1] + decls + xml_text[m.end() - 1:]).encode("utf-8"))
+
+def validate_raw(si, entry, ids):
+    """校验一条原始 XML。任一不合格都在写入前退出，文件保持原样。"""
+    if not isinstance(entry, dict):
+        sys.exit("S%d 原始XML 的每条必须是对象（XML / 原因 / 用户已同意）：%s" % (si, RAW_MENU_HINT))
+    if entry.get("用户已同意") is not True:
+        sys.exit("S%d 原始XML 缺「用户已同意」: true——未经用户同意不得手写 XML。%s"
+                 % (si, RAW_MENU_HINT))
+    reason = entry.get("原因")
+    if not isinstance(reason, str) or not reason.strip():
+        sys.exit("S%d 原始XML 必须写「原因」（菜单为什么做不到、用户怎么说的）" % si)
+    xml_text = entry.get("XML")
+    if not isinstance(xml_text, str) or not xml_text.strip():
+        sys.exit("S%d 原始XML 缺「XML」字符串" % si)
+    if "<!DOCTYPE" in xml_text or "<!ENTITY" in xml_text:
+        sys.exit("S%d 原始XML 含 DOCTYPE/ENTITY 声明——不接受，去掉后重跑" % si)
+    try:
+        root = _frag_root(xml_text)
+    except Exception as e:
+        sys.exit("S%d 原始XML 解析失败：%s" % (si, str(e)[:120]))
+    if root.tag != RAW_ROOT:
+        sys.exit("S%d 原始XML 的根元素是 %s，只接受 <p:timing>（对象动画）"
+                 "——切换与其他元素不许手写" % (si, root.tag))
+    dangling = {int(m) for m in re.findall(r'<p:spTgt spid="(\d+)"', xml_text)} - ids
+    if dangling:
+        sys.exit("S%d 原始XML 引用了本页不存在的形状 id %s——PowerPoint 会静默丢弃"
+                 "这类动画，先改对 spid 再跑" % (si, sorted(dangling)))
+    return xml_text
+
+def inject(src, sc, replace=False, allow_raw=False):
     trans_spec = sc.get("transitions", {})
     pages_spec = sc.get("pages", {})
-    if not isinstance(trans_spec, dict) or not isinstance(pages_spec, dict):
-        sys.exit("脚本结构：transitions/pages 必须是对象，页码是字符串键")
+    raw_spec = sc.get("原始XML", {})
+    if not isinstance(trans_spec, dict) or not isinstance(pages_spec, dict) \
+            or not isinstance(raw_spec, dict):
+        sys.exit("脚本结构：transitions/pages/原始XML 必须是对象，页码是字符串键")
+    if raw_spec and not allow_raw:
+        sys.exit(RAW_MENU_HINT)
+    both = set(map(str, pages_spec)) & set(map(str, raw_spec))
+    if both:
+        sys.exit("S%s 同时出现在 pages 和原始XML 里——一页只能有一条 timing，二选一"
+                 % "、".join(sorted(both)))
 
     with zipfile.ZipFile(src) as zf:
         entries = [(i, zf.read(i.filename)) for i in zf.infolist()]
@@ -302,7 +401,7 @@ def inject(src, sc, replace=False):
                          key=lambda n: int(re.search(r"(\d+)", n).group(1)))
     n_slides = len(slide_files)
 
-    replaced, stats = {}, {}
+    replaced, stats, raw_used = {}, {}, []
     data = {i.filename: b for i, b in entries}
     for fn in slide_files:
         si = int(re.search(r"(\d+)", fn).group(1))
@@ -324,15 +423,25 @@ def inject(src, sc, replace=False):
             timing, st = compile_page(pages_spec[str(si)], names)
             frag += timing or ""
             stats[si] = st
+        if str(si) in raw_spec:
+            frag += validate_raw(si, raw_spec[str(si)], slide_ids(xml.encode("utf-8")))
+            raw_used.append(si)
         if frag:
             if "</p:sld>" not in xml:
                 sys.exit("S%d 结构异常：找不到 </p:sld>（不是正常 pptxgenjs 产物？）" % si)
             xml = xml.replace("</p:sld>", frag + "</p:sld>")
+            if str(si) in raw_spec:
+                # 手写片段还要让整页解析通过：抓未声明前缀、标签没闭合这类结构错
+                try:
+                    _xml_parse(xml.encode("utf-8"))
+                except Exception as e:
+                    sys.exit("S%d 原始XML 拼进整页后解析失败：%s——多半是片段用了 slide 根元素"
+                             "没声明的命名空间前缀，补上 xmlns:xx=\"…\" 再跑" % (si, str(e)[:120]))
             data[fn] = xml.encode("utf-8")
             replaced[si] = True
 
     if not replaced:
-        sys.exit("脚本里没有任何可注入的页——检查 transitions/pages 的页码")
+        sys.exit("脚本里没有任何可注入的页——检查 transitions/pages/原始XML 的页码")
 
     tmp = src + ".anim_tmp"
     with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -345,9 +454,13 @@ def inject(src, sc, replace=False):
         st = stats[si]
         print("  S%d：%d 条效果 · %d 组点击 · 总时长 %.1fs" % (si, st["effects"], st["clicks"], st["ms"] / 1000))
     for si in sorted(replaced):
-        if si not in stats:
+        if si not in stats and si not in raw_used:
             print("  S%d：切换效果" % si)
-    return sorted(stats)
+    if raw_used:
+        print("⚠ 原始XML 逃生舱：S%s 用的是手写 XML——逐条效果断言整类关闭（[降级]），"
+              "交付说明必须声明这部分动画未经逐条验证"
+              % "、".join(str(s) for s in sorted(raw_used)))
+    return sorted(stats), sorted(raw_used)
 
 # ================================================================ COM 验证
 
@@ -408,13 +521,21 @@ def verify(src, sc, pages, probe=False):
     finally:
         pass
     ok = True
+    degraded = []
     try:
         print(f"  （验证器：{app.Name} {app.Version}.{app.Build}"
               + "；12.x = WPS 兼容层，验证强度弱于真 PowerPoint）")
         trans_spec = sc.get("transitions", {})
+        raw_spec = sc.get("原始XML", {})
         for si in pages:
             sl = pres.Slides(si)
             seq = sl.TimeLine.MainSequence
+            if str(si) in raw_spec:
+                # 手写 XML 没有声明清单可比对：只报读回条数，逐条断言整类关闭（[降级]）
+                degraded.append(si)
+                print("  [降级] S%d 原始XML：读回 %d 条动画，无逐条断言可比对"
+                      "（菜单路线才有）——不得声称这些动画已逐条验证" % (si, seq.Count))
+                continue
             items = sc.get("pages", {}).get(str(si), [])
             want = len(items)
             got = seq.Count
@@ -543,12 +664,12 @@ def verify(src, sc, pages, probe=False):
                 app.Quit()
         except Exception:
             pass
-    return ok
+    return ok, degraded
 
 # ================================================================ main
 
 def main():
-    known = {"--no-verify", "--probe", "--replace"}
+    known = {"--no-verify", "--probe", "--replace", "--raw"}
     for a in sys.argv[1:]:
         if a.startswith("--") and a.split("=", 1)[0] not in known:
             sys.exit(f"未知参数 {a.split('=', 1)[0]}；可用：{' '.join(sorted(known))}")
@@ -565,9 +686,11 @@ def main():
     except Exception as e:
         sys.exit("脚本 %s 读不了：%s" % (script, e))
     try:
-        pages = inject(src, sc, replace="--replace" in flags)
+        menu_pages, raw_pages = inject(src, sc, replace="--replace" in flags,
+                                       allow_raw="--raw" in flags)
     except ValueError as e:
         sys.exit(str(e))
+    pages = sorted(set(menu_pages) | set(raw_pages))
     if "--no-verify" in flags:
         print("⚠ 已注入但跳过验证（--no-verify）——动画未经 PowerPoint 确认")
         return 2
@@ -579,8 +702,10 @@ def main():
     if not have_com:
         print("⚠ 本机没有 PowerPoint COM，无法验证——动画已注入但未经确认")
         return 2
-    ok = verify(src, sc, pages, probe="--probe" in flags)
-    return 0 if ok else 1
+    ok, degraded = verify(src, sc, pages, probe="--probe" in flags)
+    if not ok:
+        return 1
+    return 2 if degraded else 0
 
 if __name__ == "__main__":
     sys.exit(main())
