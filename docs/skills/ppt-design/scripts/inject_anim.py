@@ -255,14 +255,21 @@ def _effect_par(ids, spid, name, item):
     behaviors = "".join(builder(ids, spid, ms, d if needs_dir else None,
                                 float(item.get("幅度", 1.5))))
     ids[0] += 1
+    meta = (str(real_pid), str(subtype), _ease_key(_ease_attrs(pair)), item.get("_delay", 0))
     return ('<p:par><p:cTn id="%d" presetID="%d" presetClass="%s" presetSubtype="%d"%s '
             'fill="hold" nodeType="%s"><p:stCondLst><p:cond delay="%d"/></p:stCondLst>'
             '<p:childTnLst>%s</p:childTnLst></p:cTn></p:par>'
             % (ids[0], real_pid, cls, subtype, _ease_attrs(pair), node,
-               item.get("_delay", 0), behaviors)), ms, ename
+               item.get("_delay", 0), behaviors)), ms, ename, meta
 
 def compile_page(items, name2id):
-    """一组效果声明 -> (timing XML, 统计)。触发分组建组，组内按 同时/之后 排布。"""
+    """一组效果声明 -> (timing XML, 统计)。
+
+    分组的判据就是「触发」：**点击 / 自动 = 开一个新组，同时 / 之后 = 并进上一组**。
+    所以"一次点击出几个"＝"这一组里放几条"——逐条声明，每页独立，没有全局默认。
+    组内排布：第一条从 0 起；「同时」与本组第一条同时起；「之后」接在**此前所有
+    已结束的效果**最后一刻之后（不是简单累加，否则「同时」的时长会被重复计入）。
+    """
     ids = [2]  # id 计数器（1 给 tmRoot，2 给 mainSeq，效果从 3 起）
     groups = []   # 每组: {"auto": bool, "items": [...]}
     for it in items:
@@ -276,10 +283,11 @@ def compile_page(items, name2id):
                 raise ValueError("「%s」之前没有可依附的效果——第一个效果用 点击 或 自动" % trg)
             groups[-1]["items"].append(dict(it, _node="withEffect" if trg == "同时" else "afterEffect"))
 
-    pars, n_effects, n_clicks, total_ms, eases = [], 0, 0, 0, {}
+    pars, n_effects, n_clicks, eases, gstats = [], 0, 0, {}, []
     for g in groups:
-        inner, cursor, first = [], 0, True
+        inner, max_end, first = [], 0, True
         n_clicks += 0 if g["auto"] else 1
+        g_members, g_start, g_end, g_meta = [], 0, 0, []
         for item in g["items"]:
             shape = item.get("形状")
             if not shape:
@@ -293,15 +301,19 @@ def compile_page(items, name2id):
                 item["_delay"] = 0
             elif item["_node"] == "withEffect":
                 item["_delay"] = 0            # 与本组第一条同时起
-            else:                             # afterEffect：接在前面的时长之后
-                item["_delay"] = cursor
-            par, ms, ename = _effect_par(ids, name2id[shape], name, item)
+            else:                             # afterEffect：接在此前所有效果结束之后
+                item["_delay"] = max_end
+            par, ms, ename, meta = _effect_par(ids, name2id[shape], name, item)
             inner.append(par)
             n_effects += 1
             eases[ename] = eases.get(ename, 0) + 1
-            cursor += ms
-            total_ms += ms
+            g_members.append(shape)
+            g_meta.append(meta)
+            g_end = max(g_end, item["_delay"] + ms)
+            max_end = max(max_end, item["_delay"] + ms)
             first = False
+        gstats.append({"auto": g["auto"], "members": g_members,
+                       "ms": g_end - g_start, "meta": g_meta})
         gid = ids[0] + 1
         ids[0] += 1
         cond = "0" if g["auto"] else "indefinite"
@@ -312,7 +324,7 @@ def compile_page(items, name2id):
                     % (gid, cond, gid + 1, "".join(inner)))
         ids[0] += 1
     if not pars:
-        return None, {"effects": 0, "clicks": 0, "ms": 0, "eases": {}}
+        return None, {"effects": 0, "clicks": 0, "ms": 0, "eases": {}, "groups": []}
     timing = ('<p:timing><p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" '
               'nodeType="tmRoot"><p:childTnLst><p:seq concurrent="1" nextAc="seek">'
               '<p:cTn id="2" dur="indefinite" nodeType="mainSeq"><p:childTnLst>%s'
@@ -321,7 +333,9 @@ def compile_page(items, name2id):
               '<p:nextCondLst><p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/>'
               '</p:tgtEl></p:cond></p:nextCondLst></p:seq></p:childTnLst></p:cTn>'
               '</p:par></p:tnLst></p:timing>' % "".join(pars))
-    return timing, {"effects": n_effects, "clicks": n_clicks, "ms": total_ms, "eases": eases}
+    return timing, {"effects": n_effects, "clicks": n_clicks,
+                    "ms": max((g["ms"] for g in gstats), default=0),
+                    "eases": eases, "groups": gstats}
 
 def compile_transition(name, spec):
     if name not in TRANSITIONS:
@@ -503,26 +517,25 @@ def inject(src, sc, replace=False, allow_raw=False):
     os.replace(tmp, src)
 
     print("已注入 %d 页动画：" % len(replaced))
-    clicky = []
     for si in sorted(stats):
         st = stats[si]
         ease = "／".join("%s×%d" % (k, v) for k, v in sorted(st.get("eases", {}).items()))
-        print("  S%d：%d 条效果 · %d 组点击 · 总时长 %.1fs · 缓动 %s"
-              % (si, st["effects"], st["clicks"], st["ms"] / 1000, ease or "—"))
-        if st["clicks"]:
-            clicky.append(si)
+        gs = st.get("groups", [])
+        print("  S%d：%d 条效果 · %d 组（自动 %d／点击 %d）· 最长节拍 %.1fs · 缓动 %s"
+              % (si, st["effects"], len(gs), sum(1 for g in gs if g["auto"]),
+                 st["clicks"], st["ms"] / 1000, ease or "—"))
+        for gi, g in enumerate(gs, 1):
+            print("        组%d %s：%s（%.1fs）"
+                  % (gi, "自动" if g["auto"] else "点击",
+                     "、".join(g["members"]), g["ms"] / 1000))
     for si in sorted(replaced):
         if si not in stats and si not in raw_used:
             print("  S%d：切换效果" % si)
-    if clicky:
-        print("⚠ S%s 页内有点击——默认应是整页自动连播（首条「自动」+ 其余「之后」），"
-              "翻页即播完、断点只在翻页；确需停下（提问/等反应）请在规格书「动画」行写明理由"
-              % "、".join(str(s) for s in clicky))
     if raw_used:
         print("⚠ 原始XML 逃生舱：S%s 用的是手写 XML——逐条效果断言整类关闭（[降级]），"
               "交付说明必须声明这部分动画未经逐条验证"
               % "、".join(str(s) for s in sorted(raw_used)))
-    return sorted(replaced), sorted(raw_used)
+    return sorted(replaced), sorted(raw_used), stats
 
 # ================================================================ COM 验证
 
@@ -547,7 +560,7 @@ EXPECT_TRANS = {
 }
 
 def _rt_dump(path):
-    """往返保存的文件 -> {页码: ([(presetID, class, subtype)...], [滤镜...])}"""
+    """往返保存的文件 -> {页码: ([(presetID, class, subtype, 缓动)…], [滤镜…])}"""
     zf = zipfile.ZipFile(path)
     out = {}
     for n in zf.namelist():
@@ -563,7 +576,7 @@ def _rt_dump(path):
     return out
 
 
-def verify(src, sc, pages, probe=False):
+def verify(src, sc, pages, stats=None, probe=False):
     try:
         from win32com.client import gencache
         app = gencache.EnsureDispatch("PowerPoint.Application").Application
@@ -600,6 +613,9 @@ def verify(src, sc, pages, probe=False):
                       "（菜单路线才有）——不得声称这些动画已逐条验证" % (si, seq.Count))
                 continue
             items = sc.get("pages", {}).get(str(si), [])
+            # 声明里每条效果在**本组内的相对起始延迟**（ms），顺序与 XML 一致
+            decl_delays = [m[3] for g in (stats or {}).get(si, {}).get("groups", [])
+                           for m in g.get("meta", [])]
             want = len(items)
             got = seq.Count
             tag = []
@@ -642,12 +658,18 @@ def verify(src, sc, pages, probe=False):
                     decel = round(float(eff.Timing.Decelerate), 2)
                 except Exception:
                     decel = None
+                # 延迟要问对象模型，不要去累加 XML 里的 delay：PowerPoint 会重写节拍的
+                # 嵌套编码（插包装节点、加偏置），但 TriggerDelayTime 是权威读回值。
+                try:
+                    tdelay = round(float(eff.Timing.TriggerDelayTime), 2)
+                except Exception:
+                    tdelay = None
                 node = TRG_NODE.get(item.get("触发", "点击"), "clickEffect")
                 exp_trg = EXPECT_TRG.get(node)
                 if probe:
-                    print("  [probe] S%d #%d %-6s ET=%s(期望%s) Trg=%s(期望%s) dur=%s 形状=%s(%s) "
-                          "Dir=%s accel=%s decel=%s"
-                          % (si, k, name, et, exp_et, trg, exp_trg, dur,
+                    print("  [probe] S%d #%d %-6s ET=%s(期望%s) Trg=%s(期望%s) dur=%s 延迟=%s "
+                          "形状=%s(%s) Dir=%s accel=%s decel=%s"
+                          % (si, k, name, et, exp_et, trg, exp_trg, dur, tdelay,
                              item.get("形状"), nm, dirv, accel, decel))
                     continue
                 if et is not None and exp_et is not None and et != exp_et:
@@ -672,6 +694,13 @@ def verify(src, sc, pages, probe=False):
                     ok = False
                     tag.append("#%d %s 缓出读回 %.2f ≠ 声明 %.2f（decel=%d）"
                                % (k, name, decel, _ep[1] / 100000.0, _ep[1]))
+                decl_delay = decl_delays[k - 1] if k - 1 < len(decl_delays) else None
+                if tdelay is not None and decl_delay is not None:
+                    if abs(tdelay * 1000 - decl_delay) > 30:
+                        ok = False
+                        tag.append("#%d %s 节拍起始延迟读回 %.2fs ≠ 声明 %.2fs"
+                                   "（同一节拍内的先后关系被改了）"
+                                   % (k, name, tdelay, decl_delay / 1000.0))
             # 切换
             tspec = trans_spec.get(str(si))
             if tspec:
@@ -770,8 +799,8 @@ def main():
     except Exception as e:
         sys.exit("脚本 %s 读不了：%s" % (script, e))
     try:
-        menu_pages, raw_pages = inject(src, sc, replace="--replace" in flags,
-                                       allow_raw="--raw" in flags)
+        menu_pages, raw_pages, stats = inject(src, sc, replace="--replace" in flags,
+                                              allow_raw="--raw" in flags)
     except ValueError as e:
         sys.exit(str(e))
     pages = sorted(set(menu_pages) | set(raw_pages))   # 只配切换的页也要验（含 EntryEffect）
@@ -786,7 +815,7 @@ def main():
     if not have_com:
         print("⚠ 本机没有 PowerPoint COM，无法验证——动画已注入但未经确认")
         return 2
-    ok, degraded = verify(src, sc, pages, probe="--probe" in flags)
+    ok, degraded = verify(src, sc, pages, stats=stats, probe="--probe" in flags)
     if not ok:
         return 1
     return 2 if degraded else 0

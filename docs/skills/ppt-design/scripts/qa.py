@@ -597,6 +597,60 @@ def _brief_names(names, cap: int = 6) -> str:
 _MOTION_TAGS = ("animEffect", "anim", "animScale", "animRot", "animMotion")
 
 
+def _walk_eff(node, base, items):
+    """childTnLst 里递归累加 delay，收集 (组内相对起始ms, 时长ms)。"""
+    for par in node:
+        if par.tag != f"{{{P_NS}}}par":
+            continue
+        ctn = par.find(f"{{{P_NS}}}cTn")
+        if ctn is None:
+            continue
+        delay = 0
+        for cond in ctn.findall(f"{{{P_NS}}}stCondLst/{{{P_NS}}}cond"):
+            d = (cond.get("delay") or "").strip()
+            if d.isdigit():
+                delay += int(d)
+        start = base + delay
+        if ctn.get("nodeType") in ("clickEffect", "withEffect", "afterEffect"):
+            durs = []
+            for beh in ctn.iter():
+                if beh.tag.rsplit("}", 1)[-1] not in _MOTION_TAGS:
+                    continue
+                durs += [int(x.get("dur")) for x in beh.iter(f"{{{P_NS}}}cTn")
+                         if (x.get("dur") or "").isdigit()]
+            items.append((start, max(durs) if durs else 0))
+        inner = ctn.find(f"{{{P_NS}}}childTnLst")
+        if inner is not None:
+            _walk_eff(inner, start, items)
+    return items
+
+
+def _anim_groups(timing):
+    """timing -> [(是否点击组, [(组内相对起始ms, 时长ms), …]), …]
+
+    组 = mainSeq 子层每一个 p:par，一组对应一次点击或一次自动起播（"一次揭示出几个"
+    就是"这一组里有几条"）。组内起始时刻沿路径累加 delay 求相对值——**不逐字比对
+    delay 属性**，因为 PowerPoint 会重写嵌套编码。
+    """
+    seq = timing.find(f".//{{{P_NS}}}cTn[@nodeType='mainSeq']")
+    if seq is None:
+        return []
+    ctl = seq.find(f"{{{P_NS}}}childTnLst")
+    if ctl is None:
+        return []
+    out = []
+    for gpar in ctl:
+        if gpar.tag != f"{{{P_NS}}}par":
+            continue
+        gctn = gpar.find(f"{{{P_NS}}}cTn")
+        click = gctn is not None and any(
+            (c.get("delay") or "") == "indefinite"
+            for c in gctn.iter(f"{{{P_NS}}}cond"))
+        inner = gctn.find(f"{{{P_NS}}}childTnLst") if gctn is not None else None
+        out.append((click, _walk_eff(inner, 0, []) if inner is not None else []))
+    return out
+
+
 def check_delivery(path: str) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     try:
@@ -685,50 +739,40 @@ def check_delivery(path: str) -> list[tuple[str, str]]:
             if timing is not None:
                 effects = [c for c in timing.iter(f"{{{P_NS}}}cTn")
                            if c.get("nodeType") in ("clickEffect", "withEffect", "afterEffect")]
-                seq_ctn = timing.find(f".//{{{P_NS}}}cTn[@nodeType='mainSeq']")
-                groups = []
-                if seq_ctn is not None:
-                    ctl = seq_ctn.find(f"{{{P_NS}}}childTnLst")
-                    if ctl is not None:
-                        groups = [g for g in ctl if g.tag == f"{{{P_NS}}}par"]
-                clicks = sum(1 for g in groups
-                             if any(c.get("delay") == "indefinite"
-                                    for c in g.iter(f"{{{P_NS}}}cond")))
-                # 每个效果的实际时长 = 它内部"运动"行为 cTn 的最大 dur（与注入器同一口径）；
-                # 「出现」没有运动行为，记 0（它就是瞬时的，不该被当成"过短"）。
-                eff_durs = []
-                for c in timing.iter(f"{{{P_NS}}}cTn"):
-                    if c.get("nodeType") not in ("clickEffect", "withEffect", "afterEffect"):
+                # ---- 节拍：一次揭示出几个、共几组、每组播多久 ----
+                # 组 = 一次点击或一次自动起播；「一次点击出几个」就是「这组里有几条」。
+                grp = _anim_groups(timing)
+                n_groups = len(grp)
+                clicks = sum(1 for c, _ in grp if c)
+                eff_durs = [d for _c, gitems in grp for _s, d in gitems]
+                if n_groups > 4:
+                    out.append(("告警", f"{slide} 一页有 {n_groups} 个揭示节拍（其中点击 {clicks} 次）"
+                                        " —— 演讲时手上太忙；把同一论点里的东西并成一组，"
+                                        "一页控制在 4 组以内"))
+                singles = [1 for _c, gitems in grp if len(gitems) == 1]
+                if n_groups >= 3 and len(singles) >= 2:
+                    out.append(("告警", f"{slide} 有 {len(singles)} 个节拍只含一个对象（共 {n_groups} 组）"
+                                        " —— 节拍过碎、等于一次点一下：同一句话里的东西应该同一次"
+                                        "出现（一组里的后续条目写「之后」或「同时」）"))
+                for gi, (_c, gitems) in enumerate(grp, 1):
+                    if not gitems:
                         continue
-                    durs = []
-                    for beh in c.iter():
-                        if beh.tag.rsplit("}", 1)[-1] not in _MOTION_TAGS:
-                            continue
-                        durs += [int(x.get("dur")) for x in beh.iter(f"{{{P_NS}}}cTn")
-                                 if (x.get("dur") or "").isdigit()]
-                    eff_durs.append(max(durs) if durs else 0)
-                total_ms = sum(eff_durs)
-                if clicks:
-                    out.append(("告警", f"{slide} 页内有 {clicks} 处点击 —— 观众/演讲者得手动点"
-                                        "才放得完这一页。默认应整页自动连播（首条「自动」+ 其余"
-                                        "「之后」），断点只在翻页；确需停下（提问/等反应）请在"
-                                        "规格书「动画」行写明理由，交付时声明豁免"))
+                    span = max(s + d for s, d in gitems) - min(s for s, _ in gitems)
+                    if span > 8000:
+                        out.append(("告警", f"{slide} 第 {gi} 个节拍要播 {span / 1000:.1f}s —— 这一次"
+                                            "点击之后观众得干等；拆成两组，或缩短单条时长"))
                 short = [d for d in eff_durs if 0 < d < 200]
                 if short:
                     out.append(("告警", f"{slide} 有 {len(short)} 条动画短于 0.2s（最短 {min(short)}ms）"
                                         " —— 一闪而过，观众看不见；入场至少 0.3s"))
                 if len(effects) > 8:
                     out.append(("告警", f"{slide} {len(effects)} 条对象动画 —— 逐条登场会拖垮节奏，"
-                                        "每页入场预算 ≤8 条，整组内容用「同时/之后」打包"))
+                                        "每页入场预算 ≤8 条；超了就该拆页，或砍掉装饰性的那几条"))
                 slow = [d for d in eff_durs if d > 3000]
                 if slow:
                     out.append(("告警", f"{slide} 有 {len(slow)} 条动画长于 3s（最长 "
                                         f"{max(slow) / 1000:.1f}s）—— 拖沓；单条建议 ≤2s，"
                                         "要显示得久就让下一条「之后」接上"))
-                if total_ms > 8000:
-                    out.append(("告警", f"{slide} 整页动画粗算 {total_ms / 1000:.1f}s"
-                                        "（同页「同时」触发的会重叠，实际略短）—— 翻页后要等它"
-                                        "播完，单页建议 ≤8s；内容多就拆到下一页"))
             # ---- 自动换片时间：这页会自己翻过去（讲到一半就跑掉）----
             for tr in root.iter(f"{{{P_NS}}}transition"):
                 adv_tm = tr.get("advTm")

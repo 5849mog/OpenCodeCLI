@@ -617,9 +617,10 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
                            and not re.search(r'accel="50000" fill="hold"', x1)))
             checks.append(("注入报告列出每页缓动", "缓动 缓入缓出×1／缓出×1" in o1))
 
-            # ② 整页自动连播（0 点击）→ qa 不该有点击告警
+            # ② 合理的节拍（2 组、每组 2 个）→ qa 不该有节拍告警
             _c, outN = _run_qa(Path(ap3))
-            checks.append(("整页自动连播（页内 0 点击）qa 无点击告警", "处点击" not in outN))
+            checks.append(("合理节拍（2 组×2 个）qa 无节拍告警",
+                           "节拍" not in outN and "处点击" not in outN))
 
             # ③「出现」是瞬时效果，加缓动必须被拒
             c3, o3 = anim_run(ap3, {"pages": {"1": [
@@ -635,16 +636,31 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
             checks.append(("缓动名非法报错并列出可选项",
                            c4 != 0 and "缓动「平滑」不在菜单里" in o4))
 
-            # ⑤ 页内点击 → qa 告警（取向：默认整页自动连播）
-            anim_run(ap3, {"pages": {"1": [
-                {"形状": "标题", "效果": "淡入", "触发": "自动"},
-                {"形状": "论点一", "效果": "淡入", "触发": "点击"}]}},
+            # ⑤ 分组就是触发语义：点击开新组、之后并进上一组 → 注入报告按组打印
+            _c5, o5 = anim_run(ap3, {"pages": {"1": [
+                {"形状": "标题", "效果": "浮入", "触发": "自动", "方向": "自底部"},
+                {"形状": "论点一", "效果": "浮入", "触发": "之后", "方向": "自底部"},
+                {"形状": "hero", "效果": "擦入", "触发": "点击", "方向": "自左侧"}]}},
                 "--replace", "--no-verify")
+            checks.append(("注入报告按组打印（组1 自动：标题、论点一）",
+                           "2 组（自动 1／点击 1）" in o5
+                           and "组1 自动：标题、论点一" in o5))
+            # 节拍过碎：3 组全是单对象 → qa 告警
+            anim_run(ap3, {"pages": {"1": [
+                {"形状": n, "效果": "出现", "触发": "点击"}
+                for n in ["标题", "论点一", "hero"]]}}, "--replace", "--no-verify")
             code5, out5 = _run_qa(Path(ap3))
-            checks.append(("页内点击 → qa 告警（默认应 0 点击）",
-                           code5 == 2 and "1 处点击" in out5 and "整页自动连播" in out5))
+            checks.append(("单对象成组（节拍过碎）qa 告警",
+                           code5 == 2 and "节拍过碎" in out5))
+            # 组数过多：6 组 → qa 告警
+            anim_run(ap3, {"pages": {"1": [
+                {"形状": n, "效果": "出现", "触发": "点击"} for n in
+                ["标题", "论点一", "hero", "标题", "论点一", "hero"]]}},
+                "--replace", "--no-verify")
+            code5b, out5b = _run_qa(Path(ap3))
+            checks.append(("节拍过多（6 组）qa 告警", code5b == 2 and "6 个揭示节拍" in out5b))
 
-            # ⑥ 时长：单条过短 / 过长 / 整页粗算超 8s
+            # ⑥ 时长：单条过短 / 过长 / 单个节拍超 8s
             anim_run(ap3, {"pages": {"1": [
                 {"形状": "标题", "效果": "淡入", "触发": "自动", "时长": 0.15},
                 {"形状": "论点一", "效果": "淡入", "触发": "之后", "时长": 3.5}]}},
@@ -657,7 +673,8 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
                 for i, n in enumerate(["标题", "论点一", "hero"])]}},
                 "--replace", "--no-verify")
             _c7, out7 = _run_qa(Path(ap3))
-            checks.append(("整页动画粗算超 8s 告警", "整页动画粗算" in out7))
+            checks.append(("单个节拍超 8s 告警（按绝对起点算，不是各条求和）",
+                           "第 1 个节拍要播 8.7s" in out7))
 
             # ⑦ 自动换片时间（advTm / advClick=0）必须被拦
             anim_run(ap3, {"transitions": {"1": "淡入"}, "pages": {"1": [
@@ -739,7 +756,8 @@ p.writeFile({ fileName: "__OUT__" }).then(() => console.log("ok"));
                            capture_output=True, text=True, encoding="utf-8",
                            errors="replace", timeout=300)
             codeO, outO = _run_qa(Path(ap2))
-            checks.append(("动画点击预算告警（6 连击）", codeO == 2 and "6 处点击" in outO))
+            checks.append(("节拍过多/过碎告警（6 连击 = 6 组）",
+                           codeO == 2 and "6 个揭示节拍" in outO))
         else:
             print("  ? node / pptxgenjs 不可用，跳过动画预算断言")
 
