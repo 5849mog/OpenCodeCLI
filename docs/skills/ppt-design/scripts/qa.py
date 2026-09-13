@@ -677,11 +677,11 @@ def check_delivery(path: str) -> list[tuple[str, str]]:
                 if kv.get("useTimings") in ("1", "true"):
                     out.append(("告警", "[deck] 演示文稿开了「使用计时/排练计时」"
                                         "（p:showPr@useTimings）—— 放映时按计时自动翻页，"
-                                        "讲到一半就跑掉；在「幻灯片放映 → 设置放映方式」里关掉"))
+                                        "讲到一半就跑掉；在「幻灯片放映 → 设置放映方式」里关掉（若就是要按计时自动播放，写明即可）"))
                 if kv.get("showType") == "kiosk":
                     out.append(("告警", "[deck] 放映方式是「展台(全屏幕)循环」"
                                         "（p:showPr@showType=\"kiosk\"）—— 会自动循环、无法"
-                                        "人工控制节奏；演讲场合改成「演讲者放映」"))
+                                        "人工控制节奏；演讲场合改成「演讲者放映」（若就是要无人值守循环，那它是要的功能，写明即可）"))
 
         prev_names: set[str] = set()
         for slide in sorted(n for n in names
@@ -748,26 +748,26 @@ def check_delivery(path: str) -> list[tuple[str, str]]:
                 if n_groups > 4:
                     out.append(("告警", f"{slide} 一页有 {n_groups} 个揭示节拍（其中点击 {clicks} 次）"
                                         " —— 演讲时手上太忙；把同一论点里的东西并成一组，"
-                                        "一页控制在 4 组以内"))
+                                        "一页控制在 4 组以内（炫技/展映档可明知而保留——规格书与交付说明写明即可）"))
                 singles = [1 for _c, gitems in grp if len(gitems) == 1]
                 if n_groups >= 3 and len(singles) >= 2:
                     out.append(("告警", f"{slide} 有 {len(singles)} 个节拍只含一个对象（共 {n_groups} 组）"
                                         " —— 节拍过碎、等于一次点一下：同一句话里的东西应该同一次"
-                                        "出现（一组里的后续条目写「之后」或「同时」）"))
+                                        "出现（一组里的后续条目写「之后」或「同时」）。炫技/展映档可明知而保留"))
                 for gi, (_c, gitems) in enumerate(grp, 1):
                     if not gitems:
                         continue
                     span = max(s + d for s, d in gitems) - min(s for s, _ in gitems)
                     if span > 8000:
                         out.append(("告警", f"{slide} 第 {gi} 个节拍要播 {span / 1000:.1f}s —— 这一次"
-                                            "点击之后观众得干等；拆成两组，或缩短单条时长"))
+                                            "点击之后观众得干等；拆成两组，或缩短单条时长。炫技/展映档可明知而保留"))
                 short = [d for d in eff_durs if 0 < d < 200]
                 if short:
                     out.append(("告警", f"{slide} 有 {len(short)} 条动画短于 0.2s（最短 {min(short)}ms）"
-                                        " —— 一闪而过，观众看不见；入场至少 0.3s"))
+                                        " —— 一闪而过，观众看不见；入场至少 0.3s（刻意做的瞬间闪现除外，须在规格书写明）"))
                 if len(effects) > 8:
                     out.append(("告警", f"{slide} {len(effects)} 条对象动画 —— 逐条登场会拖垮节奏，"
-                                        "每页入场预算 ≤8 条；超了就该拆页，或砍掉装饰性的那几条"))
+                                        "每页入场预算 ≤8 条；超了就该拆页，或砍掉装饰性的那几条（炫技/展映档可明知而保留）"))
                 slow = [d for d in eff_durs if d > 3000]
                 if slow:
                     out.append(("告警", f"{slide} 有 {len(slow)} 条动画长于 3s（最长 "
@@ -781,7 +781,8 @@ def check_delivery(path: str) -> list[tuple[str, str]]:
                                         f"advTm={adv_tm or '—'} / advClick={tr.get('advClick', '—')}）"
                                         " —— 放映时这页会自己翻过去、演讲按不住。注意 p14:dur 是"
                                         "切换本身的播放时长，不是换片计时；这项多半来自模板或别的"
-                                        "工具，去掉它"))
+                                        "工具，去掉它（展映/无人值守/大屏循环档下「自动翻页」正是"
+                                        "想要的功能——须是用户有意设置，并在规格书与交付说明里写明）"))
                     break
             if b":morph" in blob:
                 shared = shape_names & prev_names
