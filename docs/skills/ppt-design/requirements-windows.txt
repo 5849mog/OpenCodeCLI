@@ -1,0 +1,3 @@
+-r requirements.txt
+# Windows-only: PowerPoint COM rendering and animation verification.
+pywin32

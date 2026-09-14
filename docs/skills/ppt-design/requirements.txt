@@ -1,0 +1,10 @@
+# Core: required for formal pptx generation and gate-one structure QA.
+python-pptx
+pillow
+defusedxml
+jieba
+matplotlib
+numpy
+
+# Optional media input. Without it, users must export HEIC/HEIF to JPG first.
+pillow-heif
