@@ -838,7 +838,7 @@ export function Terminal() {
   const greeting = hour < 6 ? "夜深了" : hour < 12 ? "早上好" : hour < 18 ? "下午好" : "晚上好";
 
   return (
-    <div className="relative flex h-full flex-col bg-transparent pb-[env(safe-area-inset-bottom)] text-foreground font-mono text-[length:var(--font-size-base)] leading-[1.618] tracking-[-0.01em]">
+    <div className="@container/conversation relative flex h-full flex-col bg-transparent pb-[env(safe-area-inset-bottom)] text-foreground font-mono text-[length:var(--font-size-base)] leading-[1.618] tracking-[-0.01em]">
       {/* 暖调光晕：静态装饰，衬在消息区后的深空里（仅低透明度，不抢内容） */}
       <div
         aria-hidden
@@ -964,7 +964,7 @@ export function Terminal() {
         className="relative z-10 flex-1 overflow-y-auto px-4 py-4 sm:px-6 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#D4D4D4] [&::-webkit-scrollbar-track]:bg-transparent"
       >
         {/* 居中限宽列：对话内容与输入框同宽对齐（ZCode 式） */}
-        <div className="mx-auto w-full max-w-3xl space-y-4">
+        <div className="conversation-content-column mx-auto space-y-4">
           {hiddenCount > 0 && (
             <button
               onClick={() => setWindowSize((w) => w + RENDER_WINDOW)}
@@ -1013,7 +1013,7 @@ export function Terminal() {
         className={cn(
           isEmpty
             ? "pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-1 overflow-x-hidden overflow-y-auto px-4 py-4 md:justify-start md:gap-0 md:px-0 md:py-0"
-            : "mx-auto w-full max-w-3xl shrink-0 px-4 py-3",
+            : "conversation-content-column mx-auto shrink-0 px-4 py-3",
         )}
       >
         {isEmpty && (
@@ -1039,10 +1039,13 @@ export function Terminal() {
             </div>
           </div>
         )}
+        {/* Visual shell adapted from Z.AI ZCode's ChatPromptEditor and
+            ConversationComposer (Apache-2.0, zai-org/ZCode @ aac4755).
+            OpenCodeCLI keeps its own editor state and session actions. */}
         <div
           className={cn(
-            "group relative flex w-full flex-col rounded-[12px] border border-[#DEDEDE] bg-[#FAFAFA] transition-colors hover:border-[#C8C8C8] focus-within:border-[#E58F67]/70 focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.08)] dark:border-[#333333] dark:bg-[#1A1A1A]/65 dark:backdrop-blur-md dark:hover:border-[#4A4A4A] dark:focus-within:border-[#E58F67]/70 dark:focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.10),0_0_28px_rgba(229,143,103,0.14)]",
-            isEmpty && "pointer-events-auto max-w-3xl",
+            "group relative flex w-full flex-col gap-3 overflow-hidden rounded-2xl border border-[#333333] bg-[#1A1A1A]/65 p-3 transition-colors hover:border-[#4A4A4A] focus-within:border-[#E58F67]/70 focus-within:bg-[#1A1A1A] focus-within:shadow-[0_0_0_3px_rgba(229,143,103,0.10),0_0_28px_rgba(229,143,103,0.14)]",
+            isEmpty && "conversation-content-column pointer-events-auto mx-auto",
           )}
         >
           {/* 附件 chips（命令框上方） */}
@@ -1079,7 +1082,7 @@ export function Terminal() {
             </div>
           )}
           {/* 输入区（两层命令框：输入区 + 底栏，占位随内容增高，垂直居中） */}
-          <div className="flex min-h-[56px] items-center px-4 py-2">
+          <div className="flex min-h-[40px] items-start px-1.5 py-1">
             <textarea
               ref={textareaRef}
               value={input}
@@ -1096,7 +1099,7 @@ export function Terminal() {
                     : "提出后续修改要求"
               }
               disabled={isStreaming || isCompacting}
-              className="max-h-[200px] min-h-[24px] w-full min-w-0 resize-none bg-transparent py-1 text-[length:var(--font-size-base)] text-[#171717] placeholder:text-[#A6A6A6] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+              className="max-h-[160px] min-h-[40px] w-full min-w-0 resize-none bg-transparent py-1 text-[length:var(--font-size-base)] leading-6 text-[#171717] placeholder:text-[#A6A6A6] focus:outline-none disabled:opacity-50 dark:text-zinc-100 dark:placeholder:text-zinc-500"
             />
           </div>
           {/* /compact 进行中：一行状态 + 滑条（agentStatus 已挂上，这里让它可见） */}
@@ -1110,7 +1113,7 @@ export function Terminal() {
             </div>
           )}
           {/* 三明治 ③ 底部工具栏：附件 / 模式徽标 · 模型 / 思考 / 发送 */}
-          <div className="flex items-center justify-between gap-2 border-t border-[#DEDEDE] px-2.5 py-1.5 dark:border-[#2E2E2E]">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-1">
               {/* 附件：+（上传文件） */}
               <button
@@ -1443,7 +1446,7 @@ export function Terminal() {
               ))}
             </div>
             {/* 建议区：三条可点击快捷任务（与输入框同宽对齐，ZCode 式） */}
-            <div className="hidden w-full max-w-3xl space-y-1 md:block">
+            <div className="conversation-content-column hidden space-y-1 md:block">
               {HOME_SUGGESTIONS.map((s) => (
                 <button
                   key={s.text}
