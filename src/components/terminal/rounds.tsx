@@ -592,6 +592,7 @@ export function StepCard({
 
   return (
     <motion.div
+      layout
       initial={fadeUp.initial}
       animate={fadeUp.animate}
       transition={fadeUp.transition}
@@ -600,6 +601,7 @@ export function StepCard({
       <button
         onClick={() => !running && setCollapsed((c) => !c)}
         disabled={running}
+        aria-expanded={expanded}
         className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-[transform,color,background-color] duration-150 hover:bg-white/5 disabled:cursor-default group-hover/step:-translate-y-px dark:hover:bg-white/5"
       >
         <ChevronRight className={cn("h-3.5 w-3.5 shrink-0 text-[#8C8C8C] transition-transform", expanded && "rotate-90")} />
@@ -629,37 +631,46 @@ export function StepCard({
         {running && <Dots className="ml-auto" />}
         {!running && <span className="ml-auto text-[#8C8C8C]">{expanded ? "收起" : "展开"}</span>}
       </button>
-      {expanded && (
-        <div className="ml-6 mb-1 overflow-hidden rounded-lg border border-[#333333] bg-[#0A0A0A]">
-          {running ? (
-            <div className="space-y-0.5 px-3 py-2 text-xs">
-              {Object.entries(args).slice(0, 6).map(([k, v]) => (
-                <div key={k} className="flex gap-2">
-                  <span className="shrink-0 text-[#8C8C8C]">{k}:</span>
-                  <span className="break-all text-[#A6A6A6]">{formatArgValue(v)}</span>
-                </div>
-              ))}
-            </div>
-          ) : result?.plan ? (
-            <div className="px-3 py-2 text-xs text-[#A6A6A6]">计划已更新 · 可在右侧 Plan 面板查看</div>
-          ) : diff ? (
-            <DiffView before={diff.before} after={diff.after} />
-          ) : output ? (
-            <div className="px-3 py-2">
-              {meta.kind === "terminal" && command && (
-                <div className="mb-1.5 font-mono text-xs text-[#8C8C8C]">$ {command}</div>
-              )}
-              <pre className={cn("max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333333]", toneText(tone))}>
-                {output}
-              </pre>
-            </div>
-          ) : (
-            <div className={cn("px-3 py-2 text-xs", ok ? "text-emerald-500 dark:text-[#34d399]" : "text-[#E54D2E]")}>
-              {ok ? "完成" : "失败"}
-            </div>
-          )}
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            key="step-detail"
+            initial={{ opacity: 0, height: 0, y: -3 }}
+            animate={{ opacity: 1, height: "auto", y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -2 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="ml-6 mb-1 overflow-hidden rounded-lg border border-[#333333] bg-[#0A0A0A]"
+          >
+            {running ? (
+              <div className="space-y-0.5 px-3 py-2 text-xs">
+                {Object.entries(args).slice(0, 6).map(([k, v]) => (
+                  <div key={k} className="flex gap-2">
+                    <span className="shrink-0 text-[#8C8C8C]">{k}:</span>
+                    <span className="break-all text-[#A6A6A6]">{formatArgValue(v)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : result?.plan ? (
+              <div className="px-3 py-2 text-xs text-[#A6A6A6]">计划已更新 · 可在右侧 Plan 查看</div>
+            ) : diff ? (
+              <DiffView before={diff.before} after={diff.after} />
+            ) : output ? (
+              <div className="px-3 py-2">
+                {meta.kind === "terminal" && command && (
+                  <div className="mb-1.5 font-mono text-xs text-[#8C8C8C]">$ {command}</div>
+                )}
+                <pre className={cn("max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#333333]", toneText(tone))}>
+                  {output}
+                </pre>
+              </div>
+            ) : (
+              <div className={cn("px-3 py-2 text-xs", ok ? "text-emerald-500 dark:text-[#34d399]" : "text-[#E54D2E]")}>
+                {ok ? "完成" : "失败"}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
