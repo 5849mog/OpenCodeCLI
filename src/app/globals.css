@@ -3,6 +3,26 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Keep the conversation and composer on the same responsive width scale.
+   This follows ZCode's conversation layout: 3xl for narrow panes, 4xl on
+   medium panes, and 6xl when the conversation has room to breathe. */
+.conversation-content-column {
+  width: 100%;
+  max-width: 48rem;
+}
+
+@container conversation (min-width: 864px) {
+  .conversation-content-column {
+    max-width: 56rem;
+  }
+}
+
+@container conversation (min-width: 1136px) {
+  .conversation-content-column {
+    max-width: 72rem;
+  }
+}
+
 @theme inline {
   --breakpoint-tablet: 64rem;
   --breakpoint-desktop: 80rem;
