@@ -1,7 +1,7 @@
 "use client";
 
-import { useDeferredValue, useState, useEffect, useMemo } from "react";
-import { motion } from "framer-motion";
+import { useDeferredValue, useState, useEffect, useMemo, useRef } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { AppIcon } from "@/components/ui/app-icon";
 import { fadeUpSmall } from "@/lib/motion";
 import { useSession } from "@/store/session";
@@ -13,7 +13,7 @@ import { MarkdownRenderer, CopyButton } from "./markdown";
 import { CollapsibleText } from "../collapsible-text";
 import { ThinkingStep, formatDuration } from "./rounds";
 import {
-  ArrowUp, X, ChevronRight, XCircle, RefreshCw, ClipboardList, Pencil, ThumbsUp, ThumbsDown} from "lucide-react";
+  ArrowUp, X, ChevronRight, XCircle, RefreshCw, ClipboardList, Pencil, ThumbsUp, ThumbsDown, LoaderCircle} from "lucide-react";
 
 export function UserRow({
   text,
@@ -26,15 +26,55 @@ export function UserRow({
 }) {
   const imgs = (attachments ?? []).filter((a) => a.dataUrl);
   const rewriteFromMessage = useSession((s) => s.rewriteFromMessage);
+  const isStreaming = useSession((s) => s.isStreaming);
   const [editing, setEditing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [draft, setDraft] = useState(text);
-  const submitEdit = () => {
-    if (!draft.trim()) return;
-    setEditing(false);
-    void rewriteFromMessage(eventId, draft);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!editing) setDraft(text);
+  }, [editing, text]);
+
+  useEffect(() => {
+    if (!editing) return;
+    const frame = requestAnimationFrame(() => {
+      const element = textareaRef.current;
+      if (!element) return;
+      element.style.height = "0px";
+      element.style.height = `${Math.min(element.scrollHeight, 240)}px`;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editing]);
+
+  const resizeTextarea = (element: HTMLTextAreaElement | null) => {
+    if (!element) return;
+    element.style.height = "0px";
+    element.style.height = `${Math.min(element.scrollHeight, 240)}px`;
   };
+
+  const cancelEdit = () => {
+    if (submitting) return;
+    setDraft(text);
+    setEditing(false);
+  };
+
+  const submitEdit = async () => {
+    const next = draft.trim();
+    if (!next || submitting || isStreaming) return;
+    setSubmitting(true);
+    try {
+      await rewriteFromMessage(eventId, next);
+      setEditing(false);
+    } catch {
+      toast.error("重新提交失败，请再试一次");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col items-end gap-1">
+    <motion.div layout className="group/user-row flex min-w-0 flex-col items-end gap-1">
       {imgs.length > 0 && (
         <div className="flex flex-wrap justify-end gap-2">
           {imgs.map((a) => (
@@ -47,62 +87,95 @@ export function UserRow({
           ))}
         </div>
       )}
-      {editing ? (
-        <div className="w-full max-w-[80%] rounded-2xl rounded-br-md border border-[#E58F67]/40 bg-[#262626] px-4 py-2.5">
-          <textarea
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setEditing(false);
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submitEdit();
-            }}
-            rows={Math.min(8, Math.max(1, draft.split("\n").length))}
-            className="w-full resize-none bg-transparent text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
-            placeholder="输入修改后的消息…"
-          />
-          <div className="mt-1.5 flex items-center justify-end gap-1.5">
-            <button
-              onClick={() => setEditing(false)}
-              className="flex h-7 w-7 items-center justify-center rounded text-[#A6A6A6] transition-colors hover:bg-white/10"
-              title="取消"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={submitEdit}
-              disabled={!draft.trim()}
-              className="flex h-7 w-7 items-center justify-center rounded bg-[#333333] text-zinc-200 transition-colors hover:bg-[#4a4740] disabled:opacity-40"
-              title="发送并重新开始"
-            >
-              <ArrowUp className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="max-w-[75%] rounded-[10px] bg-[#F5F5F5] px-4 py-2.5 text-[#262626] dark:bg-[#2A2A2A] dark:text-zinc-100">
-            <CollapsibleText text={text} render={(t) => <MarkdownRenderer text={t} />} />
-          </div>
-          <div className="flex items-center gap-0.5 pr-1 text-[#A6A6A6] dark:text-zinc-500">
-            <CopyButton text={text} />
-            <button
-              onClick={() => {
-                setDraft(text);
-                setEditing(true);
+      <AnimatePresence mode="wait" initial={false}>
+        {editing ? (
+          <motion.div
+            key="edit"
+            layout
+            initial={{ opacity: 0, y: 6, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 3, scale: 0.99 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full max-w-[min(80%,680px)] overflow-hidden rounded-2xl rounded-br-md border border-[#E58F67]/35 bg-[#1b1b1b] shadow-[0_8px_28px_rgba(0,0,0,0.16)] ring-1 ring-white/[0.025] dark:bg-[#202020]"
+            data-testid="user-message-edit-composer"
+          >
+            <textarea
+              ref={textareaRef}
+              autoFocus
+              value={draft}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                resizeTextarea(e.target);
               }}
-              className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300"
-              title="修改"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </>
-      )}
-    </div>
+              onKeyDown={(e) => {
+                if (e.key === "Escape") cancelEdit();
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  void submitEdit();
+                }
+              }}
+              disabled={submitting}
+              rows={1}
+              className="max-h-[240px] min-h-[42px] w-full resize-none overflow-y-auto bg-transparent px-4 pb-2 pt-3 text-sm leading-6 text-zinc-100 placeholder:text-zinc-500 focus:outline-none disabled:opacity-70"
+              placeholder="修改这条消息…"
+              aria-label="编辑已发送的消息"
+            />
+            <div className="flex items-center justify-between gap-3 border-t border-white/[0.06] px-3 py-2">
+              <span className="hidden text-[11px] text-zinc-500 sm:block">修改后会从这里重新运行</span>
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  onClick={cancelEdit}
+                  disabled={submitting}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-100 disabled:opacity-50"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  取消
+                </button>
+                <button
+                  onClick={() => void submitEdit()}
+                  disabled={!draft.trim() || submitting || isStreaming}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#E58F67] px-3 text-xs font-medium text-[#1b1714] transition-[background,transform,box-shadow] duration-150 hover:bg-[#efa37d] hover:shadow-[0_0_18px_rgba(229,143,103,0.18)] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {submitting ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ArrowUp className="h-3.5 w-3.5" />}
+                  {submitting ? "正在重新运行" : "重新发送"}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="message"
+            layout
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -3 }}
+            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+            className="flex max-w-full flex-col items-end gap-1"
+          >
+            <div className="max-w-[min(75%,680px)] rounded-[14px] rounded-br-[5px] bg-[#F5F5F5] px-4 py-2.5 text-[#262626] shadow-[0_1px_2px_rgba(0,0,0,0.035)] dark:bg-[#292929] dark:text-zinc-100">
+              <CollapsibleText text={text} render={(t) => <MarkdownRenderer text={t} />} />
+            </div>
+            <div className="flex items-center gap-0.5 pr-1 text-[#A6A6A6] opacity-100 transition-opacity duration-150 dark:text-zinc-500 sm:opacity-0 sm:group-hover/user-row:opacity-100 sm:group-focus-within/user-row:opacity-100">
+              <CopyButton text={text} />
+              <button
+                onClick={() => {
+                  setDraft(text);
+                  setEditing(true);
+                }}
+                disabled={isStreaming}
+                className="flex h-7 w-7 items-center justify-center rounded transition-colors hover:bg-[#F0F0F0] hover:text-[#383838] dark:hover:bg-[#2A2A2A] dark:hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-40"
+                title="编辑并重新运行"
+                aria-label="编辑这条消息并重新运行"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
-
 export function AssistantRow({
   text,
   reasoning,
